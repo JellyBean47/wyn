@@ -1,0 +1,31 @@
+{
+  "id": "fallout-4",
+  "name": "Fallout 4",
+  "publisher": "Bethesda Softworks",
+  "steamAppId": 377160,
+  "exePatterns": [
+    "fallout4.exe",
+    "fallout4launcher.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "Creation Engine DX11 → D3DMetal, same family as Skyrim SE. Steam launches Fallout4Launcher.exe; launch Fallout4.exe directly with SteamAppId=377160. cxcompatdb auto-picks DXMT for this exe unless CX_GRAPHICS_BACKEND=d3dmetal (that is the input override; CX_ACTIVE_GRAPHICS_BACKEND is only what it writes afterwards). Prefs live in Documents\\My Games\\Fallout4. Keep iPresentInterval=1 — FO4 physics breaks above ~60 fps. Do not use Libraries.rgl or Libraries.vk."
+}

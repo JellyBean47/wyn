@@ -1,0 +1,31 @@
+{
+  "id": "cities-skylines",
+  "name": "Cities: Skylines",
+  "publisher": "Colossal Order / Paradox Interactive",
+  "steamAppId": 255710,
+  "exePatterns": [
+    "cities.exe",
+    "dowser.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": false,
+    "metalHud": true
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "-force-d3d11 -screen-width 1920 -screen-height 1080 -screen-fullscreen 1 -popupwindow",
+  "notes": "Unity 5.6.7f1 D3D11 → D3DMetal (Cyberpunk/FO4 class, not NMS Vulkan). Native macOS depot exists because Unity shipped a Mac player; Windows PE is Cities.exe. Steam's default target is Paradox dowser.exe — skip it. Do not set unix TMPDIR to a Windows path; CodeWeavers TMPDIR fix is the Windows registry Environment key (saves/mods). cxcompatdb can auto-pick DXMT for this DX11 exe unless CX_GRAPHICS_BACKEND=d3dmetal. Play script: bash .scratch/cities-skylines-20260815/play-cities-skylines.sh. Do not use Libraries.rgl or Libraries.vk. Do not claim the user has played it until they have."
+}

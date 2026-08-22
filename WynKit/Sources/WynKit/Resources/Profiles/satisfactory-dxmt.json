@@ -1,0 +1,28 @@
+{
+  "id": "satisfactory-dxmt",
+  "name": "Satisfactory (DXMT — crashes)",
+  "publisher": "Coffee Stain Publishing",
+  "steamAppId": 526870,
+  "exePatterns": [
+    "factorygamesteam.exe",
+    "factorygame.exe",
+    "factorygamesteam-win64-shipping.exe",
+    "factorygame-win64-shipping.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxmt",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "dxgi,d3d11,d3d10core=n,b",
+    "MTL_HUD_ENABLED": "0"
+  },
+  "winetricks": ["vcrun2019", "vcrun2022"],
+  "launchArgs": "-dx11 -USEALLAVAILABLECORES -Nosplash -ResX=1280 -ResY=720",
+  "unrealProject": "FactoryGame",
+  "notes": "REJECTED 5 Aug: DXMT loads Apple M4 FL11_1 then RHIThread assert TOptional<FTimestampCalibration> unset (UE D3D11RHI). Factory Crash Reporter. Keep for science; use satisfactory (D3DMetal) to play."
+}

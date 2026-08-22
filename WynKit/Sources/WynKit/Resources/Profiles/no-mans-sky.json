@@ -1,0 +1,27 @@
+{
+  "id": "no-mans-sky",
+  "name": "No Man's Sky",
+  "publisher": "Hello Games",
+  "steamAppId": 275850,
+  "exePatterns": [
+    "nms.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "vulkan-1=b",
+    "MVK_CONFIG_USE_METAL_PRIVATE_API": "1"
+  },
+  "winetricks": [
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "DEFER: play the native macOS Steam build (Metal). Windows NMS via Wine is lab-only — Vulkan stack notes in HANDOFF.md §2.4–2.5. Do not treat Tools/sikarugir-nms.sh as a daily play path."
+}

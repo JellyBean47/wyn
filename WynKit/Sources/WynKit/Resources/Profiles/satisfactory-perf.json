@@ -1,0 +1,35 @@
+{
+  "id": "satisfactory-perf",
+  "name": "Satisfactory (frame pacing / hitch test)",
+  "publisher": "Coffee Stain Publishing",
+  "steamAppId": 526870,
+  "exePatterns": [
+    "factorygamesteam.exe",
+    "factorygame.exe",
+    "factorygamesteam-win64-shipping.exe",
+    "factorygame-win64-shipping.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1",
+    "D3DM_ENABLE_ASYNC_COMMIT": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "-NO_EOS_OVERLAY -dx11 -USEALLAVAILABLECORES -Nosplash -ResX=1280 -ResY=720",
+  "unrealProject": "FactoryGame",
+  "notes": "Live CX cmdline match + ASYNC_COMMIT. Sit still 60s after navmesh quiet; Metal HUD. After: Tools/analyze-satisfactory-perf.sh."
+}

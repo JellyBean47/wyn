@@ -1,0 +1,34 @@
+{
+  "id": "ready-or-not",
+  "name": "Ready or Not",
+  "publisher": "VOID Interactive",
+  "steamAppId": 1144200,
+  "exePatterns": [
+    "readyornotsteam-win64-shipping.exe",
+    "readyornot-win64-shipping.exe",
+    "readyornot.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "-dx12 -NO_EOS_OVERLAY -ResX=1920 -ResY=1080 -fullscreen",
+  "unrealProject": "ReadyOrNot",
+  "notes": "UE5 DX12 → D3DMetal. Steam launches ReadyOrNot.exe -dx12 (also has a -dx11 option); that stub only waits on ReadyOrNotSteam-Win64-Shipping.exe. Launch the shipping exe directly with SteamAppId=1144200 and CX_GRAPHICS_BACKEND=d3dmetal. Game-dir D3D12/D3D12Core.dll is the UE5 agility SDK — if device creation fails, rename that folder. No Easy Anti-Cheat files in this build (Steam appinfo still mentions the Proton EAC runtime tool). EOS overlay disabled via -NO_EOS_OVERLAY. Do not use Libraries.rgl or Libraries.vk."
+}

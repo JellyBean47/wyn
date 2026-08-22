@@ -1,0 +1,17 @@
+{
+  "id": "lethal-company",
+  "name": "Lethal Company",
+  "publisher": "Zeekerss",
+  "steamAppId": 1966720,
+  "exePatterns": ["lethal company.exe", "Lethal Company.exe"],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": ["vcrun2019"],
+  "notes": "Unity title; DXVK path often more stable than D3DMetal for this game."
+}

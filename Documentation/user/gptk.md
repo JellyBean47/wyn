@@ -1,0 +1,41 @@
+# Apple GPTK / D3DMetal (optional)
+
+Wyn’s default graphics path is **DXMT** (MIT v0.80 in frankea Wine) and
+**DXVK-macOS**. D3DMetal is optional.
+
+## What Wyn will not do
+
+- Put GPTK files in git or GitHub Releases
+- Download GPTK from Apple or from unofficial mirrors
+- Reverse-engineer D3DMetal
+- Treat GPTK as required for a source build
+
+## What you may do
+
+If you already obtained Game Porting Toolkit from Apple for your own
+evaluation/development use, you may point Wyn at that local redist:
+
+```bash
+wyn gptk install --from /path/to/redist
+wyn gptk status
+```
+
+`--from` is required. Wyn does not search `~/Desktop/wyn/whisky-wine`.
+
+## Terms
+
+The GPTK Software License Agreement is a **personal**, limited license for
+installing and testing in connection with developing, testing, or evaluating
+video games on Apple-branded hardware. Distribution of Redistributables is
+limited to **non-commercial** use. Reverse engineering and modification of
+Apple Software are prohibited except as the agreement allows for included
+open-source pieces.
+
+Whether using D3DMetal as a general end-user game launcher fits section 2.A
+is **not settled here**. That is not legal advice; read the SLA that shipped
+with your toolkit (and consider counsel before shipping a product that depends
+on D3DMetal). CodeWeavers licenses D3DMetal separately for CrossOver; Wyn does
+not.
+
+Official download:
+https://developer.apple.com/download/all/?q=game%20porting%20toolkit

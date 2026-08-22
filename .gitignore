@@ -1,0 +1,83 @@
+.DS_Store
+.build/
+.swiftpm/
+DerivedData/
+*.swp
+*~
+*.log
+
+# Xcode user state
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcuserstate
+
+# Vendor / research clones (never commit)
+whisky-upstream/
+whisky-wine/
+.scratch/
+.cursor/
+
+# Operational notes with PII / bottle IDs (private).
+# Public docs live in Documentation/ because macOS is often case-insensitive
+# and Docs/ == docs/.
+HANDOFF.md
+Docs/HANDOVER-*
+Docs/PLAN-*
+Docs/BLUEPRINT-*
+Docs/XBOX-*
+Docs/scratch*
+Docs/windows-*
+
+# Built helpers and Wine objects
+Tools/bin/
+Tools/.restore-bak-*/
+Tools/triton/
+Tools/eos-secret-proxy.py
+Tools/eos-job-hold.c
+Tools/sync-eos-ab.sh
+Tools/cx-present-log-only-run.sh
+Tools/cx-connect-instruments.sh
+Tools/dump-crossover-env.sh
+Tools/wine-host-ab.sh
+Tools/fly-p0c-install-host.sh
+Tools/fly-install-moltenvk-nms.sh
+Tools/sikarugir-*.sh
+
+# Archives and installers
+*.tar.gz
+*.tar.xz
+*.tgz
+*.zip
+*.dmg
+*.pkg
+*.exe
+*.msi
+*.dll
+*.so
+*.dylib
+
+# Apple GPTK / D3DMetal (any path)
+D3DMetal.framework/
+libd3dshared.dylib
+libmetalirconverter.dylib
+**/GPTK/redist*/
+**/lib/external/D3DMetal.framework/**
+**/lib/external/libd3dshared.dylib
+
+# Microsoft / fonts
+*.ttf
+*.otf
+d3dcompiler_47.dll
+
+# Runtime / bottles (never in this repo)
+Bottles/
+Libraries/
+Libraries.*/
+*.bottle
+user.dat
+ConnectSecureStorage.dat
+
+# Env and secrets
+.env
+.env.*
+credentials.json

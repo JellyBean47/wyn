@@ -1,0 +1,28 @@
+Wyn
+Copyright (C) 2024–2026 Wyn contributors
+Copyright (C) 2023 Isaac Marovitz and Whisky contributors (original WhiskyKit)
+
+This product is a modified version of Whisky
+(https://github.com/Whisky-App/Whisky), licensed under the GNU General
+Public License version 3 or later. See LICENSE.
+
+Wyn does not include, and must never ship, Apple Game Porting Toolkit,
+D3DMetal.framework, libd3dshared.dylib, or libmetalirconverter.dylib.
+Those components are Apple proprietary software. Users who want D3DMetal
+must obtain Game Porting Toolkit from Apple and install it locally
+(`wyn gptk install --from <path>`). See DEPENDENCIES.md.
+
+Wine, DXVK, DXMT, MoltenVK, and other third-party runtimes are fetched
+at install time from the publishers listed in DEPENDENCIES.md. They are
+not part of this source repository.
+
+Trademarks: Whisky, Wine, Heroic, Steam, Epic Games, Battle.net, EA,
+GOG, Apple, Metal, and D3DMetal are marks of their respective owners.
+This project is not affiliated with CodeWeavers, Apple, Valve, or
+Whisky-App.
+
+Apache-2.0 components (see docs/licenses/Apache-2.0.txt):
+  - swift-argument-parser (Apple)
+  - SemanticVersion (Swift Package Index)
+
+Full third-party notices: THIRD_PARTY_LICENSES.md

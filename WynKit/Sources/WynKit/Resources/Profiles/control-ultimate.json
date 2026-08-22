@@ -1,0 +1,33 @@
+{
+  "id": "control-ultimate",
+  "name": "Control Ultimate Edition",
+  "publisher": "Remedy Entertainment",
+  "steamAppId": 870780,
+  "exePatterns": [
+    "control_dx12.exe",
+    "control_dx11.exe",
+    "control.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true,
+    "dxrEnabled": true
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "Northlight DX12 → D3DMetal. Steam's default launch target is Control.exe, a WinForms DX11/DX12 picker (Mono/.NET), not the engine. Launch Control_DX12.exe directly with SteamAppId=870780 so Steamworks still initialises. Do not use Libraries.rgl or Libraries.vk. DLSS (nvngx_dlss.dll) cannot run on Apple Silicon; the in-game toggle should disable itself. Ray tracing is DXR via D3DMetal and is viable on M3/M4. First run will hitch on PSO translation (DXIL→AIR); subsequent runs cache. renderer.ini lives in the game folder after the first boot."
+}

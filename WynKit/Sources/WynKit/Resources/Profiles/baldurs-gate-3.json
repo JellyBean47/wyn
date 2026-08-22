@@ -1,0 +1,16 @@
+{
+  "id": "baldurs-gate-3",
+  "name": "Baldur's Gate 3",
+  "publisher": "Larian Studios",
+  "steamAppId": 1086940,
+  "exePatterns": ["bg3.exe", "bg3_dx11.exe"],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "enhancedSync": "msync",
+    "avxEnabled": true
+  },
+  "environment": {},
+  "winetricks": ["vcrun2019", "dotnet48"],
+  "notes": "Use D3DMetal path. dotnet48 may be required for launcher."
+}

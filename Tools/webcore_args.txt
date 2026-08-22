@@ -1,0 +1,5 @@
+--no-sandbox
+--in-process-gpu
+--disable-gpu-compositing
+--use-gl=angle
+--use-angle=swiftshader-webgl
