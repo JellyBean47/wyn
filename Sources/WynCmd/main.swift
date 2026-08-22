@@ -11,7 +11,7 @@ extension TranslationLayer: @retroactive ExpressibleByArgument {}
 struct WynCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "wyn",
-        abstract: "Wyn — a macOS gaming translation layer built on Wine, GPTK, and DXVK.",
+        abstract: "Wyn — a macOS Wine wrapper for Windows games (DXVK/DXMT; optional user-supplied D3DMetal).",
         subcommands: [
             Install.self,
             List.self,

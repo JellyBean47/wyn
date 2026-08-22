@@ -77,7 +77,7 @@ Libraries.*/
 user.dat
 ConnectSecureStorage.dat
 
-# Env and secrets
-.env
+.tmp-*
+
 .env.*
 credentials.json
