@@ -38,11 +38,11 @@ public enum GameLibrary {
         return data.loadBottles().first { $0.settings.name == SteamLauncher.defaultBottleName }
     }
 
-    /// Wine tree, Steam bottle, or GPTK payload missing — first-run sheet.
+    /// Wine tree or Steam bottle missing — first-run sheet.
+    /// GPTK/D3DMetal is optional (FOSS default is DXMT/DXVK).
     public static func needsSetup() -> Bool {
         !WynWineInstaller.isWynWineInstalled()
             || steamBottle() == nil
-            || !GPTKInstaller.isInstalled()
     }
 
     /// Profiles shown in the library catalog. Skips Steam-client JSON and extra Satisfactory variants.

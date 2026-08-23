@@ -289,14 +289,12 @@ public enum SteamLauncher {
         var steamOptions = options
         let environment: [String: String]
 
-        // Game host unless frankea rollback was requested.
-        let useGameHost = !options.preferFrankeaSteam
+        // Game host only when Wine can load D3DMetal. Fresh FOSS setup
+        // (frankea DXMT/DXVK) has no CX_APPLEGPTK hooks — stay on frankea.
+        let useGameHost = !options.preferFrankeaSteam && GPTKInstaller.isWineGPTKAware()
         if useGameHost {
             guard WynWineInstaller.isWynWineInstalled() else {
                 throw SteamError.steamWineMissing
-            }
-            guard GPTKInstaller.isWineGPTKAware() else {
-                throw Wine.D3DMetalError.wineNotGPTKAware
             }
             try prepareGameHostSteam(
                 in: bottle,

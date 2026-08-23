@@ -19,7 +19,7 @@ Game Porting Toolkit / D3DMetal, store clients, or game files.
 ## Clone, build, run
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/JellyBean47/wyn.git
 cd wyn
 ./scripts/check-environment.sh
 ./scripts/build.sh
@@ -52,7 +52,10 @@ swift build -c release
 `brew install --cask heroic`, then use the Epic / GOG tiles. Wyn will not
 run `brew` unless you set `WYN_ALLOW_BREW_HEROIC=1`.
 
-**Steam:** `wyn steam install` downloads Valve’s official `SteamSetup.exe`.
+**Steam + first game:** see [Documentation/user/install.md](Documentation/user/install.md).
+Short version: `wyn steam install`, `wyn steam launch`, install the title in
+Steam (RV There Yet? is app 3949040), then click the tile or `wyn play rv-there-yet`.
+Wyn never downloads the game.
 
 **Battle.net / EA:** Wyn can download those vendors’ official Windows
 installers when you click Install. Epic and GOG in Wine are not the product
