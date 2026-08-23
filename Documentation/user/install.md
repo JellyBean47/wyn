@@ -27,10 +27,12 @@ cd wyn
 `build.sh` produces:
 
 - CLI: `./.build/release/wyn`
-- App: `/tmp/WynDerivedData/Build/Products/Release/Wyn.app`
+- App: `/Applications/Wyn.app` (copied from the Xcode build). Spotlight and
+  Launchpad find **Wyn**. A local compile is ad-hoc signed and usually has no
+  quarantine, so Gatekeeper does not block it.
 
-There is also an undocumented `./install.sh` (same three scripts, then copies
-the CLI to `~/.local/bin/wyn` and a `fly` symlink).
+`./install.sh` runs check + build + setup + Wine Mono, then copies the CLI to
+`~/.local/bin/wyn` (and a `fly` symlink).
 
 ## 3. FOSS Wine runtime
 
@@ -60,10 +62,37 @@ One-shot CLI (Wine + Steam bottle, optional installer download):
 ./.build/release/wyn install --skip-steam-download
 ```
 
-## 4. Open the app
+## 4. Wine Mono (do this in Terminal)
+
+Wine's first bottle run pops a **Wine Mono** installer. That GUI hangs
+(stuck at 0% CPU). Skip it. After Wine is on disk, download the official
+MSI from WineHQ into the Wine tree so `wineboot` never needs the dialog:
 
 ```bash
-open /tmp/WynDerivedData/Build/Products/Release/Wyn.app
+./scripts/install-wine-mono.sh
+```
+
+That curls `wine-mono-10.4.1-x86.msi` (~82 MB) into
+`~/Library/Application Support/com.fly.gaming/Libraries/Wine/share/wine/mono/`.
+Do this **before** `wyn steam install` / `wyn steam launch`.
+
+If the dialog already appeared, close it and install into the bottle:
+
+```bash
+./scripts/install-wine-mono.sh --into-bottle
+```
+
+Do not copy Mono from an old Wyn install. A git-clone first run should
+only use WineHQ.
+
+Wine Gecko (HTML) is the same class of dialog. If that one hangs, the
+same idea applies: put the official MSI under `share/wine/gecko/` from
+https://dl.winehq.org/wine/wine-gecko/ instead of clicking Install.
+
+## 5. Open the app
+
+```bash
+open /Applications/Wyn.app
 # or
 ./.build/release/wyn --help
 ```
@@ -71,9 +100,12 @@ open /tmp/WynDerivedData/Build/Products/Release/Wyn.app
 GPTK/D3DMetal is optional. The first-run sheet should clear once Wine and a
 Steam bottle exist. Default graphics are DXMT and DXVK.
 
-## 5. Steam + first game (RV There Yet?)
+## 6. Steam + first game (RV There Yet?)
 
 Wyn never downloads a Steam title. Steam does.
+
+Run `./scripts/install-wine-mono.sh` first (section 4) so first-boot
+does not open the hung Wine Mono window.
 
 ```bash
 ./.build/release/wyn steam install     # downloads and runs SteamSetup.exe
@@ -92,7 +124,7 @@ Wyn.app or:
 written `appmanifest_3949040.acf`. The profile lists `vcrun2019`; Wyn does
 **not** run winetricks automatically.
 
-## 6. Optional D3DMetal
+## 7. Optional D3DMetal
 
 1. Download Game Porting Toolkit from Apple (Apple ID required).
 2. Read the included Software License Agreement.
@@ -111,7 +143,7 @@ wyn runtime install --gptk-aware
 That is a different hash-pinned tarball (still without Apple blobs). Default
 setup stays on frankea Wine (DXMT/DXVK).
 
-## 7. Other stores
+## 8. Other stores
 
 - **Epic / GOG:** install [Heroic](https://heroicgameslauncher.com), then use
   those tiles. Wyn does not `brew install heroic` unless
@@ -121,7 +153,7 @@ setup stays on frankea Wine (DXMT/DXVK).
 Wyn does **not** install or launch Xbox Game Pass, the Xbox app, UTM, or a
 Windows VM.
 
-## 8. On disk
+## 9. On disk
 
 - Wine: `~/Library/Application Support/com.fly.gaming/Libraries/`
 - Bottles: `~/Library/Containers/com.fly.gaming/Bottles/`

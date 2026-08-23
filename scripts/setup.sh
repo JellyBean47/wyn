@@ -54,6 +54,8 @@ echo "==> installing into ~/Library/Application Support/com.fly.gaming/"
 
 echo
 echo "FOSS Wine runtime installed (DXMT/DXVK; no D3DMetal)."
+echo "Wine Mono (do this in Terminal; the GUI installer hangs):"
+echo "  ./scripts/install-wine-mono.sh"
 echo "GPTK is optional and user-supplied: wyn gptk install --from <redist>"
 echo "Steam client: wyn steam install"
 echo "Heroic (Epic/GOG): https://heroicgameslauncher.com"

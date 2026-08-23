@@ -40,6 +40,19 @@ after `wyn gptk install --from`.
 - **SHA-256:** `645917a4135c2ce83047186b6a352bf0d03ff785468e0c276db800ae044ab634`
 - **Corresponding source:** https://www.codeweavers.com/crossover/source (Wine LGPL); MoltenVK; DXVK 2.7.1
 
+## Wine Mono (WineHQ, first-run)
+
+Wine 11.0's GUI `install_mono` dialog hangs. `./scripts/install-wine-mono.sh`
+downloads the official MSI into the installed Wine tree so wineboot never
+needs that window.
+
+- **Name:** Wine Mono Runtime
+- **Version:** `10.4.1` (`WINE_MONO_VERSION` in `scripts/runtime-pins.env`)
+- **URL:** https://dl.winehq.org/wine/wine-mono/10.4.1/wine-mono-10.4.1-x86.msi
+- **Size:** 85504000 bytes
+- **License:** Wine Mono / MIT-style (Wine Project)
+- **Not copied from a parked Wyn install.** Git-clone first run uses WineHQ only.
+
 ## Official store installer URLs (user action only)
 
 Wyn may download these into `~/Library/Application Support/com.fly.gaming/Installers/`
