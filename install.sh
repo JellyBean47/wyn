@@ -7,6 +7,7 @@ cd "$(dirname "$0")"
 ./scripts/check-environment.sh
 ./scripts/build.sh
 ./scripts/setup.sh
+./scripts/install-wine-mono.sh
 
 BIN_DIR="${HOME}/.local/bin"
 mkdir -p "$BIN_DIR"
@@ -16,6 +17,7 @@ ln -sfn "$BIN_DIR/wyn" "$BIN_DIR/fly"
 
 echo
 echo "Installed $BIN_DIR/wyn (also linked as fly)"
+echo "App:               /Applications/Wyn.app"
 if [[ ":${PATH}:" != *":${BIN_DIR}:"* ]]; then
   echo "Add to ~/.zshrc:  export PATH=\"${BIN_DIR}:\$PATH\""
 fi

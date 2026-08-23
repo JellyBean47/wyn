@@ -33,7 +33,7 @@ GPTK files. It does not install Steam games or GPTK.
 Then:
 
 ```bash
-open /tmp/WynDerivedData/Build/Products/Release/Wyn.app
+open /Applications/Wyn.app
 # or
 ./.build/release/wyn --help
 ```
@@ -53,9 +53,10 @@ swift build -c release
 run `brew` unless you set `WYN_ALLOW_BREW_HEROIC=1`.
 
 **Steam + first game:** see [Documentation/user/install.md](Documentation/user/install.md).
-Short version: `wyn steam install`, `wyn steam launch`, install the title in
-Steam (RV There Yet? is app 3949040), then click the tile or `wyn play rv-there-yet`.
-Wyn never downloads the game.
+Short version: `./scripts/install-wine-mono.sh` (WineHQ MSI; the Wine Mono
+GUI hangs), then `wyn steam install`, `wyn steam launch`, install the title
+in Steam (RV There Yet? is app 3949040), then click the tile or
+`wyn play rv-there-yet`. Wyn never downloads the game.
 
 **Battle.net / EA:** Wyn can download those vendors’ official Windows
 installers when you click Install. Epic and GOG in Wine are not the product
