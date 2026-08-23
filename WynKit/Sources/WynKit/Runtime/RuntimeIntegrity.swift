@@ -94,8 +94,10 @@ public enum RuntimeIntegrity {
         process.standardOutput = out
         process.standardError = err
         try process.run()
-        process.waitUntilExit()
+        // Drain stdout before waitUntilExit. A 317 MB Wine listing fills the
+        // pipe (~64 KB) and deadlocks tar if we wait first.
         let listing = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        process.waitUntilExit()
         if process.terminationStatus != 0 {
             let e = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
             throw IntegrityError.tarListFailed(e.isEmpty ? "tar exit \(process.terminationStatus)" : e)

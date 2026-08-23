@@ -55,6 +55,10 @@ public class WynWineInstaller {
         if FileManager.default.fileExists(atPath: dedicatedWine.path(percentEncoded: false)) {
             return dedicated
         }
+        let fossWine = libraryFolder.appending(path: "Wine").appending(path: "bin").appending(path: "wine64")
+        if FileManager.default.fileExists(atPath: fossWine.path(percentEncoded: false)) {
+            return libraryFolder
+        }
         return preGPTKAwareBackupFolder
     }
 
@@ -85,14 +89,22 @@ public class WynWineInstaller {
         } else {
             let bak = preGPTKAwareBackupFolder
             let bakWine = bak.appending(path: "Wine").appending(path: "bin").appending(path: "wine64")
-            guard fm.fileExists(atPath: bakWine.path(percentEncoded: false)) else {
+            let fossWine = libraryFolder.appending(path: "Wine").appending(path: "bin").appending(path: "wine64")
+            // Fresh FOSS setup only has Libraries/. The pre-GPTK bak exists
+            // only after a later GPTK-aware install.
+            let source: URL
+            if fm.fileExists(atPath: bakWine.path(percentEncoded: false)) {
+                source = bak
+            } else if fm.fileExists(atPath: fossWine.path(percentEncoded: false)) {
+                source = libraryFolder
+            } else {
                 throw CocoaError(.fileNoSuchFile)
             }
 
             if fm.fileExists(atPath: dedicated.path(percentEncoded: false)) {
                 try fm.removeItem(at: dedicated)
             }
-            try fm.createSymbolicLink(at: dedicated, withDestinationURL: bak)
+            try fm.createSymbolicLink(at: dedicated, withDestinationURL: source)
             root = dedicated
         }
         try ensureFrankeaVulkanLinks(in: root)

@@ -686,14 +686,15 @@ extension WynCLI {
 
             var options = Wine.LaunchOptions(debug: debug, echoOutput: debug)
             // Default: game host (sikarugir). --frankea-steam rolls back; --gptk-steam pins game host.
-            options.preferFrankeaSteam = frankeaSteam && !gptkSteam
+            let fossWine = !GPTKInstaller.isWineGPTKAware()
+            options.preferFrankeaSteam = (frankeaSteam || fossWine) && !gptkSteam
             options.preferGPTKSteam = !options.preferFrankeaSteam
             if options.preferFrankeaSteam {
                 options.wineTree = .steam
-                print("Launching Windows Steam on frankea Wine (Libraries.steam rollback)…")
+                print("Launching Windows Steam on frankea Wine (DXMT/DXVK)…")
             } else {
                 options.wineTree = .game
-                print("Launching Windows Steam on game-host Wine (Libraries/ — sikarugir + D3DMetal)…")
+                print("Launching Windows Steam on game-host Wine (Libraries/ — D3DMetal)…")
             }
             print("Log in here and check Remember me. Press Play in Steam — that should start the game.")
             print("wyn play <game> is fallback if Play hits a launcher/picker instead of the game EXE.")

@@ -15,7 +15,7 @@ struct SetupView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Set up Wyn")
                 .font(.title2.weight(.semibold))
-            Text("Wine, the Steam bottle, and GPTK (from a local redist) need to be in place before the library can launch games. Wyn never downloads Apple GPTK.")
+            Text("Wine and the Steam bottle need to be in place before the library can launch games. GPTK/D3DMetal is optional and never downloaded.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -50,7 +50,7 @@ struct SetupView: View {
         .frame(width: 460, height: 280)
         .onAppear {
             if vm.setupMessage.isEmpty {
-                vm.setupMessage = "Wine, GPTK, or the Steam bottle is missing."
+                vm.setupMessage = "Wine or the Steam bottle is missing."
             }
         }
     }

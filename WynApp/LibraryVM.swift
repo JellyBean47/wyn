@@ -172,8 +172,6 @@ final class LibraryVM: ObservableObject {
         }
         startLaunch("Opening Steam…") {
             var options = Wine.LaunchOptions()
-            options.wineTree = .game
-            options.preferGPTKSteam = true
             options.detachAfterStart = true
             try await SteamLauncher.launchSteam(in: bottle, options: options)
         }
