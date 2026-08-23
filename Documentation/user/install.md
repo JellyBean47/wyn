@@ -63,6 +63,9 @@ setup stays on frankea Wine (DXMT/DXVK).
   `WYN_ALLOW_BREW_HEROIC=1`.
 - **Battle.net / EA:** click Install in Wyn (official vendor download).
 
+Wyn does **not** install or launch Xbox Game Pass, the Xbox app, UTM, or a
+Windows VM.
+
 ## 6. Disk
 
 Keep several gigabytes free. A full data volume will fail Wine/Heroic extracts.

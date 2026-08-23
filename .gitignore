@@ -69,6 +69,10 @@ libmetalirconverter.dylib
 *.otf
 d3dcompiler_47.dll
 
+# UTM / Windows guests (not product)
+*.utm/
+*.iso
+
 # Runtime / bottles (never in this repo)
 Bottles/
 Libraries/
@@ -79,5 +83,7 @@ ConnectSecureStorage.dat
 
 .tmp-*
 
+# Env and secrets
+.env
 .env.*
 credentials.json

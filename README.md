@@ -73,8 +73,12 @@ DXVK, not D3DMetal.
 - [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)
 - [Documentation/user/install.md](Documentation/user/install.md)
 
-Wyn is not affiliated with CodeWeavers, Apple, Valve, or Whisky-App.
-CrossOver.app must not be copied into this project.
+Wyn is a Wine wrapper. It does **not** include Xbox Game Pass, the Xbox
+app, a Windows guest (UTM / QEMU / Parallels), or a `wyn gamepass`
+command.
+
+Wyn is not affiliated with CodeWeavers, Apple, Valve, Microsoft, or
+Whisky-App. CrossOver.app must not be copied into this project.
 
 ## Layout
 

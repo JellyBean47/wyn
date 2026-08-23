@@ -15,6 +15,7 @@ they can apply to Wine.
 - Built helpers under `Tools/bin/`
 - CrossOver.app or CodeWeavers proprietary bits
 - Microsoft fonts / `d3dcompiler_47.dll`
+- Windows ISOs, UTM `.utm` guests, Xbox Game Pass packages
 
 Pull requests that add those files will be rejected. Keep
 [`DEPENDENCIES.md`](DEPENDENCIES.md) hashes in sync if you change download URLs.

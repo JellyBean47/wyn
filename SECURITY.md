@@ -10,9 +10,10 @@ Email the maintainer privately. Do not open a public GitHub issue for:
 
 ## Scope
 
-Wyn launches third-party Windows software under Wine. Game publishers’ ToS and
-anti-cheat still apply. This project does not provide security guarantees for
-those programs.
+Wyn launches third-party Windows software under Wine. It does not ship a
+Windows guest, UTM, or Xbox Game Pass. Game publishers’ ToS and anti-cheat
+still apply. This project does not provide security guarantees for those
+programs.
 
 ## Supply chain
 
