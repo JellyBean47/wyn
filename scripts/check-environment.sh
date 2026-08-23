@@ -29,6 +29,11 @@ fi
 ok "xcode-select: $(xcode-select -p)"
 
 command -v swift >/dev/null || fail "swift not on PATH"
+swift_ver="$(swift --version 2>/dev/null | awk '/Swift version/{for (i = 1; i <= NF; i++) if ($i == "version") { print $(i + 1); exit }}')"
+swift_major="${swift_ver%%.*}"
+if [[ -z "$swift_major" || "$swift_major" -lt 6 ]]; then
+  fail "Swift 6 or later required (found ${swift_ver:-unknown}). Install Xcode 16+"
+fi
 ok "swift $(swift --version 2>/dev/null | head -1)"
 
 command -v xcodebuild >/dev/null || fail "xcodebuild not on PATH"

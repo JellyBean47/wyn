@@ -7,9 +7,13 @@ on:
 
 jobs:
   swift:
-    runs-on: macos-14
+    # macos-14 defaults to Xcode 15 / Swift 5.10, which cannot compile
+    # packages that set swiftLanguageVersions to Swift 6.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - name: Swift toolchain
+        run: swift --version
       - name: Check environment
         run: ./scripts/check-environment.sh
       - name: Build CLI

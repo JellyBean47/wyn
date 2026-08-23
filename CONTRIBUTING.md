@@ -22,6 +22,8 @@ Pull requests that add those files will be rejected. Keep
 
 ## Build
 
+Needs Swift 6 (Xcode 16+). `macos-14` / Swift 5.10 will fail.
+
 ```bash
 ./scripts/check-environment.sh
 ./scripts/build.sh

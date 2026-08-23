@@ -10,7 +10,7 @@ Game Porting Toolkit / D3DMetal, store clients, or game files.
 ## What you need
 
 - Apple Silicon Mac, macOS 14 or later
-- Xcode or Command Line Tools (`xcode-select --install`)
+- Xcode 16 or later (Swift 6). Xcode 15 / Swift 5.10 cannot build this tree
 - Rosetta 2 (`softwareupdate --install-rosetta`)
 - Several gigabytes free (Wine runtime is ~300–400 MB compressed)
 - Optional: [Homebrew](https://brew.sh) if you want Heroic via cask

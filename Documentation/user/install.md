@@ -2,7 +2,7 @@
 
 ## 1. Platform
 
-Apple Silicon, macOS 14+, Xcode Command Line Tools, Rosetta 2. Confirm:
+Apple Silicon, macOS 14+, **Xcode 16+ (Swift 6)**, Rosetta 2. Confirm:
 
 ```bash
 ./scripts/check-environment.sh
