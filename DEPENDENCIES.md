@@ -29,16 +29,28 @@ Used by `./scripts/setup.sh` and `wyn runtime install` (community WhiskyWine).
 
 Wyn does **not** rehost this tarball on its own GitHub Releases.
 
-## Optional GPTK-aware Wine (still no Apple blobs)
+## Optional D3DMetal game-host (not downloaded)
 
-Used only with `wyn runtime install --gptk-aware`. Loads user-supplied D3DMetal
-after `wyn gptk install --from`.
+`wyn runtime install --gptk-aware` **does not fetch Wine**. The game-host is
+Sikarugir CrossOver-hosted Wine the user already has (CrossOver.app or a
+Sikarugir wrapper). Wyn will not redistribute CrossOver binaries or unofficial
+CX tarballs. See [Documentation/user/game-host.md](Documentation/user/game-host.md).
 
-- **Name:** EricSpencer WhiskyWine (CrossOver 26.1.0 LGPL source)
-- **Version tag:** `wine-v26.1.0-foss-phase1l`
+- **Obtain:** https://www.codeweavers.com/crossover (trial or purchase) and/or
+  https://github.com/Sikarugir-App/Sikarugir
+- **Install:** `wyn runtime install --gptk-aware --directory /Applications/CrossOver.app`
+  or `./scripts/install-cx-game-host.sh --directory …`
+- **Identity:** `Wine/bin` → CrossOver-Hosted Application; `wine64` → wineloader;
+  `lib64/apple_gptk` present; wineserver CX-class (~593760 / 4 Jun), not Whisky
+  (~856608 / 25 Apr). The check **refuses Whisky-as-game-host**.
+- **GPTK 3.0:** user Apple DMG via `wyn gptk install --from` onto that CX tree.
+
+The former EricSpencer `wine-v26.1.0-foss-phase1l` WhiskyWine tarball is **not**
+the game-host. Do not install it as `Libraries/` for D3DMetal.
+
+- **Name:** EricSpencer WhiskyWine (historical; not used)
 - **URL:** https://github.com/EricSpencer00/Whisky/releases/download/wine-v26.1.0-foss-phase1l/Libraries.tar.gz
 - **SHA-256:** `645917a4135c2ce83047186b6a352bf0d03ff785468e0c276db800ae044ab634`
-- **Corresponding source:** https://www.codeweavers.com/crossover/source (Wine LGPL); MoltenVK; DXVK 2.7.1
 
 ## Wine Mono (WineHQ, first-run)
 

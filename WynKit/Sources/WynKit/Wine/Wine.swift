@@ -686,8 +686,8 @@ public class Wine {
                 return "GPTK/D3DMetal not installed. Obtain it from Apple, then: wyn gptk install --from /path/to/redist"
             case .wineNotGPTKAware:
                 return """
-                Installed Wine cannot load D3DMetal (no CX_APPLEGPTK hooks in ntdll). \
-                Install GPTK-aware Wine: wyn runtime install --gptk-aware \
+                Installed Wine is not the D3DMetal game-host (need Sikarugir CrossOver-hosted Wine, not Whisky). \
+                wyn runtime install --gptk-aware --directory /Applications/CrossOver.app \
                 Then: wyn gptk install --from /path/to/redist. Or stay on DXVK. \
                 Force stub overlay on non-aware Wine: FLY_GPTK_WIRE_WINE=1 (breaks Steam).
                 """

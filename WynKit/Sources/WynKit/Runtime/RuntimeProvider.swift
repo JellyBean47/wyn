@@ -10,8 +10,7 @@ import SemanticVersion
 public enum RuntimeSource: String, Codable, CaseIterable, Sendable {
     /// Prebuilt WhiskyWine tarball from the frankea/Whisky community fork (DXMT/DXVK; no GPTK hooks).
     case whiskyCDN = "whisky-cdn"
-    /// CrossOver-source Wine with `CX_APPLEGPTK_*` ntdll hooks (EricSpencer community build).
-    /// Loads user-provided Apple GPTK (`libd3dshared` + D3DMetal) for CrossOver-class D3DMetal.
+    /// User-supplied Sikarugir CrossOver-hosted Wine (not downloaded). D3DMetal game-host.
     case gptkAware = "gptk-aware"
     /// Locally built runtime from vendor/whisky-wine (dev).
     case localBuild = "local-build"
@@ -21,7 +20,7 @@ public enum RuntimeSource: String, Codable, CaseIterable, Sendable {
     public var displayName: String {
         switch self {
         case .whiskyCDN: return "Community WhiskyWine"
-        case .gptkAware: return "GPTK-aware Wine (CrossOver source)"
+        case .gptkAware: return "CX-hosted game-host Wine (user-supplied)"
         case .localBuild: return "Local Build"
         case .custom: return "Custom"
         }
@@ -41,25 +40,18 @@ public enum RuntimeSource: String, Codable, CaseIterable, Sendable {
         case .whiskyCDN:
             return URL(string: "https://github.com/frankea/Whisky/releases/download")
         case .gptkAware:
-            // Pin: Wine 11 from CrossOver 26.1.0 LGPL source — ntdll has CX_APPLEGPTK_LIBD3DSHARED_PATH.
-            return URL(string: "https://github.com/EricSpencer00/Whisky/releases/download")
+            // Not fetched. Game-host is user-supplied CX Wine; see GameHostIdentity.
+            return nil
         case .localBuild, .custom:
             return nil
         }
     }
 
-    /// Fixed release tag for the GPTK-aware EricSpencer Wine tarball.
-    public static let gptkAwareReleaseTag = "wine-v26.1.0-foss-phase1l"
+    /// No tarball. `wyn runtime install --gptk-aware` copies/links user CX Wine.
+    public static let gptkAwareReleaseTag: String? = nil
 
     public var directLibrariesURL: URL? {
-        switch self {
-        case .gptkAware:
-            return releasesBaseURL?
-                .appending(path: Self.gptkAwareReleaseTag)
-                .appending(path: "Libraries.tar.gz")
-        default:
-            return nil
-        }
+        nil
     }
 }
 

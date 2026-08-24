@@ -124,24 +124,40 @@ Wyn.app or:
 written `appmanifest_3949040.acf`. The profile lists `vcrun2019`; Wyn does
 **not** run winetricks automatically.
 
-## 7. Optional D3DMetal
+## 7. Optional D3DMetal (CX-hosted game-host)
 
-1. Download Game Porting Toolkit from Apple (Apple ID required).
-2. Read the included Software License Agreement.
-3. `wyn gptk install --from /path/to/redist`
+Default setup stays on frankea Wine (DXMT/DXVK). D3DMetal needs a **different
+Wine tree**: Sikarugir CrossOver-hosted Wine, not Whisky 11 + GPTK bolted on.
+Wyn does not download CrossOver Wine. Full path:
+[game-host.md](game-host.md).
+
+1. Get CrossOver from https://www.codeweavers.com/crossover (trial or purchase),
+   or a Sikarugir wrapper whose engine is that CrossOver-hosted Wine
+   (https://github.com/Sikarugir-App/Sikarugir). Do not copy CrossOver.app into git.
+2. Copy or link it into `~/Library/Application Support/com.fly.gaming/Libraries/`:
+
+   ```bash
+   wyn runtime install --gptk-aware --directory /Applications/CrossOver.app
+   # or
+   ./scripts/install-cx-game-host.sh --directory /Applications/CrossOver.app
+   ```
+
+   `--gptk-aware` does **not** download a tarball. It refuses Whisky-as-game-host
+   (`wine64` must be `wineloader`, `lib64/apple_gptk` present, wineserver CX-class
+   ~593760 / 4 Jun — not Whisky ~856608 / 25 Apr).
+3. Apple GPTK 3.0 is separate (user DMG). Read the SLA, then:
+
+   ```bash
+   wyn gptk install --from /path/to/redist
+   ```
+
    The folder must contain `lib/external` or `external` with
-   `D3DMetal.framework` and `libd3dshared.dylib`.
+   `D3DMetal.framework` and `libd3dshared.dylib`. Wyn never downloads GPTK.
 
-Wyn will not download GPTK. Setup does not wire GPTK automatically.
-
-For Wine that can *load* D3DMetal (ntdll `CX_APPLEGPTK_*` hooks):
-
-```bash
-wyn runtime install --gptk-aware
-```
-
-That is a different hash-pinned tarball (still without Apple blobs). Default
-setup stays on frankea Wine (DXMT/DXVK).
+Steam UI for 3.0 lives on the game-host wineserver. Isolation AppDefaults for
+`steam.exe` / `steamwebhelper` are `=b`. frankea (`Libraries.steam`) is DXMT /
+window rollback only. `wyn steam launch` and the Steam tile already use the
+game-host when this CX identity is present.
 
 ## 8. Other stores
 

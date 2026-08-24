@@ -157,15 +157,17 @@ public enum GPTKInstaller {
             .appending(path: "nvngx.dll")
     }
 
-    /// True when the installed Wine's ntdll understands GPTK (`CX_APPLEGPTK_LIBD3DSHARED_PATH`).
-    /// frankea WhiskyWine (Gcenx) does not; EricSpencer CrossOver-source builds do.
+    /// True when Libraries/Wine is a CrossOver-hosted game-host that can load D3DMetal.
+    /// ntdll `CX_APPLEGPTK_*` alone is not enough — EricSpencer/Whisky tarballs have
+    /// the symbol but are not the game-host. Steam UI uses this gate.
     public static func isWineGPTKAware() -> Bool {
-        let ntdll = wineLibFolder
-            .appending(path: "wine")
-            .appending(path: "x86_64-unix")
-            .appending(path: "ntdll.so")
-        guard let data = try? Data(contentsOf: ntdll) else { return false }
-        return data.range(of: Data("CX_APPLEGPTK_LIBD3DSHARED_PATH".utf8)) != nil
+        let report = GameHostIdentity.inspect()
+        return report.isCrossOverHosted && report.ntdllGPTKAware
+    }
+
+    /// ntdll-only probe (CX hooks). Does not accept Whisky as the game-host.
+    public static func ntdllHasCXAppleGPTK() -> Bool {
+        GameHostIdentity.ntdllHasCXAppleGPTK(in: WynWineInstaller.libraryFolder.appending(path: "Wine"))
     }
 
     /// Overlay GPTK PE/unix stubs only when Wine is GPTK-aware, or when forced.
