@@ -13,13 +13,16 @@ they can apply to Wine.
 - Store installers (`SteamSetup.exe`, `Battle.net-Setup.exe`, …)
 - Game files, logs, credentials, operational `Docs/HANDOVER-*`
 - Built helpers under `Tools/bin/`
-- CrossOver.app or CodeWeavers proprietary bits (do not copy into git; the
-  D3DMetal game-host is self-built winecx, not CrossOver)
+- Proprietary Wine.app bundles or loaders (the D3DMetal game-host is
+  self-built winecx)
 - Microsoft fonts / `d3dcompiler_47.dll`
 - Windows ISOs, UTM `.utm` guests, Xbox Game Pass packages
 
 Pull requests that add those files will be rejected. Keep
 [`DEPENDENCIES.md`](DEPENDENCIES.md) hashes in sync if you change download URLs.
+
+Do not describe Wyn as a clone of another Wine product in user-facing docs
+or CLI help. Credit CodeWeavers only for LGPL winecx corresponding source.
 
 ## Build
 

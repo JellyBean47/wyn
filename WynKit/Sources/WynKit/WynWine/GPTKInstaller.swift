@@ -154,13 +154,13 @@ public enum GPTKInstaller {
     }
 
     /// True when Libraries/Wine is FOSS winecx with the ntdll GPTK hook.
-    /// CrossOver.app / wineloader and Whisky 11 without the hook are refused.
+    /// Proprietary Wine.app / wineloader and Whisky 11 without the hook are refused.
     /// Steam UI uses this gate; D3DMetal play also needs `isWineModulesWired()`.
     public static func isWineGPTKAware() -> Bool {
         GameHostIdentity.inspect().isFOSSGPTKHost
     }
 
-    /// ntdll-only probe (`CX_APPLEGPTK_*` in winecx). Does not accept Whisky as the game-host.
+    /// ntdll-only probe (winecx CX_APPLEGPTK hook). Does not accept Whisky as the game-host.
     public static func ntdllHasCXAppleGPTK() -> Bool {
         GameHostIdentity.ntdllHasCXAppleGPTK(in: WynWineInstaller.libraryFolder.appending(path: "Wine"))
     }
@@ -406,7 +406,7 @@ public enum GPTKInstaller {
         )
     }
 
-    /// Environment additions so CrossOver-style loaders find libd3dshared + MetalFX.
+    /// Environment so winecx's GPTK ntdll hook finds libd3dshared + MetalFX.
     /// Avoid DYLD_FALLBACK_LIBRARY_PATH — pointing it only at external/ breaks Wine's
     /// own lib lookup and can kill Steam before the game starts.
     public static func launchEnvironment() -> [String: String] {
@@ -417,9 +417,10 @@ public enum GPTKInstaller {
         var env: [String: String] = [
             "CX_APPLEGPTK_LIBD3DSHARED_PATH": libd3d,
             "CX_APPLEGPT_LIBD3DSHARED_PATH": libd3d,
-            // cxcompatdb has no JSON DB on Wyn. Without CX_GRAPHICS_BACKEND, `set_graphics_backend`
-            // HACKs DX11 exes onto DXMT (`HACK: trying graphics backend dxmt`) and "builtin"
-            // d3d11 becomes DXMT. CrossOver drives this env; AppDefaults `d3d*=b` are not enough.
+            // winecx has no JSON compat DB here. Without CX_GRAPHICS_BACKEND,
+            // set_graphics_backend HACKs DX11 exes onto DXMT (`HACK: trying graphics
+            // backend dxmt`) and "builtin" d3d11 becomes DXMT. AppDefaults `d3d*=b`
+            // are not enough; this env is the winecx hook.
             "CX_ROOT": wineRoot.path(percentEncoded: false),
             "CX_GRAPHICS_BACKEND": "d3dmetal"
         ]

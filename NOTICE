@@ -18,8 +18,9 @@ not part of this source repository.
 
 Trademarks: Whisky, Wine, Heroic, Steam, Epic Games, Battle.net, EA,
 GOG, Apple, Metal, and D3DMetal are marks of their respective owners.
-This project is not affiliated with CodeWeavers, Apple, Valve, or
-Whisky-App.
+This project is not affiliated with Apple, Valve, Whisky-App, or the
+publishers of other Wine products. winecx is used under LGPL; see
+THIRD_PARTY_LICENSES.md.
 
 Apache-2.0 components (see docs/licenses/Apache-2.0.txt):
   - swift-argument-parser (Apple)

@@ -160,7 +160,7 @@ public class Wine {
         public var preferD3DMetalAuth: Bool
         /// Rollback Steam UI / auth path: frankea Wine (`Libraries.steam`).
         public var preferFrankeaSteam: Bool
-        /// Steam UI on game-host Wine (`Libraries/` — sikarugir 10.0_6 after P0-c). Default when not frankea.
+        /// Steam UI on game-host Wine (`Libraries/` — FOSS winecx after P0-c). Default when not frankea.
         public var preferGPTKSteam: Bool
         /// Return after `wine start` has spawned instead of waiting for process exit.
         /// The library overlay uses this so Play is not stuck until the game quits.
@@ -687,7 +687,7 @@ public class Wine {
             case .wineNotGPTKAware:
                 return """
                 Installed Wine is not the D3DMetal game-host (need FOSS winecx with \
-                ntdll CX_APPLEGPTK, not CrossOver.app and not Whisky 11). \
+                ntdll CX_APPLEGPTK, not Whisky 11). \
                 ./scripts/build-foss-game-host.sh then \
                 wyn runtime install --gptk-aware --directory <wine-root> \
                 Then: wyn gptk install --from /path/to/redist. \
@@ -735,9 +735,9 @@ public class Wine {
     /// Per-exe DLL overrides so Steam CEF stays on Wine builtins (not GPTK D3DMetal stubs),
     /// while the game EXE still gets `d3d11,…=b`.
     ///
-    /// P0-c / sikarugir 10.0_6: match `Tools/sikarugir-smoke.sh` — no CEF shim, no local
+    /// Game-host Wine: no CEF shim in this function, no local
     /// pre-GPTK PE deploy beside Steam (those were GPTK Wine 11 workarounds and crash-loop
-    /// steamwebhelper on sikarugir).
+    /// steamwebhelper on an older host).
     ///
     /// Note `SteamLauncher.swift` still exports `d3d11,dxgi,d3d10core=n,b` as a process-wide
     /// `WINEDLLOVERRIDES` on the frankea `-applaunch` path, which reaches steamwebhelper too.
@@ -759,10 +759,10 @@ public class Wine {
         // translation layer into Chromium's GPU process makes steamwebhelper die at startup
         // with `crashpad_client_win.cc(144) crash server failed to launch, self-terminating`,
         // respawning every 10 s and never logging on. It looked correct for a long time only
-        // because on sikarugir/frankea system32 held Wine's builtin stubs, so `n` resolved to
+        // because on frankea system32 held Wine's builtin stubs, so `n` resolved to
         // builtin anyway and the intent above held by accident.
-        // Measured 12 Aug with `.scratch/cx-build-26.3/steam-score.sh`: `n,b` FAIL 2/2,
-        // absent GOOD 4/4, `b` GOOD 2/2. CrossOver's own bottle sets no Steam AppDefaults.
+        // Measured 12 Aug (`n,b` FAIL 2/2, absent GOOD 4/4, `b` GOOD 2/2).
+        // The game-host bottle sets no Steam AppDefaults.
         let steamSafe: [String: String] = [
             "d3d11": "b",
             "dxgi": "b",
@@ -795,7 +795,7 @@ public class Wine {
             values: ["ShowCrashDialog": ("REG_DWORD", "0")]
         )
         if debug {
-            print("[wyn:debug] AppDefaults: Steam/CEF sikarugir-safe (n,b, no cef-shim); game \(gameExeNames) GPTK builtin")
+            print("[wyn:debug] AppDefaults: Steam/CEF game-host-safe (n,b, no cef-shim); game \(gameExeNames) GPTK builtin")
         }
     }
 

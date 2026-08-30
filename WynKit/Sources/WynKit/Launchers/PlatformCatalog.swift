@@ -9,7 +9,7 @@
 
 import Foundation
 
-/// CrossOver-style storefronts Wyn can put on the Platform row.
+/// Windows storefronts Wyn can put on the Platform row.
 public enum PlatformKind: String, Sendable, Hashable, CaseIterable, Identifiable {
     case steam
     case ubisoft
@@ -46,8 +46,8 @@ public enum PlatformKind: String, Sendable, Hashable, CaseIterable, Identifiable
         }
     }
 
-    /// Typical CrossOver “Install a Windows Application” stores we do not ship installers for.
-    public static let crossOverGapKinds: [PlatformKind] = [.epic, .ea, .battlenet, .gog]
+    /// Storefronts Wyn can install via the official Windows installer (not Steam / Connect / Rockstar).
+    public static let installableStorefronts: [PlatformKind] = [.epic, .ea, .battlenet, .gog]
 
     public static let displayOrder: [PlatformKind] = [
         .steam, .ubisoft, .rockstar, .epic, .ea, .battlenet, .gog
@@ -195,7 +195,7 @@ public enum PlatformCatalog {
     }
 
     /// Installed storefronts. Steam + Connect come only from the registered Steam bottle.
-    /// Dedicated CX stores prefer their named BottleVM prefix. Rockstar is the clone
+    /// Dedicated store bottles prefer their named BottleVM prefix. Rockstar is the clone
     /// prefix (not added to BottleVM). One tile per kind.
     public static func installed() -> [InstalledPlatform] {
         var found: [PlatformKind: InstalledPlatform] = [:]
@@ -203,7 +203,7 @@ public enum PlatformCatalog {
         var data = BottleData()
         let registered = data.loadBottles()
 
-        for kind in PlatformKind.crossOverGapKinds {
+        for kind in PlatformKind.installableStorefronts {
             guard let name = kind.dedicatedBottleName else { continue }
             if let bottle = registered.first(where: { $0.settings.name == name }),
                let exe = exeURL(kind: kind, in: bottle) {
@@ -224,7 +224,7 @@ public enum PlatformCatalog {
             if found[.rockstar] == nil, let exe = exeURL(kind: .rockstar, in: bottle) {
                 found[.rockstar] = InstalledPlatform(kind: .rockstar, executable: exe, bottleURL: url)
             }
-            for kind in PlatformKind.crossOverGapKinds {
+            for kind in PlatformKind.installableStorefronts {
                 if found[kind] == nil, let exe = exeURL(kind: kind, in: bottle) {
                     found[kind] = InstalledPlatform(kind: kind, executable: exe, bottleURL: url)
                 }
@@ -255,16 +255,16 @@ public enum PlatformCatalog {
             if let item = byKind[kind] {
                 return PlatformRowItem(kind: kind, installed: item)
             }
-            if PlatformKind.crossOverGapKinds.contains(kind) {
+            if PlatformKind.installableStorefronts.contains(kind) {
                 return PlatformRowItem(kind: kind, installed: nil)
             }
             return nil
         }
     }
 
-    public static func missingCrossOverStores(from installed: [InstalledPlatform] = installed()) -> [PlatformKind] {
+    public static func missingStorefronts(from installed: [InstalledPlatform] = installed()) -> [PlatformKind] {
         let present = Set(installed.map(\.kind))
-        return PlatformKind.crossOverGapKinds.filter { !present.contains($0) }
+        return PlatformKind.installableStorefronts.filter { !present.contains($0) }
     }
 
     public static func isRunning(_ kind: PlatformKind) -> Bool {
@@ -290,7 +290,7 @@ public enum PlatformCatalog {
         }
     }
 
-    /// Dedicated BottleVM prefix for a CX store, if registered.
+    /// Dedicated BottleVM prefix for a storefront, if registered.
     public static func dedicatedBottle(for kind: PlatformKind) -> Bottle? {
         guard let name = kind.dedicatedBottleName else { return nil }
         var data = BottleData()
@@ -509,7 +509,7 @@ public enum PlatformCatalog {
         let bottle = item.bottle()
         switch item.kind {
         case .steam:
-            // Game-host when Libraries/ is FOSS winecx GPTK-aware; else frankea (SteamLauncher gate).
+            // Game-host when Libraries/ is FOSS winecx + GPTK; else frankea (SteamLauncher gate).
             var options = Wine.LaunchOptions()
             options.wineTree = .game
             options.preferGPTKSteam = true

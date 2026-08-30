@@ -1,12 +1,12 @@
 # D3DMetal game-host (FOSS winecx)
 
 The D3DMetal game-host is **self-built FOSS winecx** (Wine 11.15 + in-tree
-ntdll `CX_APPLEGPTK_LIBD3DSHARED_PATH` hook), not CrossOver.app / wineloader
-and not Whisky 11 with GPTK bolted on.
+ntdll `CX_APPLEGPTK_LIBD3DSHARED_PATH` hook — that symbol name is winecx’s).
+Whisky 11 with GPTK bolted on is not accepted.
 
 Wyn does **not** vendor Wine or GPTK binaries and does **not** download Wine
-for `--gptk-aware`. CrossOver.app is refused. Unofficial “CX engine” tarballs
-are not an install source.
+for `--gptk-aware`. Proprietary Wine.app bundles and wineloader layouts are
+refused.
 
 ## What lives where
 
@@ -33,13 +33,13 @@ Apple Silicon Homebrew is arm64.
 ```
 
 Source tree: https://github.com/dappermint/winecx (`wine1115`). Harness:
-https://github.com/frankea/winecx-gptk. Do not copy CrossOver.app into git.
+https://github.com/frankea/winecx-gptk.
 
 ## Copy or link into Wyn
 
 ```bash
 # After ./scripts/setup.sh (frankea rollback) and a built CLI:
-./scripts/install-cx-game-host.sh --directory /path/to/wine-root
+./scripts/install-foss-game-host.sh --directory /path/to/wine-root
 # same thing via CLI:
 wyn runtime install --gptk-aware --directory /path/to/wine-root
 wyn runtime install --gptk-aware --check
@@ -58,14 +58,14 @@ tarball Wyn fetches.
 ## Identity (sanity-check)
 
 `wyn runtime install --gptk-aware --check` and
-`./scripts/install-cx-game-host.sh --check` refuse CrossOver.app / wineloader
-and Whisky 11 without the ntdll hook.
+`./scripts/install-foss-game-host.sh --check` refuse proprietary Wine.app /
+wineloader layouts and Whisky 11 without the ntdll hook.
 
 | Probe | FOSS winecx (accept) | Refuse |
 | --- | --- | --- |
 | `ntdll.so` | contains `CX_APPLEGPTK_LIBD3DSHARED_PATH` | missing |
 | `wine64` | ordinary `wine64` | `wineloader` |
-| `Wine/bin` | ordinary `bin/` | `CrossOver-Hosted Application` |
+| `Wine/bin` | ordinary `bin/` | hosted-application layout |
 | Whisky 11 | n/a | `WhiskyWineVersion.plist` / wineserver ~856608 and no ntdll hook |
 | After GPTK overlay | `d3d11.so` / `dxgi.so` / `d3d12.so` → `lib/external/libd3dshared.dylib` beside `D3DMetal.framework` | copied (non-symlink) unix modules |
 

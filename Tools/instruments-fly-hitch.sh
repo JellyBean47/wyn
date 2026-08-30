@@ -59,7 +59,7 @@ cmd_kill_all() {
   # Belt-and-suspenders for leftover shipping
   pkill -f "$SHIPPING_RE" 2>/dev/null || true
   pkill -f 'FactoryGameSteam.exe' 2>/dev/null || true
-  echo "Killed Fly/CX wine + Shipping (best effort)."
+  echo "Killed game-host wine + Shipping (best effort)."
 }
 
 cmd_launch() {

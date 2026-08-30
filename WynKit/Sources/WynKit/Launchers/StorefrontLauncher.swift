@@ -29,8 +29,8 @@
 //  ghost). Play relaunches if that window is missing. Never `--disable-gpu`.
 //  Never wineserver -k the Steam bottle. Connect launcher is unchanged.
 //
-//  Battle.net: Qt chrome (logo) paints via D3D11. Login is CEF. CX CrossTie
-//  runs the official client (Wine 11 + Auto/DXVK/DXMT). 13:45/14:05 CEF flag
+//  Battle.net: Qt chrome (logo) paints via D3D11. Login is CEF. Wyn runs
+//  the official client (Wine 11 + Auto/DXVK/DXMT). 13:45/14:05 CEF flag
 //  guesses failed. Round 1 stock ANGLE died SwANGLE. Round 2 DXMT D3D11 works
 //  then `CreateSwapChain: cross-process swapchain not supported`. Round 3
 //  `--in-process-gpu` stopped the swapchain error but blanked the Qt logo and
@@ -40,7 +40,7 @@
 //  `Failed to create metal view… no exported symbols needed by DXMT`.
 //  3Shain/dxmt#170: Wine 11 dlopen(RTLD_NOW) hides `macdrv_functions` from
 //  `dlsym(RTLD_DEFAULT)`. Play inserts `winemac_rtld_global.dylib` so
-//  frankea's already-exported CX table is visible. Round 7: that table's
+//  frankea's already-exported macdrv_functions table is visible. Round 7: that table's
 //  get_win_data is process-local; the dylib shims #166 GET_SURFACE
 //  (`macdrv_client_surface_create`) for a foreign HWND. No extra Chromium flags.
 //  Not GPTK / D3DMetal / SwiftShader.
@@ -74,7 +74,7 @@ public enum StorefrontLauncher {
     ]
 
     public static func launch(kind: PlatformKind, in bottle: Bottle) async throws {
-        guard PlatformKind.crossOverGapKinds.contains(kind) else {
+        guard PlatformKind.installableStorefronts.contains(kind) else {
             throw PlatformLaunchError.notWired(kind)
         }
         // Official EGL (16:19) and Galaxy (17:04) are parked. Both are Heroic.
@@ -1509,7 +1509,7 @@ public enum StorefrontLauncher {
         bottle.settings.dxvk = true
     }
 
-    /// CX 26 includes DXMT; 32-bit Battle.net CEF is the documented Mac use.
+    /// Wine 11 includes DXMT; 32-bit Battle.net CEF is the documented Mac use.
     /// Copies frankea Steam `DXMT/x32` (winemetal + d3d11/dxgi). Not D3DMetal.
     private static func prepareDXMT(in bottle: Bottle) throws {
         try? Wine.upsertWineRegistryValues(

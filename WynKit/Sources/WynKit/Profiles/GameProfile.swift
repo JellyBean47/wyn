@@ -5,7 +5,7 @@
 
 import Foundation
 
-/// CrossOver-style per-game compatibility profile.
+/// Per-game compatibility profile.
 public struct GameProfile: Codable, Identifiable, Sendable {
     public var id: String
     public var name: String

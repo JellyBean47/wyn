@@ -25,31 +25,30 @@ Used by `./scripts/setup.sh` and `wyn runtime install` (community WhiskyWine).
 - **URL:** https://github.com/frankea/Whisky/releases/download/v3.1.1/Libraries.tar.gz
 - **SHA-256:** `01f3a1b43b98065fe20c529c1023b61dd79a6d2ad93bba6040865f646481ccf3`
 - **Version plist:** https://frankea.github.io/Whisky/WhiskyWineVersion.plist
-- **Corresponding source (LGPL):** WineHQ + CodeWeavers FOSS dumps; DXVK-macOS; DXMT v0.80 (MIT)
+- **Corresponding source (LGPL):** WineHQ + published Wine source dumps; DXVK-macOS; DXMT v0.80 (MIT)
 
 Wyn does **not** rehost this tarball on its own GitHub Releases.
 
 ## Optional D3DMetal game-host (not downloaded)
 
 `wyn runtime install --gptk-aware` **does not fetch Wine**. The game-host is
-self-built FOSS winecx. Wyn will not redistribute CrossOver binaries or
-unofficial CX tarballs, and will not accept CrossOver.app. See
-[Documentation/user/game-host.md](Documentation/user/game-host.md).
+self-built FOSS winecx. Wyn will not redistribute proprietary Wine.app
+binaries. See [Documentation/user/game-host.md](Documentation/user/game-host.md).
 
 - **Source:** https://github.com/dappermint/winecx (`wine1115`)
 - **Pins:** `WINECX_COMMIT` / `NIXPKGS_REV` in `scripts/runtime-pins.env`
 - **Build:** `./scripts/build-foss-game-host.sh` (mingw-w64 gcc, not llvm-mingw)
 - **Install:** `wyn runtime install --gptk-aware --directory <wine-root>`
-  or `./scripts/install-cx-game-host.sh --directory …`
-- **Identity:** `ntdll.so` contains `CX_APPLEGPTK_LIBD3DSHARED_PATH`; `wine64` is
-  not wineloader; `Wine/bin` is not CrossOver-Hosted Application. After GPTK
-  overlay, unix `d3d11.so` is a symlink to `lib/external/libd3dshared.dylib`.
-  Refuses CrossOver.app and Whisky 11 without the ntdll hook.
+  or `./scripts/install-foss-game-host.sh --directory …`
+- **Identity:** `ntdll.so` contains `CX_APPLEGPTK_LIBD3DSHARED_PATH` (winecx
+  GPTK hook); `wine64` is not wineloader; `Wine/bin` is an ordinary `bin/`.
+  After GPTK overlay, unix `d3d11.so` is a symlink to
+  `lib/external/libd3dshared.dylib`. Refuses proprietary Wine.app / wineloader
+  layouts and Whisky 11 without the ntdll hook.
 - **GPTK 3.0:** user Apple DMG via `wyn gptk install --from` onto that winecx tree.
 
 The former EricSpencer `wine-v26.1.0-foss-phase1l` WhiskyWine tarball is **not**
-the game-host. Do not install it as `Libraries/` for D3DMetal. CrossOver.app is
-also not the game-host.
+the game-host. Do not install it as `Libraries/` for D3DMetal.
 
 - **Name:** EricSpencer WhiskyWine (historical; not used)
 - **URL:** https://github.com/EricSpencer00/Whisky/releases/download/wine-v26.1.0-foss-phase1l/Libraries.tar.gz

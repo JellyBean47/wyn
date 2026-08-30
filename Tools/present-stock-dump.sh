@@ -103,4 +103,4 @@ for i in $(seq 1 30); do
   sleep 1
 done
 echo "OUT=$OUT"
-echo "Fly Wine Connect only — not CrossOver. Wait for large login window."
+echo "Wyn Wine Connect only. Wait for large login window."

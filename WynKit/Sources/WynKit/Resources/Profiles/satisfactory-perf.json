@@ -31,5 +31,5 @@
   ],
   "launchArgs": "-NO_EOS_OVERLAY -dx11 -USEALLAVAILABLECORES -Nosplash -ResX=1280 -ResY=720",
   "unrealProject": "FactoryGame",
-  "notes": "Live CX cmdline match + ASYNC_COMMIT. Sit still 60s after navmesh quiet; Metal HUD. After: Tools/analyze-satisfactory-perf.sh."
+  "notes": "Same launch args as satisfactory plus ASYNC_COMMIT. Sit still 60s after navmesh quiet; Metal HUD. After: Tools/analyze-satisfactory-perf.sh."
 }

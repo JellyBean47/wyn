@@ -456,7 +456,7 @@ public enum LaunchDiagnostics {
             return "GPTK(~1809)"
         }
         if lower.contains("crossover") {
-            return "CrossOver"
+            return "other-wine-app"
         }
         return "unknown"
     }

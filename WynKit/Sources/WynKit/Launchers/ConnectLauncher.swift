@@ -269,7 +269,7 @@ public enum ConnectLauncher {
     private static func connectCacheDir(in bottle: Bottle) -> URL? {
         let fm = FileManager.default
         let users = bottle.url.appending(path: "drive_c").appending(path: "users")
-        var names = [NSUserName(), "ebenoelofse", "crossover"]
+        var names = [NSUserName(), "ebenoelofse", "crossover"] // crossover: common Wine prefix user
         if let children = try? fm.contentsOfDirectory(at: users, includingPropertiesForKeys: nil) {
             names.append(contentsOf: children.map(\.lastPathComponent))
         }

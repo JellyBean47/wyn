@@ -2,7 +2,7 @@
 
 Wyn’s default graphics path is **DXMT** (MIT v0.80 in frankea Wine) and
 **DXVK-macOS**. D3DMetal is optional and needs **self-built FOSS winecx**
-as the game-host — not CrossOver.app and not Whisky with GPTK overlaid. See [game-host.md](game-host.md).
+as the game-host — not Whisky with GPTK overlaid. See [game-host.md](game-host.md).
 
 ## What Wyn will not do
 
@@ -40,8 +40,7 @@ open-source pieces.
 Whether using D3DMetal as a general end-user game launcher fits section 2.A
 is **not settled here**. That is not legal advice; read the SLA that shipped
 with your toolkit (and consider counsel before shipping a product that depends
-on D3DMetal). CodeWeavers licenses D3DMetal separately for CrossOver; Wyn does
-not.
+on D3DMetal). Wyn has no commercial D3DMetal license.
 
 Official download:
 https://developer.apple.com/download/all/?q=game%20porting%20toolkit

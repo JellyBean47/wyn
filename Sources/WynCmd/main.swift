@@ -367,7 +367,7 @@ extension WynCLI {
             discussion: """
             Looks up the game in steamapps via its Steam app id and applies the profile.
 
-            Single-host (P0-c — sikarugir 10.0_6 + D3DMetal in Libraries/):
+            Single-host (FOSS winecx + D3DMetal in Libraries/):
               wyn steam launch          # game-host Steam UI — log in, Remember me, then Play
               wyn play <id>             # fallback: D3DMetal direct EXE (skips Steam launchers)
 
@@ -661,7 +661,7 @@ extension WynCLI {
     struct SteamLaunch: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
             commandName: "launch",
-            abstract: "Open the Steam client in the Steam bottle (sikarugir Libraries/ by default)."
+            abstract: "Open the Steam client in the Steam bottle (game-host Libraries/ by default)."
         )
 
         @Flag(name: .long, help: "Stream Wine output (useful when Steam fails to open).")
@@ -685,7 +685,7 @@ extension WynCLI {
             }
 
             var options = Wine.LaunchOptions(debug: debug, echoOutput: debug)
-            // Default: game host (sikarugir). --frankea-steam rolls back; --gptk-steam pins game host.
+            // Default: game host (FOSS winecx). --frankea-steam rolls back; --gptk-steam pins game host.
             let fossWine = !GPTKInstaller.isWineGPTKAware()
             options.preferFrankeaSteam = (frankeaSteam || fossWine) && !gptkSteam
             options.preferGPTKSteam = !options.preferFrankeaSteam
@@ -748,7 +748,7 @@ extension WynCLI {
         @Option(name: .long, help: "Install from a local Libraries.tar.gz (frankea FOSS path only).")
         var from: String?
 
-        @Option(name: .long, help: "Local FOSS winecx prefix, Wine root, or Libraries directory. CrossOver.app is refused.")
+        @Option(name: .long, help: "Local FOSS winecx prefix, Wine root, or Libraries directory. Proprietary Wine.app bundles are refused.")
         var directory: String?
 
         @Flag(name: .long, help: "Download from community WhiskyWine host (DXMT/DXVK; no D3DMetal).")
@@ -760,7 +760,7 @@ extension WynCLI {
         @Flag(name: .long, help: "With --gptk-aware, symlink the winecx tree instead of copying.")
         var link: Bool = false
 
-        @Flag(name: .long, help: "Sanity-check Libraries/Wine identity (FOSS winecx vs CX vs Whisky). No copy.")
+        @Flag(name: .long, help: "Sanity-check Libraries/Wine identity (FOSS winecx vs proprietary loader vs Whisky). No copy.")
         var check: Bool = false
 
         mutating func run() async throws {

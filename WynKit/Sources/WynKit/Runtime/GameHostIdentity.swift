@@ -3,23 +3,28 @@
 //  WynKit
 //
 //  D3DMetal game-host must be FOSS winecx (ntdll CX_APPLEGPTK + unix
-//  libd3dshared symlinks), not CrossOver.app / wineloader, and not
-//  Whisky 11 without those hooks.
+//  libd3dshared symlinks), not a proprietary Wine.app / wineloader layout,
+//  and not Whisky 11 without those hooks.
 //
 
 import Foundation
 
 /// Structural identity of `Libraries/Wine` as the D3DMetal game-host.
 public enum GameHostIdentity {
-    /// Parked CX `wineserver` on the machine that proved Satisfactory (~593760, 4 Jun).
-    public static let cxWineserverBytesExample = 593760
     /// Parked Whisky `wineserver` that must not be the game-host (~856608, 25 Apr).
     public static let whiskyWineserverBytesExample = 856608
 
+    /// Filesystem names of a proprietary Wine.app layout. Matched only so install
+    /// can refuse that tree; Wyn does not use or copy it.
+    private static let refusedAppBundleName = "CrossOver"
+    private static let refusedAppPathFragment = "/CrossOver.app"
+    private static let refusedHostedBinName = "CrossOver-Hosted Application"
+
     public static let howToObtain = """
     D3DMetal game-host is self-built FOSS winecx (Wine 11.15 + in-tree GPTK ntdll \
-    hook), not CrossOver.app and not Whisky 11 with GPTK bolted on. Wyn will not \
-    download Wine for --gptk-aware and will not accept wineloader / CrossOver.app.
+    hook). Wyn will not download Wine for --gptk-aware. Proprietary Wine.app \
+    bundles and wineloader layouts are refused. Whisky 11 with GPTK bolted on \
+    is not accepted.
 
     Build from the pinned winecx tree (mingw-w64 gcc, not llvm-mingw):
 
@@ -32,14 +37,14 @@ public enum GameHostIdentity {
       wyn gptk install --from /path/to/Apple/GPTK/redist-or-dmg
 
     Identity:
-      ntdll.so contains CX_APPLEGPTK_LIBD3DSHARED_PATH
+      ntdll.so contains CX_APPLEGPTK_LIBD3DSHARED_PATH (winecx GPTK hook)
       wine64 is a normal Wine loader (not wineloader)
-      Wine/bin is not CrossOver-Hosted Application
+      Wine/bin is an ordinary bin/ directory
       after GPTK overlay: d3d11.so / dxgi.so / d3d12.so are symlinks to \
     lib/external/libd3dshared.dylib beside D3DMetal.framework
 
     Refuses:
-      CrossOver.app, wineloader, CrossOver-Hosted Application
+      proprietary Wine.app / wineloader / hosted-application bin
       Whisky 11 / frankea v3.1.1 (no ntdll hook) — that stays DXMT rollback \
     as Libraries.steam via ./scripts/setup.sh
 
@@ -49,20 +54,20 @@ public enum GameHostIdentity {
     public struct Report: Sendable {
         public let wineRoot: URL
         public let binURL: URL
-        public let binIsCrossOverHosted: Bool
+        public let binIsProprietaryHosted: Bool
         public let wine64IsWineloader: Bool
         public let appleGPTKPresent: Bool
         public let wineserverBytes: Int?
         public let looksLikeWhisky: Bool
         public let ntdllGPTKAware: Bool
         public let unixD3DMetalWired: Bool
-        public let isCrossOverHosted: Bool
+        public let isProprietaryHosted: Bool
         public let isFOSSGPTKHost: Bool
         public var refusal: String? {
-            if isCrossOverHosted {
+            if isProprietaryHosted {
                 return """
-                Refusing CrossOver-hosted Wine as the D3DMetal game-host \
-                (wineloader / CrossOver-Hosted Application / CrossOver.app). \
+                Refusing a proprietary Wine loader as the D3DMetal game-host \
+                (wineloader / hosted-application bin). \
                 Build FOSS winecx and pass that tree to \
                 wyn runtime install --gptk-aware --directory …
                 """
@@ -93,7 +98,7 @@ public enum GameHostIdentity {
             var lines: [String] = []
             lines.append("Game-host Wine:    \(wineRoot.path(percentEncoded: false))")
             lines.append("Wine/bin:          \(binURL.path(percentEncoded: false))")
-            lines.append("bin is CX-hosted:  \(binIsCrossOverHosted ? "yes — refused" : "no")")
+            lines.append("bin hosted layout: \(binIsProprietaryHosted ? "yes — refused" : "no")")
             lines.append("wine64 wineloader: \(wine64IsWineloader ? "yes — refused" : "no")")
             lines.append("lib64/apple_gptk:  \(appleGPTKPresent ? "yes (unused for FOSS host)" : "no")")
             if let n = wineserverBytes {
@@ -104,7 +109,7 @@ public enum GameHostIdentity {
             lines.append("Looks like Whisky: \(looksLikeWhisky ? "YES — refused as game-host" : "no")")
             lines.append("ntdll CX_APPLEGPTK:\(ntdllGPTKAware ? "yes" : "no")")
             lines.append("unix libd3dshared: \(unixD3DMetalWired ? "yes (symlinks)" : "no")")
-            lines.append("CX game-host:      \(isCrossOverHosted ? "yes — refused" : "no")")
+            lines.append("proprietary host:  \(isProprietaryHosted ? "yes — refused" : "no")")
             lines.append("FOSS GPTK host:    \(isFOSSGPTKHost ? "yes" : "no")")
             if let refusal {
                 lines.append("Refuse:            \(refusal.split(separator: "\n").first.map(String.init) ?? refusal)")
@@ -115,7 +120,7 @@ public enum GameHostIdentity {
 
     public enum HostError: LocalizedError, Equatable {
         case missingSource(String)
-        case crossoverRefused(String)
+        case proprietaryHostRefused(String)
         case notFOSSGPTKHost(String)
         case whiskyRefused(String)
 
@@ -123,7 +128,7 @@ public enum GameHostIdentity {
             switch self {
             case .missingSource(let detail):
                 return "No FOSS winecx tree at \(detail).\n\n\(GameHostIdentity.howToObtain)"
-            case .crossoverRefused(let detail):
+            case .proprietaryHostRefused(let detail):
                 return "\(detail)\n\n\(GameHostIdentity.howToObtain)"
             case .notFOSSGPTKHost(let detail):
                 return "\(detail)\n\n\(GameHostIdentity.howToObtain)"
@@ -144,7 +149,7 @@ public enum GameHostIdentity {
         let wineserver = bin.appending(path: "wineserver")
         let apple = wineRoot.appending(path: "lib64").appending(path: "apple_gptk")
 
-        let binCX = isCrossOverHostedBin(bin)
+        let binHosted = isProprietaryHostedBin(bin)
         let loader = resolvesToWineloader(wine64)
         let applePresent = directoryExists(apple)
         let serverBytes = fileSize(of: wineserver)
@@ -159,27 +164,27 @@ public enum GameHostIdentity {
         // winecx-gptk packaged as a Whisky beta (ntdll hook present) is not this.
         let looksWhisky = !ntdll && (whiskyBySize || whiskyPlist)
 
-        let hosted = binCX || loader
+        let hosted = binHosted || loader
         let hasLoader = fileExists(wine64) || fileExists(bin.appending(path: "wine"))
         let foss = ntdll && !hosted && !looksWhisky && hasLoader
 
         return Report(
             wineRoot: wineRoot,
             binURL: bin,
-            binIsCrossOverHosted: binCX,
+            binIsProprietaryHosted: binHosted,
             wine64IsWineloader: loader,
             appleGPTKPresent: applePresent,
             wineserverBytes: serverBytes,
             looksLikeWhisky: looksWhisky,
             ntdllGPTKAware: ntdll,
             unixD3DMetalWired: unixD3DMetalWired(in: wineRoot),
-            isCrossOverHosted: hosted,
+            isProprietaryHosted: hosted,
             isFOSSGPTKHost: foss
         )
     }
 
-    public static func isCrossOverHosted(libraryFolder: URL = WynWineInstaller.libraryFolder) -> Bool {
-        inspect(libraryFolder: libraryFolder).isCrossOverHosted
+    public static func isProprietaryHosted(libraryFolder: URL = WynWineInstaller.libraryFolder) -> Bool {
+        inspect(libraryFolder: libraryFolder).isProprietaryHosted
     }
 
     public static func isFOSSGPTKHost(libraryFolder: URL = WynWineInstaller.libraryFolder) -> Bool {
@@ -189,8 +194,8 @@ public enum GameHostIdentity {
     public static func assertGameHost(libraryFolder: URL = WynWineInstaller.libraryFolder) throws {
         let report = inspect(libraryFolder: libraryFolder)
         if let refusal = report.refusal {
-            if report.isCrossOverHosted {
-                throw HostError.crossoverRefused(refusal)
+            if report.isProprietaryHosted {
+                throw HostError.proprietaryHostRefused(refusal)
             }
             if report.looksLikeWhisky {
                 throw HostError.whiskyRefused(refusal)
@@ -200,8 +205,8 @@ public enum GameHostIdentity {
     }
 
     /// Map a Wine prefix, a Wyn Libraries/ tree, or a Wine root to the folder
-    /// that contains `bin/wine64`. CrossOver.app is still resolved so install()
-    /// can refuse it with a clear error.
+    /// that contains `bin/wine64`. Known proprietary .app layouts are still
+    /// resolved so install() can refuse them.
     public static func resolveWineRoot(from userPath: URL) -> URL? {
         let fm = FileManager.default
         let path = userPath.path(percentEncoded: false)
@@ -210,18 +215,18 @@ public enum GameHostIdentity {
         var candidates: [URL] = [userPath]
         if userPath.pathExtension == "app" {
             let shared = userPath.appending(path: "Contents").appending(path: "SharedSupport")
-            candidates.append(shared.appending(path: "CrossOver"))
+            candidates.append(shared.appending(path: refusedAppBundleName))
             candidates.append(shared.appending(path: "wine"))
         }
         candidates.append(userPath.appending(path: "Wine"))
-        candidates.append(userPath.appending(path: "Contents").appending(path: "SharedSupport").appending(path: "CrossOver"))
+        candidates.append(userPath.appending(path: "Contents").appending(path: "SharedSupport").appending(path: refusedAppBundleName))
         candidates.append(userPath.appending(path: "Contents").appending(path: "SharedSupport").appending(path: "wine"))
 
         for c in candidates {
             if isWineRoot(c) { return c }
-            let hosted = c.appending(path: "CrossOver-Hosted Application")
+            let hosted = c.appending(path: refusedHostedBinName)
             if isWineRoot(hosted) { return c }
-            if c.lastPathComponent == "CrossOver-Hosted Application", isWineRoot(c) {
+            if c.lastPathComponent == refusedHostedBinName, isWineRoot(c) {
                 return c.deletingLastPathComponent()
             }
         }
@@ -239,18 +244,18 @@ public enum GameHostIdentity {
     /// Copy or symlink a user-supplied FOSS winecx tree into `Libraries/`.
     /// Parks a non-host `Libraries/` as `Libraries.pre-gptk-aware.bak` (frankea rollback).
     public static func install(from userPath: URL, link: Bool) throws {
-        if looksLikeCrossOverApp(userPath) {
-            throw HostError.crossoverRefused(
-                "Refusing CrossOver.app at \(userPath.path(percentEncoded: false))."
+        if looksLikeRefusedWineApp(userPath) {
+            throw HostError.proprietaryHostRefused(
+                "Refusing a proprietary Wine.app bundle at \(userPath.path(percentEncoded: false))."
             )
         }
         guard let sourceRoot = resolveWineRoot(from: userPath) else {
             throw HostError.missingSource(userPath.path(percentEncoded: false))
         }
         let sourceReport = inspectWineRoot(sourceRoot)
-        if sourceReport.isCrossOverHosted {
-            throw HostError.crossoverRefused(
-                sourceReport.refusal ?? "Source is CrossOver-hosted Wine."
+        if sourceReport.isProprietaryHosted {
+            throw HostError.proprietaryHostRefused(
+                sourceReport.refusal ?? "Source is a proprietary Wine loader."
             )
         }
         if sourceReport.looksLikeWhisky {
@@ -292,11 +297,6 @@ public enum GameHostIdentity {
         try WynWineInstaller.ensureSteamWineTree()
     }
 
-    /// Kept as a synonym so older call sites that parked non-CX trees still compile.
-    public static func parkNonCrossOverLibraries() throws {
-        try parkNonFOSSGameHostLibraries()
-    }
-
     /// True when unix `d3d11.so` (and dxgi/d3d12) are symlinks to `libd3dshared.dylib`.
     public static func unixD3DMetalWired(in wineRoot: URL) -> Bool {
         let unixDir = wineLibUnixDir(in: wineRoot)
@@ -321,13 +321,8 @@ public enum GameHostIdentity {
         }
         try fm.createDirectory(at: destWine, withIntermediateDirectories: true)
 
-        let hosted = sourceRoot.appending(path: "CrossOver-Hosted Application")
-        let sourceBin: URL
-        if directoryExists(hosted) {
-            sourceBin = hosted
-        } else {
-            sourceBin = binFolder(in: sourceRoot)
-        }
+        // FOSS winecx ships an ordinary bin/. Hosted-application layouts are refused above.
+        let sourceBin = sourceRoot.appending(path: "bin")
 
         try transfer(from: sourceBin, to: destWine.appending(path: "bin"), link: link)
 
@@ -417,27 +412,27 @@ public enum GameHostIdentity {
     }
 
     private static func binFolder(in wineRoot: URL) -> URL {
-        let hosted = wineRoot.appending(path: "CrossOver-Hosted Application")
+        let hosted = wineRoot.appending(path: refusedHostedBinName)
         if directoryExists(hosted) { return hosted }
         return wineRoot.appending(path: "bin")
     }
 
-    private static func looksLikeCrossOverApp(_ url: URL) -> Bool {
+    private static func looksLikeRefusedWineApp(_ url: URL) -> Bool {
         let path = url.path(percentEncoded: false)
-        if url.pathExtension == "app", url.deletingPathExtension().lastPathComponent == "CrossOver" {
+        if url.pathExtension == "app", url.deletingPathExtension().lastPathComponent == refusedAppBundleName {
             return true
         }
-        if path.contains("/CrossOver.app") { return true }
+        if path.contains(refusedAppPathFragment) { return true }
         return false
     }
 
-    private static func isCrossOverHostedBin(_ bin: URL) -> Bool {
-        if bin.lastPathComponent == "CrossOver-Hosted Application" { return true }
+    private static func isProprietaryHostedBin(_ bin: URL) -> Bool {
+        if bin.lastPathComponent == refusedHostedBinName { return true }
         let path = bin.path(percentEncoded: false)
         if let dest = try? FileManager.default.destinationOfSymbolicLink(atPath: path) {
-            return URL(fileURLWithPath: dest).lastPathComponent == "CrossOver-Hosted Application"
+            return URL(fileURLWithPath: dest).lastPathComponent == refusedHostedBinName
         }
-        return bin.resolvingSymlinksInPath().lastPathComponent == "CrossOver-Hosted Application"
+        return bin.resolvingSymlinksInPath().lastPathComponent == refusedHostedBinName
     }
 
     private static func resolvesToWineloader(_ wine64: URL) -> Bool {

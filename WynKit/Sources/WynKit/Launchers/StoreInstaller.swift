@@ -2,7 +2,7 @@
 //  StoreInstaller.swift
 //  WynKit
 //
-//  CrossOver-style storefront install: one BottleVM bottle per store,
+//  Official Windows storefront install: one BottleVM bottle per store,
 //  frankea Wine, official Windows installer. Never Steam (32050D6B) or
 //  Rockstar/RDR2 (F83BCCE3).
 //
@@ -68,7 +68,7 @@ public enum StoreInstaller {
     }
 
     public static func install(_ kind: PlatformKind) async throws {
-        guard PlatformKind.crossOverGapKinds.contains(kind) else {
+        guard PlatformKind.installableStorefronts.contains(kind) else {
             throw StoreInstallError.notInstallable(kind)
         }
         guard WynWineInstaller.isWineInstalled(for: .steam) else {
