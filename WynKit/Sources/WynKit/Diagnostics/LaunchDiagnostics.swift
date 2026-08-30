@@ -318,11 +318,6 @@ public enum LaunchDiagnostics {
                 tree = "unknown tree"
             }
             lines.append("Steam wineserver: \(tree)")
-            if let reason = SteamLauncher.steamClientGameParentDescription(in: bottle) {
-                lines.append("Steam session: CHILD OF GAME — \(reason)")
-            } else {
-                lines.append("Steam session: own-session (not a child of the game)")
-            }
         } else {
             lines.append("Steam wineserver: (no steam.exe for this bottle)")
         }
