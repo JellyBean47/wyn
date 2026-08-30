@@ -56,16 +56,25 @@ the game-host. Do not install it as `Libraries/` for D3DMetal.
 
 ## Wine Mono (WineHQ, first-run)
 
-Wine 11.0's GUI `install_mono` dialog hangs. `./scripts/install-wine-mono.sh`
-downloads the official MSI into the installed Wine tree so wineboot never
-needs that window.
+winecx `appwiz.cpl` only skips the hung GUI installer when the **matching**
+MSI is already in `Libraries/Wine/share/wine/mono/`. `./scripts/setup.sh`
+unpacks frankea Wine; `./scripts/install-foss-game-host.sh` then replaces
+`Libraries/`, so a 10.4.1 copy there is the wrong file for winecx. Cache
+both MSIs under `~/Library/Caches/wyn/` (WineHQ only — not a parked Wyn
+tree). `wyn steam install` runs `msiexec /qn` before SteamSetup.
 
-- **Name:** Wine Mono Runtime
-- **Version:** `10.4.1` (`WINE_MONO_VERSION` in `scripts/runtime-pins.env`)
+- **Name:** Wine Mono Runtime (winecx / D3DMetal game-host)
+- **Version:** `11.2.0` (`WINE_MONO_VERSION` — winecx `addons.c` `MONO_VERSION` at `WINECX_COMMIT`)
+- **URL:** https://dl.winehq.org/wine/wine-mono/11.2.0/wine-mono-11.2.0-x86.msi
+- **SHA-256:** `b4525679e7da30d4658ceb85739cbc55c771791054abbb4b3152fe96ded0b897`
+- **License:** Wine Mono / MIT-style (Wine Project)
+
+- **Name:** Wine Mono Runtime (frankea Wine 11.0 / `./scripts/setup.sh`)
+- **Version:** `10.4.1` (`WINE_MONO_FRANKEA_VERSION`)
 - **URL:** https://dl.winehq.org/wine/wine-mono/10.4.1/wine-mono-10.4.1-x86.msi
+- **SHA-256:** `071f4b2887e1c97a11d791ff3d65be9429eed6dec4c2708888bfd546ba358e23`
 - **Size:** 85504000 bytes
 - **License:** Wine Mono / MIT-style (Wine Project)
-- **Not copied from a parked Wyn install.** Git-clone first run uses WineHQ only.
 
 ## Official store installer URLs (user action only)
 

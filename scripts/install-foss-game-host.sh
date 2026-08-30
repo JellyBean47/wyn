@@ -282,7 +282,10 @@ if [[ -x "$ROOT/.build/release/wyn" ]]; then
   echo "==> delegating to wyn runtime install --gptk-aware"
   extra=()
   if [[ "$LINK" -eq 1 ]]; then extra+=(--link); fi
-  exec "$ROOT/.build/release/wyn" runtime install --gptk-aware --directory "$DIRECTORY" "${extra[@]+"${extra[@]}"}"
+  "$ROOT/.build/release/wyn" runtime install --gptk-aware --directory "$DIRECTORY" "${extra[@]+"${extra[@]}"}"
+  echo "==> Wine Mono into live winecx datadir (wineboot GUI hang otherwise)"
+  "$ROOT/scripts/install-wine-mono.sh"
+  exit 0
 fi
 
 mkdir -p "$SUPPORT"
@@ -330,6 +333,8 @@ done
 inspect_and_print "$LIBRARIES/Wine"
 refuse_if_bad "$LIBRARIES/Wine"
 echo "FOSS GPTK host:    yes"
+echo "==> Wine Mono into live winecx datadir (wineboot GUI hang otherwise)"
+"$ROOT/scripts/install-wine-mono.sh"
 echo
 echo "Next: wyn gptk install --from /path/to/Apple/GPTK/redist"
 echo "Steam UI for D3DMetal 3.0 uses this wineserver. Isolation AppDefaults =b"

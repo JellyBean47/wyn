@@ -55,6 +55,12 @@ Destination:
 `--gptk-aware` **does not download** Wine. There is no hash-pinned GPTK-aware
 tarball Wyn fetches.
 
+Replacing `Libraries/` drops frankea's `share/wine/mono`. The install
+script (and `wyn runtime install --gptk-aware`) stages
+`wine-mono-11.2.0-x86.msi` from WineHQ into the live winecx datadir
+(`~/Library/Caches/wyn/` is the cache). `wyn steam install` then
+`msiexec /qn` before SteamSetup so wineboot does not show the hung GUI.
+
 ## Identity (sanity-check)
 
 `wyn runtime install --gptk-aware --check` and

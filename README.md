@@ -53,8 +53,9 @@ swift build -c release
 run `brew` unless you set `WYN_ALLOW_BREW_HEROIC=1`.
 
 **Steam + first game:** see [Documentation/user/install.md](Documentation/user/install.md).
-Short version: `./scripts/install-wine-mono.sh` (WineHQ MSI; the Wine Mono
-GUI hangs), then `wyn steam install`, `wyn steam launch`, install the title
+Short version: `./scripts/install-wine-mono.sh` (WineHQ MSI into the live
+Wine tree), then `wyn steam install` (`msiexec /qn` then SteamSetup; do
+not use the hung Wine Mono GUI), `wyn steam launch`, install the title
 in Steam (RV There Yet? is app 3949040), then click the tile or
 `wyn play rv-there-yet`. Wyn never downloads the game.
 

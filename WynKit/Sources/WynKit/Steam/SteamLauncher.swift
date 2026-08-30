@@ -175,7 +175,9 @@ public enum SteamLauncher {
     }
 
     /// Run SteamSetup.exe inside the bottle (interactive — user completes the wizard).
+    /// Wine Mono is `msiexec /qn` first so wineboot never shows the hung GUI installer.
     public static func runSteamInstaller(in bottle: Bottle, installer: URL) async throws {
+        try await WineMono.preparePrefix(bottle)
         _ = try await Wine.runWine(
             [installer.path(percentEncoded: false)],
             bottle: bottle

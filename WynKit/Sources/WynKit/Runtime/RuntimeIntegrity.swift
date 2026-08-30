@@ -42,6 +42,20 @@ public enum RuntimeIntegrity {
         version: "wine-v26.1.0-foss-phase1l-not-game-host"
     )
 
+    /// winecx `dlls/appwiz.cpl/addons.c` `MONO_VERSION` / `MONO_SHA` at `WINECX_COMMIT`.
+    public static let wineMonoWinecx = Pin(
+        url: URL(string: "https://dl.winehq.org/wine/wine-mono/11.2.0/wine-mono-11.2.0-x86.msi")!,
+        sha256: "b4525679e7da30d4658ceb85739cbc55c771791054abbb4b3152fe96ded0b897",
+        version: "11.2.0"
+    )
+
+    /// frankea Wine 11.0 (`./scripts/setup.sh`). wineboot looks for this MSI, not 11.2.0.
+    public static let wineMonoFrankea = Pin(
+        url: URL(string: "https://dl.winehq.org/wine/wine-mono/10.4.1/wine-mono-10.4.1-x86.msi")!,
+        sha256: "071f4b2887e1c97a11d791ff3d65be9429eed6dec4c2708888bfd546ba358e23",
+        version: "10.4.1"
+    )
+
     public static let applePayloadMarkers = [
         "D3DMetal.framework",
         "libd3dshared.dylib",
