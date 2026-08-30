@@ -24,7 +24,7 @@ Apache-2.0 requires preserving the license text and NOTICE attribution
 | Component | Typical version | License | Publisher / URL | Wyn may auto-download? |
 | --- | --- | --- | --- | --- |
 | Wine (community WhiskyWine) | 11.0 in frankea `v3.1.1` | LGPL-2.1-or-later | https://github.com/frankea/Whisky/releases | Yes, hash-pinned |
-| Wine (GPTK-aware, CX FOSS) | `wine-v26.1.0-foss-phase1l` | LGPL-2.1-or-later | https://github.com/EricSpencer00/Whisky/releases | Only with `--gptk-aware` |
+| Wine (CX-hosted game-host) | user CrossOver / Sikarugir | CodeWeavers EULA + Wine LGPL | https://www.codeweavers.com/crossover | Never auto-fetched; user copies/links |
 | CrossOver FOSS Wine **source** | 26.x | LGPL-2.1-or-later (and other OSS) | https://www.codeweavers.com/crossover/source | No |
 | DXVK / DXVK-macOS | 1.10.3-async (frankea) | zlib | https://github.com/doitsujin/dxvk · https://github.com/Gcenx/DXVK-macOS | Inside Wine tarball |
 | DXMT | 0.80 (last MIT release) | MIT (v0.80); later is LGPL-2.1+ | https://github.com/3Shain/dxmt | Inside frankea tarball |
@@ -44,7 +44,7 @@ must not, without a corresponding-source offer).
 | --- | --- | --- |
 | Apple Game Porting Toolkit, D3DMetal, libd3dshared, metalirconverter | Apple GPTK Software License Agreement (evaluation / non-commercial redistribution; no reverse engineering) | https://developer.apple.com/download/all/?q=game%20porting%20toolkit |
 | CrossOver.app | CodeWeavers EULA | Do not copy into Wyn |
-| Sikarugir engines | Mixed / unclear | Not part of Wyn setup |
+| Sikarugir wrapper | MIT (wrapper); CX engine is CodeWeavers EULA | https://github.com/Sikarugir-App/Sikarugir (do not fetch unofficial CX engines) |
 | Steam, Battle.net, EA App, Epic, GOG, Ubisoft clients | Vendor ToS | Official vendor URLs on explicit user action |
 | Microsoft `d3dcompiler_47`, corefonts | Microsoft redistributable / core fonts EULAs | winetricks or user; do not commit |
 | macOS SDK, Xcode, Rosetta 2 | Apple | User installs |

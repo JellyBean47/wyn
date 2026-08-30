@@ -34,10 +34,12 @@ public enum RuntimeIntegrity {
         version: "3.1.1"
     )
 
+    /// Not the D3DMetal game-host. Kept so old docs/scripts that named this
+    /// tarball can be recognized and refused. Do not install it as Libraries/.
     public static let gptkAware = Pin(
         url: URL(string: "https://github.com/EricSpencer00/Whisky/releases/download/wine-v26.1.0-foss-phase1l/Libraries.tar.gz")!,
         sha256: "645917a4135c2ce83047186b6a352bf0d03ff785468e0c276db800ae044ab634",
-        version: "wine-v26.1.0-foss-phase1l"
+        version: "wine-v26.1.0-foss-phase1l-not-game-host"
     )
 
     public static let applePayloadMarkers = [

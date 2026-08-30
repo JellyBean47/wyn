@@ -694,7 +694,7 @@ extension WynCLI {
                 print("Launching Windows Steam on frankea Wine (DXMT/DXVK)…")
             } else {
                 options.wineTree = .game
-                print("Launching Windows Steam on game-host Wine (Libraries/ — D3DMetal)…")
+                print("Launching Windows Steam on game-host Wine (Libraries/ — CX-hosted + D3DMetal)…")
             }
             print("Log in here and check Remember me. Press Play in Steam — that should start the game.")
             print("wyn play <game> is fallback if Play hits a launcher/picker instead of the game EXE.")
@@ -729,11 +729,13 @@ extension WynCLI {
                 print("Version:    \(version.major).\(version.minor).\(version.patch)")
             }
             print("Wine binary: \(status.wineBinary.path(percentEncoded: false))")
-            print("GPTK aware:  \(GPTKInstaller.isWineGPTKAware() ? "yes (CX_APPLEGPTK in ntdll)" : "no")")
+            print("GPTK aware:  \(GPTKInstaller.isWineGPTKAware() ? "yes (CX-hosted + CX_APPLEGPTK)" : "no")")
             print("GPTK files:  \(GPTKInstaller.isInstalled() ? "yes (external/)" : "not installed")")
             print("GPTK stubs:  \(GPTKInstaller.isWineModulesWired() ? "wired" : "not wired")")
             let steamOK = WynWineInstaller.isSteamWineInstalled()
             print("Steam Wine:  \(steamOK ? "yes (frankea fallback) — \(WynWineInstaller.steamLibraryFolder.path)" : "no frankea fallback (optional; one-Wine uses Libraries/)")")
+            print("")
+            print(GameHostIdentity.inspect().rendered)
         }
     }
 
@@ -743,26 +745,60 @@ extension WynCLI {
             abstract: "Install the WynWine runtime."
         )
 
-        @Option(name: .long, help: "Install from a local Libraries.tar.gz.")
+        @Option(name: .long, help: "Install from a local Libraries.tar.gz (frankea FOSS path only).")
         var from: String?
 
-        @Option(name: .long, help: "Install from a local Libraries directory.")
+        @Option(name: .long, help: "Local CrossOver.app, Sikarugir wrapper, Wine root, or Libraries directory.")
         var directory: String?
 
         @Flag(name: .long, help: "Download from community WhiskyWine host (DXMT/DXVK; no D3DMetal).")
         var whisky: Bool = false
 
-        @Flag(name: .long, help: "Download GPTK-aware Wine (CrossOver-source; enables D3DMetal + local GPTK).")
+        @Flag(name: .long, help: "Install user-supplied Sikarugir CrossOver-hosted Wine as the D3DMetal game-host. Does not download Wine.")
         var gptkAware: Bool = false
 
+        @Flag(name: .long, help: "With --gptk-aware, symlink the CX Wine tree instead of copying.")
+        var link: Bool = false
+
+        @Flag(name: .long, help: "Sanity-check Libraries/Wine identity (CX vs Whisky). No copy.")
+        var check: Bool = false
+
         mutating func run() async throws {
+            if whisky && gptkAware {
+                throw ValidationError("--whisky is frankea DXMT/DXVK; --gptk-aware is CX-hosted game-host. Not both.")
+            }
+
+            if check {
+                let report = GameHostIdentity.inspect()
+                print(report.rendered)
+                try GameHostIdentity.assertGameHost()
+                print("Game-host identity ok. Next: wyn gptk install --from /path/to/Apple/GPTK/redist")
+                return
+            }
+
+            if gptkAware {
+                if let path = from {
+                    throw ValidationError("""
+                    --gptk-aware does not unpack tarballs (they may contain Apple GPTK or Whisky Wine).
+                    Extract a CrossOver-hosted tree you are licensed to use, then:
+                      wyn runtime install --gptk-aware --directory \(path)
+                    Refused path: \(path)
+                    """)
+                }
+                guard let dir = directory else {
+                    throw ValidationError(GameHostIdentity.howToObtain)
+                }
+                print("Installing CX-hosted game-host Wine from \(dir)\(link ? " (link)" : "")…")
+                try GameHostIdentity.install(from: URL(fileURLWithPath: dir), link: link)
+                RuntimeManager.activeSource = .gptkAware
+                print(GameHostIdentity.inspect().rendered)
+                print("CX-hosted game-host installed. Next: wyn gptk install --from /path/to/Apple/GPTK/redist")
+                return
+            }
+
             if let path = from {
                 let url = URL(fileURLWithPath: path)
                 try WynWineInstaller.install(from: url)
-                if gptkAware {
-                    RuntimeManager.activeSource = .gptkAware
-                    try mergeCompanionLibsIfNeeded()
-                }
                 print("Installed WynWine from \(path)")
                 printGPTKHint()
                 return
@@ -775,48 +811,23 @@ extension WynCLI {
                 return
             }
 
-            if gptkAware {
-                RuntimeManager.activeSource = .gptkAware
-                let pin = RuntimeIntegrity.gptkAware
-                print("Downloading GPTK-aware Wine (\(pin.version))…")
-                print("  \(pin.url.absoluteString)")
-                print("  SHA-256 \(pin.sha256)")
-                let tarball = try await downloadFile(from: pin.url)
-                try WynWineInstaller.install(from: tarball, expectedSHA256: pin.sha256)
-                try mergeCompanionLibsIfNeeded()
-                print("GPTK-aware WynWine installed.")
-                printGPTKHint()
-                return
-            }
-
-            // Default: hash-pinned community WhiskyWine (not a floating plist).
+            // Default: hash-pinned community WhiskyWine (frankea DXMT/DXVK rollback).
             RuntimeManager.activeSource = .whiskyCDN
             let pin = RuntimeIntegrity.whiskyCDN
-            print("Downloading WynWine \(pin.version) (hash-pinned)…")
+            print("Downloading WynWine \(pin.version) (hash-pinned frankea; not the D3DMetal game-host)…")
             print("  \(pin.url.absoluteString)")
             let tarball = try await downloadFile(from: pin.url)
             try WynWineInstaller.install(from: tarball, expectedSHA256: pin.sha256)
-            print("WynWine installed successfully.")
+            print("WynWine installed successfully (DXMT/DXVK).")
             printGPTKHint()
         }
 
         private func printGPTKHint() {
             if GPTKInstaller.isWineGPTKAware() {
-                print("Wine is GPTK-aware. Next: wyn gptk install --from /path/to/redist")
+                print("Wine is CX-hosted GPTK-aware. Next: wyn gptk install --from /path/to/redist")
             } else {
-                print("Wine is not GPTK-aware (DXMT/DXVK only). For D3DMetal: wyn runtime install --gptk-aware")
-            }
-        }
-
-        /// EricSpencer tarballs omit MoltenVK/FreeType/GnuTLS — merge from frankea bak when present.
-        private func mergeCompanionLibsIfNeeded() throws {
-            let n = try WynWineInstaller.mergeCompanionLibraries()
-            if n > 0 {
-                print("Merged \(n) companion lib(s) from Libraries.pre-gptk-aware.bak (MoltenVK/FreeType/…).")
-            } else if !FileManager.default.fileExists(
-                atPath: WynWineInstaller.preGPTKAwareBackupFolder.path(percentEncoded: false)
-            ) {
-                print("Note: no Libraries.pre-gptk-aware.bak — Steam may need MoltenVK/FreeType copied into Wine/lib.")
+                print("Wine is not the D3DMetal game-host (DXMT/DXVK only).")
+                print("For D3DMetal: wyn runtime install --gptk-aware --directory /path/to/CrossOver.app")
             }
         }
 
@@ -850,7 +861,7 @@ extension WynCLI {
 
         mutating func run() throws {
             print("WynWine installed: \(WynWineInstaller.isWynWineInstalled() ? "yes" : "no")")
-            print("Wine GPTK-aware:   \(GPTKInstaller.isWineGPTKAware() ? "yes (CX_APPLEGPTK in ntdll)" : "no")")
+            print("Wine GPTK-aware:   \(GPTKInstaller.isWineGPTKAware() ? "yes (CX-hosted + CX_APPLEGPTK)" : "no")")
             print("GPTK files:        \(GPTKInstaller.isInstalled() ? "yes (external/)" : "no")")
             if let ver = GPTKInstaller.installedD3DMetalVersion() {
                 print("D3DMetal version:  \(ver)")
@@ -870,8 +881,8 @@ extension WynCLI {
             }
             if !GPTKInstaller.isWineGPTKAware() {
                 print("""
-                Note: current Wine cannot load D3DMetal. Install GPTK-aware Wine:
-                  wyn runtime install --gptk-aware
+                Note: current Wine cannot load D3DMetal. Install CX-hosted game-host Wine:
+                  wyn runtime install --gptk-aware --directory /Applications/CrossOver.app
                 Then: wyn gptk install --from /path/to/redist
                 """)
             } else if !GPTKInstaller.isInstalled() {
@@ -913,7 +924,7 @@ extension WynCLI {
                 }
                 print("MetalFX/nvngx: \(GPTKInstaller.isMetalFXWired() ? "wired" : "MISSING (redist may lack nvngx-on-metalfx)")")
             } else {
-                print("Wine stubs not overlaid. Need GPTK-aware Wine: wyn runtime install --gptk-aware")
+                print("Wine stubs not overlaid. Need CX-hosted Wine: wyn runtime install --gptk-aware --directory <CrossOver.app>")
             }
         }
     }

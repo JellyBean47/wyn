@@ -53,9 +53,11 @@ echo "==> installing into ~/Library/Application Support/com.fly.gaming/"
 "$WYN" runtime install --from "$TAR"
 
 echo
-echo "FOSS Wine runtime installed (DXMT/DXVK; no D3DMetal)."
+echo "FOSS Wine runtime installed (DXMT/DXVK; no D3DMetal). This is Libraries.steam rollback."
 echo "Wine Mono (do this in Terminal; the GUI installer hangs):"
 echo "  ./scripts/install-wine-mono.sh"
-echo "GPTK is optional and user-supplied: wyn gptk install --from <redist>"
+echo "D3DMetal game-host is CrossOver-hosted Wine (not this tarball):"
+echo "  ./scripts/install-cx-game-host.sh --directory /Applications/CrossOver.app"
+echo "GPTK 3.0 is optional and user-supplied: wyn gptk install --from <redist>"
 echo "Steam client: wyn steam install"
 echo "Heroic (Epic/GOG): https://heroicgameslauncher.com"
