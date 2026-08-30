@@ -1,8 +1,8 @@
 # Apple GPTK / D3DMetal (optional)
 
 Wyn’s default graphics path is **DXMT** (MIT v0.80 in frankea Wine) and
-**DXVK-macOS**. D3DMetal is optional and needs **Sikarugir CrossOver-hosted Wine**
-as the game-host — not Whisky with GPTK overlaid. See [game-host.md](game-host.md).
+**DXVK-macOS**. D3DMetal is optional and needs **self-built FOSS winecx**
+as the game-host — not CrossOver.app and not Whisky with GPTK overlaid. See [game-host.md](game-host.md).
 
 ## What Wyn will not do
 
@@ -23,7 +23,8 @@ wyn gptk status
 
 `--from` is required. Wyn does not search `~/Desktop/wyn/whisky-wine`.
 
-Install CX-hosted Wine first (`wyn runtime install --gptk-aware --directory …`).
+Install FOSS winecx first (`./scripts/build-foss-game-host.sh`, then
+`wyn runtime install --gptk-aware --directory …`).
 `wyn gptk install` overlays Apple D3DMetal 3.0 onto that tree; it is not a Wine
 installer.
 

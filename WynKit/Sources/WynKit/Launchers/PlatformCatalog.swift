@@ -509,7 +509,7 @@ public enum PlatformCatalog {
         let bottle = item.bottle()
         switch item.kind {
         case .steam:
-            // Game-host when Libraries/ is CX-hosted GPTK-aware; else frankea (SteamLauncher gate).
+            // Game-host when Libraries/ is FOSS winecx GPTK-aware; else frankea (SteamLauncher gate).
             var options = Wine.LaunchOptions()
             options.wineTree = .game
             options.preferGPTKSteam = true

@@ -686,10 +686,12 @@ public class Wine {
                 return "GPTK/D3DMetal not installed. Obtain it from Apple, then: wyn gptk install --from /path/to/redist"
             case .wineNotGPTKAware:
                 return """
-                Installed Wine is not the D3DMetal game-host (need Sikarugir CrossOver-hosted Wine, not Whisky). \
-                wyn runtime install --gptk-aware --directory /Applications/CrossOver.app \
-                Then: wyn gptk install --from /path/to/redist. Or stay on DXVK. \
-                Force stub overlay on non-aware Wine: FLY_GPTK_WIRE_WINE=1 (breaks Steam).
+                Installed Wine is not the D3DMetal game-host (need FOSS winecx with \
+                ntdll CX_APPLEGPTK, not CrossOver.app and not Whisky 11). \
+                ./scripts/build-foss-game-host.sh then \
+                wyn runtime install --gptk-aware --directory <wine-root> \
+                Then: wyn gptk install --from /path/to/redist. \
+                translationLayer=d3dmetal does not fall back to frankea DXVK.
                 """
             case .dxvkMissingForSteam:
                 return "DXVK payload missing under Libraries/DXVK (needed for Steam UI with D3DMetal games)."

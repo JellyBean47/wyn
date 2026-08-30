@@ -10,7 +10,7 @@ import SemanticVersion
 public enum RuntimeSource: String, Codable, CaseIterable, Sendable {
     /// Prebuilt WhiskyWine tarball from the frankea/Whisky community fork (DXMT/DXVK; no GPTK hooks).
     case whiskyCDN = "whisky-cdn"
-    /// User-supplied Sikarugir CrossOver-hosted Wine (not downloaded). D3DMetal game-host.
+    /// User-supplied FOSS winecx (not downloaded). D3DMetal game-host.
     case gptkAware = "gptk-aware"
     /// Locally built runtime from vendor/whisky-wine (dev).
     case localBuild = "local-build"
@@ -20,7 +20,7 @@ public enum RuntimeSource: String, Codable, CaseIterable, Sendable {
     public var displayName: String {
         switch self {
         case .whiskyCDN: return "Community WhiskyWine"
-        case .gptkAware: return "CX-hosted game-host Wine (user-supplied)"
+        case .gptkAware: return "FOSS winecx game-host (user-built)"
         case .localBuild: return "Local Build"
         case .custom: return "Custom"
         }
@@ -40,14 +40,14 @@ public enum RuntimeSource: String, Codable, CaseIterable, Sendable {
         case .whiskyCDN:
             return URL(string: "https://github.com/frankea/Whisky/releases/download")
         case .gptkAware:
-            // Not fetched. Game-host is user-supplied CX Wine; see GameHostIdentity.
+            // Not fetched. Game-host is user-built winecx; see GameHostIdentity.
             return nil
         case .localBuild, .custom:
             return nil
         }
     }
 
-    /// No tarball. `wyn runtime install --gptk-aware` copies/links user CX Wine.
+    /// No tarball. `wyn runtime install --gptk-aware` copies/links user-built winecx.
     public static let gptkAwareReleaseTag: String? = nil
 
     public var directLibrariesURL: URL? {
