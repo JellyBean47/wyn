@@ -62,28 +62,34 @@ One-shot CLI (Wine + Steam bottle, optional installer download):
 ./.build/release/wyn install --skip-steam-download
 ```
 
-## 4. Wine Mono (do this in Terminal)
+## 4. Wine Mono (Terminal / `msiexec /qn`)
 
-Wine's first bottle run pops a **Wine Mono** installer. That GUI hangs
-(stuck at 0% CPU). Skip it. After Wine is on disk, download the official
-MSI from WineHQ into the Wine tree so `wineboot` never needs the dialog:
+Wine's first bottle run can pop a **Wine Mono** installer. That GUI hangs
+(stuck at 0% CPU). Do not click it. The first-time path is scripts plus
+`wyn steam install`:
 
 ```bash
 ./scripts/install-wine-mono.sh
 ```
 
-That curls `wine-mono-10.4.1-x86.msi` (~82 MB) into
+That curls the WineHQ MSI that matches **live** `Libraries/Wine` into
+`~/Library/Caches/wyn/` and
 `~/Library/Application Support/com.fly.gaming/Libraries/Wine/share/wine/mono/`.
-Do this **before** `wyn steam install` / `wyn steam launch`.
+frankea Wine (`./scripts/setup.sh`) wants `wine-mono-10.4.1-x86.msi`. FOSS
+winecx wants `wine-mono-11.2.0-x86.msi` (winecx `addons.c`). Replacing
+`Libraries/` with the game-host wipes the frankea copy;
+`./scripts/install-foss-game-host.sh` stages 11.2.0 again from the cache.
 
-If the dialog already appeared, close it and install into the bottle:
+`wyn steam install` then runs `msiexec /qn` into the Steam bottle **before**
+SteamSetup, so wineboot never shows the dialog. Do not copy Mono from a
+parked Wyn install.
+
+If the dialog already appeared, close only that window (not wineserver)
+and:
 
 ```bash
 ./scripts/install-wine-mono.sh --into-bottle
 ```
-
-Do not copy Mono from an old Wyn install. A git-clone first run should
-only use WineHQ.
 
 Wine Gecko (HTML) is the same class of dialog. If that one hangs, the
 same idea applies: put the official MSI under `share/wine/gecko/` from
@@ -104,11 +110,11 @@ Steam bottle exist. Default graphics are DXMT and DXVK.
 
 Wyn never downloads a Steam title. Steam does.
 
-Run `./scripts/install-wine-mono.sh` first (section 4) so first-boot
-does not open the hung Wine Mono window.
+`wyn steam install` stages Wine Mono with `msiexec /qn` (section 4), then
+runs SteamSetup. Keep the Steam wizard; do not use the Wine Mono GUI.
 
 ```bash
-./.build/release/wyn steam install     # downloads and runs SteamSetup.exe
+./.build/release/wyn steam install     # msiexec /qn, then SteamSetup.exe
 ./.build/release/wyn steam launch      # log in, check Remember me
 ```
 

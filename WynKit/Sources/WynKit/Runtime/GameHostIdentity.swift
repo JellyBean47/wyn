@@ -272,6 +272,9 @@ public enum GameHostIdentity {
         try ensureWine64Symlink()
         try writeFOSSVersionPlist()
         try assertGameHost()
+        // frankea share/wine/mono is gone with the parked Libraries/. Restore the
+        // winecx-matching MSI from ~/Library/Caches/wyn so wineboot does not GUI.
+        try WineMono.restoreDatadirFromCache()
     }
 
     public static func parkNonFOSSGameHostLibraries() throws {

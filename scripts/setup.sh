@@ -54,8 +54,8 @@ echo "==> installing into ~/Library/Application Support/com.fly.gaming/"
 
 echo
 echo "FOSS Wine runtime installed (DXMT/DXVK; no D3DMetal). This is Libraries.steam rollback."
-echo "Wine Mono (do this in Terminal; the GUI installer hangs):"
-echo "  ./scripts/install-wine-mono.sh"
+echo "Wine Mono: ./scripts/install-wine-mono.sh (or ./install.sh). wyn steam install"
+echo "runs msiexec /qn before SteamSetup — do not use the hung GUI installer."
 echo "D3DMetal game-host is FOSS winecx (not this tarball):"
 echo "  ./scripts/build-foss-game-host.sh"
 echo "  ./scripts/install-foss-game-host.sh --directory <wine-root>"

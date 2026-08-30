@@ -627,7 +627,7 @@ extension WynCLI {
     struct SteamInstall: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
             commandName: "install",
-            abstract: "Download and run SteamSetup.exe in the Steam bottle."
+            abstract: "Download SteamSetup.exe; msiexec /qn Wine Mono, then run the wizard."
         )
 
         mutating func run() async throws {
@@ -642,6 +642,7 @@ extension WynCLI {
                 return
             }
 
+            print("Wine Mono: msiexec /qn (no installer window), then Steam setup.")
             print("Downloading Steam installer...")
             let installer = try await SteamLauncher.downloadInstaller()
             print("Starting Steam setup wizard (follow the on-screen prompts)...")
@@ -791,6 +792,8 @@ extension WynCLI {
                 print("Installing FOSS winecx game-host from \(dir)\(link ? " (link)" : "")…")
                 try GameHostIdentity.install(from: URL(fileURLWithPath: dir), link: link)
                 RuntimeManager.activeSource = .gptkAware
+                print("Staging Wine Mono MSI for winecx (WineHQ; msiexec /qn at wyn steam install)…")
+                try await WineMono.ensureDatadirPackage()
                 print(GameHostIdentity.inspect().rendered)
                 print("FOSS GPTK game-host installed. Next: wyn gptk install --from /path/to/Apple/GPTK/redist")
                 return
