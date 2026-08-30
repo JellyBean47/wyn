@@ -749,8 +749,12 @@ public class Wine {
         gameExeNames: [String],
         debug: Bool = false
     ) throws {
-        // Restore Valve steamwebhelper if a prior GPTK-era shim is still installed.
-        _ = try SteamCEFShim.uninstall(from: bottle, debug: debug)
+        // steam.exe -cef-in-process-gpu is not forwarded to steamwebhelper.
+        // Without --in-process-gpu, CEF paints (login JS runs) and the HWND stays
+        // black — Wine never gets the frames. The shim injects
+        // --disable-gpu --in-process-gpu. -cef-disable-gpu on steam.exe still
+        // needed so Steam itself does not spawn a crashing GPU helper.
+        _ = try SteamCEFShim.install(into: bottle, debug: debug)
         try removeLocalSteamGraphicsDLLs(bottle: bottle, debug: debug)
 
         // `b`, not `n,b`. These must be builtin, and `n,b` does not mean that — it means
@@ -795,7 +799,7 @@ public class Wine {
             values: ["ShowCrashDialog": ("REG_DWORD", "0")]
         )
         if debug {
-            print("[wyn:debug] AppDefaults: Steam/CEF game-host-safe (n,b, no cef-shim); game \(gameExeNames) GPTK builtin")
+            print("[wyn:debug] AppDefaults: Steam/CEF game-host-safe (d3d*=b + cef-shim); game \(gameExeNames) GPTK builtin")
         }
     }
 

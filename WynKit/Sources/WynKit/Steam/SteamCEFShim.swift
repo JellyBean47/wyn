@@ -51,7 +51,7 @@ public enum SteamCEFShim {
               let size = attrs[.size] as? NSNumber else {
             return false
         }
-        return size.intValue < 100_000
+        return size.intValue < 500_000
     }
 
     /// Ensure CEF dir has shim as steamwebhelper.exe and Valve binary as steamwebhelper_real.exe.
@@ -90,7 +90,7 @@ public enum SteamCEFShim {
         if !realExists {
             let attrs = try fm.attributesOfItem(atPath: helper.path(percentEncoded: false))
             let size = (attrs[.size] as? NSNumber)?.intValue ?? 0
-            if size < 100_000 {
+            if size < 500_000 {
                 if debug {
                     print("[wyn:debug] CEF shim: helper looks like a shim but no _real — abort")
                 }

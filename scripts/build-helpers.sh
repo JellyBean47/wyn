@@ -15,8 +15,17 @@ clang -arch x86_64 -dynamiclib -O2 -fobjc-arc -framework Foundation -framework A
   "$ROOT/Tools/present_force_inject.m"
 
 clang -arch x86_64 -dynamiclib -O2 \
-  -o "$BIN/winemac_rtld_global.dylib" \
-  "$ROOT/Tools/winemac_rtld_global.c"
+    -o "$BIN/winemac_rtld_global.dylib" \
+    "$ROOT/Tools/winemac_rtld_global.c"
+
+# Steam CEF: --in-process-gpu so login HWND is not black. Not committed.
+if command -v x86_64-w64-mingw32-gcc >/dev/null; then
+  x86_64-w64-mingw32-gcc -O2 -mwindows \
+    -o "$BIN/steamwebhelper_shim.exe" \
+    "$ROOT/Tools/steamwebhelper_shim.c"
+else
+  echo "skip steamwebhelper_shim.exe (need x86_64-w64-mingw32-gcc)"
+fi
 
 # Names StorefrontLauncher / Connect look for.
 cp -f "$BIN/fly_stretch_epi_bridge.fast.dylib" "$BIN/fly_stretch_epi_bridge.dylib" 2>/dev/null || true
