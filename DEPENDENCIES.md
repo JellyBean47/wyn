@@ -32,21 +32,24 @@ Wyn does **not** rehost this tarball on its own GitHub Releases.
 ## Optional D3DMetal game-host (not downloaded)
 
 `wyn runtime install --gptk-aware` **does not fetch Wine**. The game-host is
-Sikarugir CrossOver-hosted Wine the user already has (CrossOver.app or a
-Sikarugir wrapper). Wyn will not redistribute CrossOver binaries or unofficial
-CX tarballs. See [Documentation/user/game-host.md](Documentation/user/game-host.md).
+self-built FOSS winecx. Wyn will not redistribute CrossOver binaries or
+unofficial CX tarballs, and will not accept CrossOver.app. See
+[Documentation/user/game-host.md](Documentation/user/game-host.md).
 
-- **Obtain:** https://www.codeweavers.com/crossover (trial or purchase) and/or
-  https://github.com/Sikarugir-App/Sikarugir
-- **Install:** `wyn runtime install --gptk-aware --directory /Applications/CrossOver.app`
+- **Source:** https://github.com/dappermint/winecx (`wine1115`)
+- **Pins:** `WINECX_COMMIT` / `NIXPKGS_REV` in `scripts/runtime-pins.env`
+- **Build:** `./scripts/build-foss-game-host.sh` (mingw-w64 gcc, not llvm-mingw)
+- **Install:** `wyn runtime install --gptk-aware --directory <wine-root>`
   or `./scripts/install-cx-game-host.sh --directory …`
-- **Identity:** `Wine/bin` → CrossOver-Hosted Application; `wine64` → wineloader;
-  `lib64/apple_gptk` present; wineserver CX-class (~593760 / 4 Jun), not Whisky
-  (~856608 / 25 Apr). The check **refuses Whisky-as-game-host**.
-- **GPTK 3.0:** user Apple DMG via `wyn gptk install --from` onto that CX tree.
+- **Identity:** `ntdll.so` contains `CX_APPLEGPTK_LIBD3DSHARED_PATH`; `wine64` is
+  not wineloader; `Wine/bin` is not CrossOver-Hosted Application. After GPTK
+  overlay, unix `d3d11.so` is a symlink to `lib/external/libd3dshared.dylib`.
+  Refuses CrossOver.app and Whisky 11 without the ntdll hook.
+- **GPTK 3.0:** user Apple DMG via `wyn gptk install --from` onto that winecx tree.
 
 The former EricSpencer `wine-v26.1.0-foss-phase1l` WhiskyWine tarball is **not**
-the game-host. Do not install it as `Libraries/` for D3DMetal.
+the game-host. Do not install it as `Libraries/` for D3DMetal. CrossOver.app is
+also not the game-host.
 
 - **Name:** EricSpencer WhiskyWine (historical; not used)
 - **URL:** https://github.com/EricSpencer00/Whisky/releases/download/wine-v26.1.0-foss-phase1l/Libraries.tar.gz

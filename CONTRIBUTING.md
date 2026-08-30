@@ -13,8 +13,8 @@ they can apply to Wine.
 - Store installers (`SteamSetup.exe`, `Battle.net-Setup.exe`, …)
 - Game files, logs, credentials, operational `Docs/HANDOVER-*`
 - Built helpers under `Tools/bin/`
-- CrossOver.app or CodeWeavers proprietary bits (users copy/link CX Wine into
-  `~/Library/Application Support/com.fly.gaming/Libraries/` themselves)
+- CrossOver.app or CodeWeavers proprietary bits (do not copy into git; the
+  D3DMetal game-host is self-built winecx, not CrossOver)
 - Microsoft fonts / `d3dcompiler_47.dll`
 - Windows ISOs, UTM `.utm` guests, Xbox Game Pass packages
 

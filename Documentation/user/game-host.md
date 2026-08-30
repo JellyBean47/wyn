@@ -1,43 +1,47 @@
-# D3DMetal game-host (CrossOver-hosted Wine)
+# D3DMetal game-host (FOSS winecx)
 
-The D3DMetal game-host is **Sikarugir CrossOver-hosted Wine**, not Whisky 11
-with GPTK bolted on. Restoring a parked CX-hosted `Libraries/Wine` and running
-Steam UI there is the path that actually ran Satisfactory.
+The D3DMetal game-host is **self-built FOSS winecx** (Wine 11.15 + in-tree
+ntdll `CX_APPLEGPTK_LIBD3DSHARED_PATH` hook), not CrossOver.app / wineloader
+and not Whisky 11 with GPTK bolted on.
 
-Wyn does **not** vendor Wine or GPTK binaries and does **not** download
-CrossOver. Unofficial “CX engine” tarballs are not an install source.
+Wyn does **not** vendor Wine or GPTK binaries and does **not** download Wine
+for `--gptk-aware`. CrossOver.app is refused. Unofficial “CX engine” tarballs
+are not an install source.
 
 ## What lives where
 
 | Tree | Role |
 | --- | --- |
-| `Libraries/` (game-host) | Sikarugir CrossOver-hosted Wine. Steam UI for GPTK 3.0 + games. |
+| `Libraries/` (game-host) | FOSS winecx. Steam UI for GPTK 3.0 + games. |
 | `Libraries.steam` (frankea) | `./scripts/setup.sh` WhiskyWine v3.1.1 — DXMT / window rollback only. |
-| Apple GPTK 3.0 | User DMG/redist via `wyn gptk install --from` onto the CX tree (`D3DMetal.framework` + `libd3dshared`). Not Wine. |
+| Apple GPTK 3.0 | User DMG/redist via `wyn gptk install --from` onto the winecx tree (`D3DMetal.framework` + `libd3dshared`). Not Wine. |
 
 Steam on the game-host wineserver. Isolation AppDefaults for `steam.exe` and
 `steamwebhelper.exe` are **`=b`** (builtin), not `n,b`.
+`translationLayer=d3dmetal` does **not** silently fall back to frankea DXVK.
 
-## Obtain CrossOver-hosted Wine
+## Build FOSS winecx
 
-1. **CrossOver** from CodeWeavers (trial or purchase):
-   https://www.codeweavers.com/crossover
-2. Or a **Sikarugir** wrapper whose engine is that CrossOver-hosted Wine.
-   Sikarugir itself: https://github.com/Sikarugir-App/Sikarugir
-   (`brew install --cask Sikarugir-App/sikarugir/sikarugir`).
+Pins live in `scripts/runtime-pins.env` (`WINECX_COMMIT`, `NIXPKGS_REV`).
+PE modules must be built with **mingw-w64 gcc** (llvm-mingw `kernelbase`
+stalls Steam CM login). Unix half is **x86_64** (Rosetta). Needs Nix
+`extra-platforms = x86_64-darwin` for freetype/gnutls/gstreamer/ffmpeg —
+Apple Silicon Homebrew is arm64.
 
-Do not copy `CrossOver.app` into this git tree.
+```bash
+./scripts/build-foss-game-host.sh
+```
+
+Source tree: https://github.com/dappermint/winecx (`wine1115`). Harness:
+https://github.com/frankea/winecx-gptk. Do not copy CrossOver.app into git.
 
 ## Copy or link into Wyn
 
 ```bash
 # After ./scripts/setup.sh (frankea rollback) and a built CLI:
-./scripts/install-cx-game-host.sh --directory /Applications/CrossOver.app
-# or a Sikarugir wrapper .app
-./scripts/install-cx-game-host.sh --directory /Applications/YourWrapper.app --link
-
+./scripts/install-cx-game-host.sh --directory /path/to/wine-root
 # same thing via CLI:
-wyn runtime install --gptk-aware --directory /Applications/CrossOver.app
+wyn runtime install --gptk-aware --directory /path/to/wine-root
 wyn runtime install --gptk-aware --check
 ```
 
@@ -45,27 +49,36 @@ Destination:
 
 `~/Library/Application Support/com.fly.gaming/Libraries/`
 
-`--link` keeps CrossOver.app as the bytes. A copy (`ditto`) survives deleting
-the app. Non-CX `Libraries/` is parked as `Libraries.pre-gptk-aware.bak` and
-exposed as `Libraries.steam`.
+`--link` keeps the build tree as the bytes. Non-host `Libraries/` is parked as
+`Libraries.pre-gptk-aware.bak` and exposed as `Libraries.steam`.
 
 `--gptk-aware` **does not download** Wine. There is no hash-pinned GPTK-aware
-tarball for the game-host.
+tarball Wyn fetches.
 
 ## Identity (sanity-check)
 
 `wyn runtime install --gptk-aware --check` and
-`./scripts/install-cx-game-host.sh --check` refuse Whisky-as-game-host.
+`./scripts/install-cx-game-host.sh --check` refuse CrossOver.app / wineloader
+and Whisky 11 without the ntdll hook.
 
-| Probe | CrossOver-hosted (accept) | Whisky (refuse) |
+| Probe | FOSS winecx (accept) | Refuse |
 | --- | --- | --- |
-| `Wine/bin` | `CrossOver-Hosted Application` (symlink or that folder copied to `bin/`) | ordinary `bin/` |
-| `wine64` | `wineloader` | a `wine64` binary |
-| `lib64/apple_gptk` | present | absent |
-| `wineserver` | CX-class, parked **~593760 / 4 Jun** | Whisky **~856608 / 25 Apr** |
+| `ntdll.so` | contains `CX_APPLEGPTK_LIBD3DSHARED_PATH` | missing |
+| `wine64` | ordinary `wine64` | `wineloader` |
+| `Wine/bin` | ordinary `bin/` | `CrossOver-Hosted Application` |
+| Whisky 11 | n/a | `WhiskyWineVersion.plist` / wineserver ~856608 and no ntdll hook |
+| After GPTK overlay | `d3d11.so` / `dxgi.so` / `d3d12.so` → `lib/external/libd3dshared.dylib` beside `D3DMetal.framework` | copied (non-symlink) unix modules |
 
-Steam tiles and `wyn steam launch` already use the game-host when this identity
-plus ntdll `CX_APPLEGPTK_*` hooks are present. Otherwise they stay on frankea.
+Steam tiles and `wyn steam launch` use the game-host when this identity is
+present. Otherwise they stay on frankea. D3DMetal **play** errors if the host
+or Logged-On Steam is missing.
+
+## Satisfactory (D3DMetal)
+
+Play-menu pointer: Steam Input off (`UseSteamControllerConfig=0` for 526870).
+The FOSS host must ship `winebus.so` with `@loader_path/../..` so libinotify
+loads (`scripts/build-foss-game-host.sh`). Do not pin `FG.InputMode`. Do not
+`xinput*=d`. Never `wineserver -k`. CLI: `./.build/debug/wyn play satisfactory`.
 
 ## GPTK 3.0 (Apple, not Wine)
 
@@ -77,4 +90,6 @@ wyn gptk status
 Apple download (Wyn never fetches it):
 https://developer.apple.com/download/all/?q=game%20porting%20toolkit
 
-Read Apple’s SLA. Overlay goes onto the CX tree (`lib/external`).
+Read Apple’s SLA. Overlay goes onto the winecx tree (`lib/external`).
+Unix D3D modules must be **symlinks** to `libd3dshared` (`cp -L` breaks
+`dlopen` of D3DMetal).

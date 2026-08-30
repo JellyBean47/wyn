@@ -123,14 +123,10 @@ public enum GPTKInstaller {
         return roots
     }
 
-    /// True when GPTK PE/unix stubs were overlaid into the Wine tree.
+    /// True when unix D3D modules are symlinks to `libd3dshared.dylib` beside D3DMetal.framework.
     public static func isWineModulesWired() -> Bool {
-        FileManager.default.fileExists(
-            atPath: wineLibFolder
-                .appending(path: "wine")
-                .appending(path: "x86_64-unix")
-                .appending(path: "d3d11.so")
-                .path(percentEncoded: false)
+        GameHostIdentity.unixD3DMetalWired(
+            in: WynWineInstaller.libraryFolder.appending(path: "Wine")
         )
     }
 
@@ -157,15 +153,14 @@ public enum GPTKInstaller {
             .appending(path: "nvngx.dll")
     }
 
-    /// True when Libraries/Wine is a CrossOver-hosted game-host that can load D3DMetal.
-    /// ntdll `CX_APPLEGPTK_*` alone is not enough — EricSpencer/Whisky tarballs have
-    /// the symbol but are not the game-host. Steam UI uses this gate.
+    /// True when Libraries/Wine is FOSS winecx with the ntdll GPTK hook.
+    /// CrossOver.app / wineloader and Whisky 11 without the hook are refused.
+    /// Steam UI uses this gate; D3DMetal play also needs `isWineModulesWired()`.
     public static func isWineGPTKAware() -> Bool {
-        let report = GameHostIdentity.inspect()
-        return report.isCrossOverHosted && report.ntdllGPTKAware
+        GameHostIdentity.inspect().isFOSSGPTKHost
     }
 
-    /// ntdll-only probe (CX hooks). Does not accept Whisky as the game-host.
+    /// ntdll-only probe (`CX_APPLEGPTK_*` in winecx). Does not accept Whisky as the game-host.
     public static func ntdllHasCXAppleGPTK() -> Bool {
         GameHostIdentity.ntdllHasCXAppleGPTK(in: WynWineInstaller.libraryFolder.appending(path: "Wine"))
     }

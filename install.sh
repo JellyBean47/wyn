@@ -23,5 +23,5 @@ if [[ ":${PATH}:" != *":${BIN_DIR}:"* ]]; then
 fi
 echo "Steam (optional):  wyn steam install"
 echo "Heroic:            https://heroicgameslauncher.com"
-echo "Game-host (CX):    ./scripts/install-cx-game-host.sh --directory /Applications/CrossOver.app"
+echo "Game-host (FOSS):  ./scripts/build-foss-game-host.sh && ./scripts/install-cx-game-host.sh --directory <wine-root>"
 echo "GPTK (optional):   wyn gptk install --from <apple-redist>"

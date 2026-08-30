@@ -124,27 +124,30 @@ Wyn.app or:
 written `appmanifest_3949040.acf`. The profile lists `vcrun2019`; Wyn does
 **not** run winetricks automatically.
 
-## 7. Optional D3DMetal (CX-hosted game-host)
+## 7. Optional D3DMetal (FOSS winecx game-host)
 
 Default setup stays on frankea Wine (DXMT/DXVK). D3DMetal needs a **different
-Wine tree**: Sikarugir CrossOver-hosted Wine, not Whisky 11 + GPTK bolted on.
-Wyn does not download CrossOver Wine. Full path:
+Wine tree**: self-built FOSS winecx, not CrossOver.app and not Whisky 11 + GPTK
+bolted on. Wyn does not download Wine for `--gptk-aware`. Full path:
 [game-host.md](game-host.md).
 
-1. Get CrossOver from https://www.codeweavers.com/crossover (trial or purchase),
-   or a Sikarugir wrapper whose engine is that CrossOver-hosted Wine
-   (https://github.com/Sikarugir-App/Sikarugir). Do not copy CrossOver.app into git.
-2. Copy or link it into `~/Library/Application Support/com.fly.gaming/Libraries/`:
+1. Build winecx (mingw-w64 gcc, x86_64 unix half, Nix x86_64-darwin libs):
 
    ```bash
-   wyn runtime install --gptk-aware --directory /Applications/CrossOver.app
-   # or
-   ./scripts/install-cx-game-host.sh --directory /Applications/CrossOver.app
+   ./scripts/build-foss-game-host.sh
    ```
 
-   `--gptk-aware` does **not** download a tarball. It refuses Whisky-as-game-host
-   (`wine64` must be `wineloader`, `lib64/apple_gptk` present, wineserver CX-class
-   ~593760 / 4 Jun — not Whisky ~856608 / 25 Apr).
+   Do not use CrossOver.app or unofficial CX tarballs.
+2. Copy or link the prefix into `~/Library/Application Support/com.fly.gaming/Libraries/`:
+
+   ```bash
+   wyn runtime install --gptk-aware --directory /path/to/wine-root
+   # or
+   ./scripts/install-cx-game-host.sh --directory /path/to/wine-root
+   ```
+
+   `--gptk-aware` does **not** download a tarball. It refuses CrossOver.app /
+   wineloader and Whisky 11 without ntdll `CX_APPLEGPTK_LIBD3DSHARED_PATH`.
 3. Apple GPTK 3.0 is separate (user DMG). Read the SLA, then:
 
    ```bash
@@ -152,12 +155,14 @@ Wyn does not download CrossOver Wine. Full path:
    ```
 
    The folder must contain `lib/external` or `external` with
-   `D3DMetal.framework` and `libd3dshared.dylib`. Wyn never downloads GPTK.
+   `D3DMetal.framework` and `libd3dshared.dylib`. Unix `d3d11.so` must be a
+   **symlink** to `libd3dshared`. Wyn never downloads GPTK.
 
 Steam UI for 3.0 lives on the game-host wineserver. Isolation AppDefaults for
 `steam.exe` / `steamwebhelper` are `=b`. frankea (`Libraries.steam`) is DXMT /
 window rollback only. `wyn steam launch` and the Steam tile already use the
-game-host when this CX identity is present.
+game-host when this FOSS identity is present. D3DMetal play does not fall back
+to frankea DXVK.
 
 ## 8. Other stores
 

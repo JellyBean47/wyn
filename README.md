@@ -28,7 +28,7 @@ cd wyn
 
 `setup.sh` downloads the **hash-pinned** frankea WhiskyWine tarball (Wine 11 +
 DXVK-macOS + DXMT 0.80 + MoltenVK). It **refuses** archives that contain Apple
-GPTK files. It is not the D3DMetal game-host (user-supplied CrossOver-hosted Wine; see Documentation/user/game-host.md). It does not install Steam games or GPTK.
+GPTK files. It is not the D3DMetal game-host (self-built FOSS winecx; see Documentation/user/game-host.md). It does not install Steam games or GPTK.
 
 Then:
 
@@ -62,12 +62,14 @@ in Steam (RV There Yet? is app 3949040), then click the tile or
 installers when you click Install. Epic and GOG in Wine are not the product
 path (use Heroic).
 
-**D3DMetal:** the game-host is **Sikarugir CrossOver-hosted Wine**, not Whisky 11
-+ GPTK. Wyn never downloads CrossOver or GPTK. See
+**D3DMetal:** the game-host is **self-built FOSS winecx**, not CrossOver.app
+and not Whisky 11 + GPTK. Wyn never downloads CrossOver, winecx, or GPTK for
+`--gptk-aware`. See
 [Documentation/user/game-host.md](Documentation/user/game-host.md).
 
 ```bash
-wyn runtime install --gptk-aware --directory /Applications/CrossOver.app
+./scripts/build-foss-game-host.sh
+wyn runtime install --gptk-aware --directory /path/to/wine-root
 wyn gptk install --from /path/to/GPTK/redist
 ```
 
