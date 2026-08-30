@@ -216,8 +216,27 @@ if [[ -d "$PREFIX/opt/whiskywine" ]]; then
       install_name_tool -change libinotify.dylib '@rpath/libinotify.dylib' "$PREFIX/wine-root/bin/wineserver" 2>/dev/null || true
     fi
     if [[ -f "$PREFIX/wine-root/lib/wine/x86_64-unix/winebus.so" ]]; then
-      install_name_tool -add_rpath '@loader_path/../../..' "$PREFIX/wine-root/lib/wine/x86_64-unix/winebus.so" 2>/dev/null || true
-      install_name_tool -change libinotify.dylib '@rpath/libinotify.dylib' "$PREFIX/wine-root/lib/wine/x86_64-unix/winebus.so" 2>/dev/null || true
+      winebus="$PREFIX/wine-root/lib/wine/x86_64-unix/winebus.so"
+      # winebus.so lives in lib/wine/x86_64-unix/; libinotify.dylib lives in
+      # lib/. @loader_path/../.. is lib/. @loader_path/../../.. is Wine/ and
+      # misses the dylib (30 Aug 2026: dlopen @rpath/libinotify.dylib failed,
+      # ZwLoadDriver c0000135, setupapi error 126). Do not swallow a failed
+      # rpath/codesign: a silent || true shipped a broken bus for a week.
+      # Match the LC_RPATH path exactly — a substring grep for ../.. also
+      # matches the wrong ../../.. path. otool prints "path … (offset N)".
+      command -v otool >/dev/null || fail "need otool to verify winebus rpath"
+      winebus_rpaths=$(otool -l "$winebus" | awk '/cmd LC_RPATH/{getline; getline; print $2}')
+      if ! printf '%s\n' "$winebus_rpaths" | grep -qx '@loader_path/../..'; then
+        if ! install_name_tool -add_rpath '@loader_path/../..' "$winebus" 2>/dev/null; then
+          install_name_tool -rpath '@loader_path/../../..' '@loader_path/../..' "$winebus" \
+            || fail "winebus rpath: cannot add or replace @loader_path/../.."
+        fi
+      fi
+      install_name_tool -change libinotify.dylib '@rpath/libinotify.dylib' "$winebus" 2>/dev/null || true
+      codesign -f -s - "$winebus" || fail "winebus rpath: codesign failed"
+      otool -l "$winebus" | awk '/cmd LC_RPATH/{getline; getline; print $2}' \
+        | grep -qx '@loader_path/../..' \
+        || fail "winebus rpath fix FAILED: missing @loader_path/../.. (libinotify would not load)"
     fi
     unix="$PREFIX/wine-root/lib/wine/x86_64-unix"
     for name in libfreetype.6.dylib libfreetype.dylib libgnutls.30.dylib libgnutls.dylib libMoltenVK.dylib libvulkan.1.dylib; do
