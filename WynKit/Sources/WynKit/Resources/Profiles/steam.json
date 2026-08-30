@@ -11,6 +11,6 @@
   "environment": {
     "WINEDLLOVERRIDES": "winemenubuilder.exe=d;gameoverlayrenderer64=n;dxgi,d3d11,d3d10core=n,b"
   },
-  "launchArgs": "-no-cef-sandbox -noverifyfiles -cef-disable-gpu",
-  "notes": "P0-c: Steam UI defaults to game-host winecx in Libraries/ (wyn steam launch). Game-host launch does NOT apply this profile's dxmt / dxgi,d3d11=n,b — those poisoned Steam Play children. Play inherits GPTK + D3DMetal from steam.exe. This JSON is still used for frankea rollback and for -no-cef-sandbox args. Same bottle stores Remember-me tokens. -cef-disable-gpu: CEF GPU process crash-loops under winecx (black client window since bottle create, 24 Aug); software CEF is fine for a launcher."
+  "launchArgs": "-no-cef-sandbox -noverifyfiles -cef-disable-gpu -cef-in-process-gpu",
+  "notes": "P0-c: Steam UI defaults to game-host winecx in Libraries/ (wyn steam launch). Game-host launch does NOT apply this profile's dxmt / dxgi,d3d11=n,b — those poisoned Steam Play children. Play inherits GPTK + D3DMetal from steam.exe. This JSON is still used for frankea rollback and for CEF args. Same bottle stores Remember-me tokens. -cef-disable-gpu: CEF GPU process crash-loops under winecx. steam.exe -cef-in-process-gpu is not forwarded to steamwebhelper — the steamwebhelper shim injects --disable-gpu --in-process-gpu so the login HWND paints."
 }
