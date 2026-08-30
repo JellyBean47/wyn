@@ -57,9 +57,14 @@ steam_is_own_session() {
 
 # Daemonize: setsid + double-fork + ignore HUP. Extra args after the log path
 # are passed to steam.exe (e.g. -silent). Requires WINE, STEAM_DIR.
+# Always pass -cef-disable-gpu: winecx CEF GPU process crash-loops (black HWND).
 start_own_session_steam() {
   local log="${1:?start_own_session_steam: log path}"
   shift
+  case " $* " in
+    *" -cef-disable-gpu "*) ;;
+    *) set -- "$@" -cef-disable-gpu ;;
+  esac
   : "${WINE:?}" "${STEAM_DIR:?}"
   mkdir -p "$(dirname "$log")"
   echo "Starting own-session FOSS Steam (setsid + double-fork; not a child of this script or the game)"
