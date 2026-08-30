@@ -2,7 +2,7 @@
 //  GameLibrary.swift
 //  WynKit
 //
-//  Installed-game catalog for the CrossOver-shaped library UI.
+//  Installed-game catalog for the library UI.
 //
 
 import Foundation

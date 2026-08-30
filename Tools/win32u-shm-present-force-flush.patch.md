@@ -12,7 +12,7 @@
 2. `shm_surface_flush` uses `SendMessageTimeout(..., SMTO_ABORTIFHUNG|SMTO_BLOCK, 500)` —
    easy to miss under a busy parent queue.
 
-**Apply to:** frankea / CX-foss `dlls/win32u/dce.c` (HACK 23950 block), then rebuild
+**Apply to:** frankea `dlls/win32u/dce.c` (HACK 23950 block), then rebuild
 `win32u.so` and replace
 `Libraries.steam/Wine/lib/wine/x86_64-unix/win32u.so` (keep a `.bak`).
 

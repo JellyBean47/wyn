@@ -100,17 +100,15 @@ cp -f "$UC/devargs.txt" "$UC/webcore_args.txt"
 rm -f "$BRIDGE_HOST" /tmp/fly-stretch-epi.log 2>/dev/null || true
 
 export WINEPREFIX="$BOTTLE"
-# WINEESYNC=1 was briefly believed to be what kills CEF on a CrossOver-lineage tree (one run
-# each: bare 0 vs esync 314k gl_factory_win NOTREACHED). It is not. Re-measured as a rate over
-# 3 bare and 2 esync runs (.scratch/cx-build-26.3/gl-score.sh): every run storms, 5.9-8.2k/s,
-# with and without esync. The original counts differed only because they were raw totals from a
-# fixed 55 s window that the storm occupied for 49 s and 30 s respectively.
+# WINEESYNC=1 was briefly believed to be what kills CEF on a winecx-lineage
+# tree (one run each: bare 0 vs esync 314k gl_factory_win NOTREACHED). It is
+# not. Re-measured as a rate over 3 bare and 2 esync runs: every run storms,
+# 5.9-8.2k/s, with and without esync. The original counts differed only
+# because they were raw totals from a fixed 55 s window that the storm occupied
+# for 49 s and 30 s respectively.
 #
-# Still worth fixing for the CX tree, though not for this bug: CrossOver 26 itself does not use
-# esync. Its bottle upgrade (share/crossover/bottle_templates/*/CXBT_*.pm, upgrade_graphics_
-# settings) sets WINEMSYNC=1 whenever it finds WINEESYNC=1 and then *removes* WINEESYNC. So on
-# the game tree the CrossOver-native setting is FLY_MSYNC=1 with esync off. Left as-is here
-# because this launcher is shared with the frankea tree, which is the playable path.
+# Game-host default here is FLY_MSYNC=1. Left as-is because this launcher is
+# shared with the frankea tree, which is the playable path.
 [ "${FLY_NO_ESYNC:-0}" = "1" ] || export WINEESYNC=1
 # WRITECOPY simulation is an ntdll feature and Chromium leans hard on copy-on-write pages,
 # so FLY_NO_WRITECOPY=1 exists to take it out of the picture when CEF fails to init GL.
@@ -131,7 +129,7 @@ fi
 # Dropping it here looked like it changed nothing for weeks because the same disable was also
 # baked into the bottle's registry (AppDefaults\upc.exe, UplayWebCore.exe, UbisoftConnect.exe,
 # UbisoftGameLauncher.exe). Either copy alone is enough to storm; both are removed as of
-# 12 Aug 23:05. CrossOver sets no WINEDLLOVERRIDES at all and has no upc AppDefaults.
+# 12 Aug 23:05. Game-host Wine sets no WINEDLLOVERRIDES at all and has no upc AppDefaults.
 # The rest of the string is proven harmless: scored CLEAN with d2d1/d3d10core=d, d3d11/dxgi=b
 # and d3dcompiler_47=n all still in place.
 # FLY_DLLOVERRIDES replaces the whole string for one-off experiments (e.g. taking the GPTK

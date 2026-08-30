@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Install a self-built FOSS winecx tree as Wyn's D3DMetal game-host.
-# Does not download Wine, CrossOver, GPTK, or Whisky.
-# Refuses CrossOver.app / wineloader and Whisky 11 without ntdll CX_APPLEGPTK.
+# Does not download Wine, GPTK, or Whisky.
+# Refuses proprietary Wine.app / wineloader layouts and Whisky 11 without
+# the winecx ntdll CX_APPLEGPTK hook.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -20,13 +21,14 @@ usage() {
   cat <<'EOF'
 Install self-built FOSS winecx as the D3DMetal game-host.
 
-Wyn does not download Wine for this path and will not accept CrossOver.app
-or wineloader. Build winecx first (./scripts/build-foss-game-host.sh).
+Wyn does not download Wine for this path. Proprietary Wine.app bundles and
+wineloader layouts are refused. Build winecx first
+(./scripts/build-foss-game-host.sh).
 
 Usage:
-  ./scripts/install-cx-game-host.sh --directory /path/to/wine-prefix
-  ./scripts/install-cx-game-host.sh --directory /path/to/Libraries --link
-  ./scripts/install-cx-game-host.sh --check
+  ./scripts/install-foss-game-host.sh --directory /path/to/wine-prefix
+  ./scripts/install-foss-game-host.sh --directory /path/to/Libraries --link
+  ./scripts/install-foss-game-host.sh --check
 
 --directory   Wine prefix / Wine root / Wyn Libraries tree (bin/wine64 + ntdll.so)
 --link        Symlink into ~/Library/Application Support/com.fly.gaming/Libraries/
@@ -34,9 +36,9 @@ Usage:
 --check       Sanity-check the installed Libraries/ only (no copy)
 
 Identity:
-  ntdll.so contains CX_APPLEGPTK_LIBD3DSHARED_PATH
+  ntdll.so contains CX_APPLEGPTK_LIBD3DSHARED_PATH (winecx GPTK hook)
   wine64 is not wineloader
-  Wine/bin is not CrossOver-Hosted Application
+  Wine/bin is an ordinary bin/ directory
 
 GPTK 3.0 is separate: wyn gptk install --from <Apple redist or DMG>
 frankea (./scripts/setup.sh) stays DXMT / window rollback as Libraries.steam.
@@ -165,9 +167,9 @@ inspect_and_print() {
   echo "Wine/bin:          $bin"
 
   if bin_is_cx_hosted "$bin"; then
-    echo "bin is CX-hosted:  yes — refused"
+    echo "bin hosted layout: yes — refused"
   else
-    echo "bin is CX-hosted:  no"
+    echo "bin hosted layout: no"
   fi
 
   if resolves_to_wineloader "$wine64"; then
@@ -193,7 +195,7 @@ inspect_and_print() {
 GameHostHint="$(cat <<'HINT'
 Build FOSS winecx (./scripts/build-foss-game-host.sh) and pass that prefix
 to --directory. Wyn will not download Wine here and will not accept
-CrossOver.app or wineloader.
+proprietary Wine.app bundles or wineloader.
 HINT
 )"
 
@@ -205,7 +207,7 @@ refuse_if_bad() {
   wineserver="$bin/wineserver"
 
   if [[ "$wine_root" == *CrossOver.app* ]] || [[ "$DIRECTORY" == *CrossOver.app* ]]; then
-    fail "Refusing CrossOver.app.
+    fail "Refusing a proprietary Wine.app bundle.
 $GameHostHint"
   fi
 
@@ -220,7 +222,7 @@ $GameHostHint"
   fi
 
   if [[ $loader -eq 1 || $hosted -eq 1 ]]; then
-    fail "Refusing CrossOver-hosted Wine (wineloader / CrossOver-Hosted Application).
+    fail "Refusing proprietary Wine loader layout (wineloader / hosted-application bin).
 $GameHostHint"
   fi
 
@@ -265,7 +267,7 @@ $GameHostHint"
 [[ -e "$DIRECTORY" ]] || fail "not found: $DIRECTORY"
 
 if [[ "$DIRECTORY" == *CrossOver.app* ]]; then
-  fail "Refusing CrossOver.app.
+  fail "Refusing a proprietary Wine.app bundle.
 $GameHostHint"
 fi
 

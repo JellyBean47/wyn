@@ -1,4 +1,4 @@
-/* FOSS macdrv present patch sketch — for frankea/wine-11 or CX-foss rebuild.
+/* FOSS macdrv present patch sketch — for frankea/wine-11 rebuild.
  *
  * Problem (Fly Connect §2.9/§2.10):
  *   Splash ULW AlphaBlend → layered surface → setColorImage → updateLayer sets CALayer.contents (works).

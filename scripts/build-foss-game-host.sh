@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build FOSS winecx (Wine 11.15 + in-tree GPTK ntdll hook) for Wyn's D3DMetal
-# game-host. Does not download CrossOver, GPTK, or Whisky. Does not vendor Wine.
+# game-host. Does not download GPTK or Whisky. Does not vendor Wine.
 #
 # Pins match frankea/winecx-gptk CI (WINECX_COMMIT / NIXPKGS_REV).
 # PE half: mingw-w64 gcc — llvm-mingw kernelbase stalls Steam CM login.

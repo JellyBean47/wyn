@@ -11,8 +11,8 @@
 #                          could not distinguish, because it measured no network at
 #                          all: the process was alive, heartbeating and 100% idle,
 #                          which is exactly what waiting on a Ubisoft content check
-#                          looks like. CodeWeavers document a long "Checking for
-#                          Additional Content" stall for this very title.
+#                          looks like. This title can sit a long time on
+#                          "Checking for Additional Content".
 #
 # No sudo required. Run it while the game sits on the black screen.
 set -uo pipefail

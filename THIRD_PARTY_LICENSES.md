@@ -25,7 +25,7 @@ Apache-2.0 requires preserving the license text and NOTICE attribution
 | --- | --- | --- | --- | --- |
 | Wine (community WhiskyWine) | 11.0 in frankea `v3.1.1` | LGPL-2.1-or-later | https://github.com/frankea/Whisky/releases | Yes, hash-pinned |
 | Wine (FOSS winecx game-host) | user-built (`WINECX_COMMIT` in `scripts/runtime-pins.env`) | LGPL-2.1-or-later | https://github.com/dappermint/winecx | Never auto-fetched; user builds then copies/links |
-| CrossOver FOSS Wine **source** | 26.x | LGPL-2.1-or-later (and other OSS) | https://www.codeweavers.com/crossover/source | No |
+| Wine corresponding source (winecx lineage) | published Wine dumps | LGPL-2.1-or-later (and other OSS) | https://gitlab.winehq.org/wine/wine · https://www.codeweavers.com/crossover/source | No |
 | DXVK / DXVK-macOS | 1.10.3-async (frankea) | zlib | https://github.com/doitsujin/dxvk · https://github.com/Gcenx/DXVK-macOS | Inside Wine tarball |
 | DXMT | 0.80 (last MIT release) | MIT (v0.80); later is LGPL-2.1+ | https://github.com/3Shain/dxmt | Inside frankea tarball |
 | MoltenVK | 1.4.x | Apache-2.0 | https://github.com/KhronosGroup/MoltenVK | Inside Wine tarball |
@@ -43,8 +43,7 @@ must not, without a corresponding-source offer).
 | Component | License / terms | How to obtain |
 | --- | --- | --- |
 | Apple Game Porting Toolkit, D3DMetal, libd3dshared, metalirconverter | Apple GPTK Software License Agreement (evaluation / non-commercial redistribution; no reverse engineering) | https://developer.apple.com/download/all/?q=game%20porting%20toolkit |
-| CrossOver.app | CodeWeavers EULA | Do not copy into Wyn |
-| Sikarugir wrapper | MIT (wrapper); do not use its CX engine as Wyn’s game-host | https://github.com/Sikarugir-App/Sikarugir |
+| Proprietary Wine.app products | vendor EULA | Do not copy into Wyn; game-host is self-built winecx |
 | Steam, Battle.net, EA App, Epic, GOG, Ubisoft clients | Vendor ToS | Official vendor URLs on explicit user action |
 | Microsoft `d3dcompiler_47`, corefonts | Microsoft redistributable / core fonts EULAs | winetricks or user; do not commit |
 | macOS SDK, Xcode, Rosetta 2 | Apple | User installs |

@@ -214,8 +214,8 @@ public enum SteamLauncher {
 
     /// Environment Steam Play children inherit.
     ///
-    /// CrossOver's `bin/wine` **deletes** `WINEDLLOVERRIDES` (line 716) and drives graphics
-    /// via `CX_GRAPHICS_BACKEND` + `cxcompatdb` per-exe. Wyn has no compat DB, so the Steam
+    /// winecx's `bin/wine` deletes `WINEDLLOVERRIDES` and drives graphics via
+    /// `CX_GRAPHICS_BACKEND` (winecx env). Wyn has no per-exe compat DB, so the Steam
     /// process itself must carry GPTK (`CX_APPLEGPTK_LIBD3DSHARED_PATH`) and D3DMetal
     /// `d3d*=b`. `steam.json` used to export `dxgi,d3d11,d3d10core=n,b` (DXMT native-first)
     /// and `ProfileApplicator.apply` set the bottle to DXMT — every green Play button then
@@ -271,7 +271,7 @@ public enum SteamLauncher {
     }
 
     /// Launch the Steam client with Wyn's Steam compatibility profile applied.
-    /// Default: game-host `Libraries/` (sikarugir 10.0_6 + D3DMetal after P0-c).
+    /// Default: game-host `Libraries/` (FOSS winecx + D3DMetal).
     /// Rollback: `preferFrankeaSteam` / `--frankea-steam` → `Libraries.steam`.
     public static func launchSteam(
         in bottle: Bottle,
@@ -309,7 +309,7 @@ public enum SteamLauncher {
                 print("[wyn:debug] Steam UI → game-host Wine tree (\(WynWineInstaller.libraryFolder.path))")
                 print("[wyn:debug] Play inherits WINEDLLOVERRIDES=\(environment["WINEDLLOVERRIDES"] ?? "(none)")")
             } else {
-                print("Steam UI: game-host Wine (Libraries/ — sikarugir + D3DMetal).")
+                print("Steam UI: game-host Wine (Libraries/ — FOSS winecx + D3DMetal).")
                 print("Press Play in Steam — games inherit this D3DMetal wrapper. wyn play is fallback.")
             }
         } else {

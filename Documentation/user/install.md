@@ -127,8 +127,8 @@ written `appmanifest_3949040.acf`. The profile lists `vcrun2019`; Wyn does
 ## 7. Optional D3DMetal (FOSS winecx game-host)
 
 Default setup stays on frankea Wine (DXMT/DXVK). D3DMetal needs a **different
-Wine tree**: self-built FOSS winecx, not CrossOver.app and not Whisky 11 + GPTK
-bolted on. Wyn does not download Wine for `--gptk-aware`. Full path:
+Wine tree**: self-built FOSS winecx, not Whisky 11 with GPTK bolted on. Wyn
+does not download Wine for `--gptk-aware`. Full path:
 [game-host.md](game-host.md).
 
 1. Build winecx (mingw-w64 gcc, x86_64 unix half, Nix x86_64-darwin libs):
@@ -137,17 +137,17 @@ bolted on. Wyn does not download Wine for `--gptk-aware`. Full path:
    ./scripts/build-foss-game-host.sh
    ```
 
-   Do not use CrossOver.app or unofficial CX tarballs.
 2. Copy or link the prefix into `~/Library/Application Support/com.fly.gaming/Libraries/`:
 
    ```bash
    wyn runtime install --gptk-aware --directory /path/to/wine-root
    # or
-   ./scripts/install-cx-game-host.sh --directory /path/to/wine-root
+   ./scripts/install-foss-game-host.sh --directory /path/to/wine-root
    ```
 
-   `--gptk-aware` does **not** download a tarball. It refuses CrossOver.app /
-   wineloader and Whisky 11 without ntdll `CX_APPLEGPTK_LIBD3DSHARED_PATH`.
+   `--gptk-aware` does **not** download a tarball. It refuses proprietary
+   Wine.app / wineloader layouts and Whisky 11 without ntdll
+   `CX_APPLEGPTK_LIBD3DSHARED_PATH` (winecx’s GPTK hook).
 3. Apple GPTK 3.0 is separate (user DMG). Read the SLA, then:
 
    ```bash

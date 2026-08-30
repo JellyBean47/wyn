@@ -62,9 +62,8 @@ in Steam (RV There Yet? is app 3949040), then click the tile or
 installers when you click Install. Epic and GOG in Wine are not the product
 path (use Heroic).
 
-**D3DMetal:** the game-host is **self-built FOSS winecx**, not CrossOver.app
-and not Whisky 11 + GPTK. Wyn never downloads CrossOver, winecx, or GPTK for
-`--gptk-aware`. See
+**D3DMetal:** the game-host is **self-built FOSS winecx**, not Whisky 11 with
+GPTK bolted on. Wyn never downloads winecx or GPTK for `--gptk-aware`. See
 [Documentation/user/game-host.md](Documentation/user/game-host.md).
 
 ```bash
@@ -86,8 +85,8 @@ Wyn is a Wine wrapper. It does **not** include Xbox Game Pass, the Xbox
 app, a Windows guest (UTM / QEMU / Parallels), or a `wyn gamepass`
 command.
 
-Wyn is not affiliated with CodeWeavers, Apple, Valve, Microsoft, or
-Whisky-App. CrossOver.app must not be copied into this project.
+Wyn is not affiliated with Apple, Valve, Microsoft, or Whisky-App.
+Trademarks of other Wine products are theirs; see [NOTICE](NOTICE).
 
 ## Layout
 
