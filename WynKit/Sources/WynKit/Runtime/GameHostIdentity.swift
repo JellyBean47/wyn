@@ -2,9 +2,10 @@
 //  GameHostIdentity.swift
 //  WynKit
 //
-//  D3DMetal game-host must be FOSS winecx (ntdll CX_APPLEGPTK + unix
-//  libd3dshared symlinks), not a proprietary Wine.app / wineloader layout,
-//  and not Whisky 11 without those hooks.
+//  D3DMetal game-host must be FOSS winecx (ntdll CX_APPLEGPTK). Unix
+//  libd3dshared symlinks are renderer selection (`wyn renderer set`),
+//  not host identity. Refuses proprietary Wine.app / wineloader layouts
+//  and Whisky 11 without those hooks.
 //
 
 import Foundation
@@ -36,13 +37,15 @@ public enum GameHostIdentity {
       wyn runtime install --gptk-aware --directory /path/to/wine-prefix-or-Libraries
       wyn gptk install
       # default: ~/Downloads/Game_Porting_Toolkit_3.0.dmg
+      wyn renderer set d3dmetal
 
     Identity:
       ntdll.so contains CX_APPLEGPTK_LIBD3DSHARED_PATH (winecx GPTK hook)
       wine64 is a normal Wine loader (not wineloader)
       Wine/bin is an ordinary bin/ directory
-      after GPTK overlay: d3d11.so / dxgi.so / d3d12.so are symlinks to \
-    lib/external/libd3dshared.dylib beside D3DMetal.framework
+      GPTK install copies D3DMetal.framework + libd3dshared (availability)
+      wyn renderer set d3dmetal: d3d11.so / dxgi.so / d3d12.so are symlinks to \
+    lib/external/libd3dshared.dylib
 
     Refuses:
       proprietary Wine.app / wineloader / hosted-application bin
@@ -109,7 +112,7 @@ public enum GameHostIdentity {
             }
             lines.append("Looks like Whisky: \(looksLikeWhisky ? "YES — refused as game-host" : "no")")
             lines.append("ntdll CX_APPLEGPTK:\(ntdllGPTKAware ? "yes" : "no")")
-            lines.append("unix libd3dshared: \(unixD3DMetalWired ? "yes (symlinks)" : "no")")
+            lines.append("unix libd3dshared: \(unixD3DMetalWired ? "yes (D3DMetal selected)" : "no (DXMT/Wine unix modules)")")
             lines.append("proprietary host:  \(isProprietaryHosted ? "yes — refused" : "no")")
             lines.append("FOSS GPTK host:    \(isFOSSGPTKHost ? "yes" : "no")")
             if let refusal {
@@ -297,14 +300,15 @@ public enum GameHostIdentity {
         try WynWineInstaller.ensureSteamWineTree()
     }
 
-    /// True when unix `d3d11.so` (and dxgi/d3d12) are symlinks to `libd3dshared.dylib`.
+    /// True when unix `d3d11.so` (and dxgi/d3d12) are selected as D3DMetal
+    /// (`libd3dshared` symlinks). This is renderer selection, not host identity.
     public static func unixD3DMetalWired(in wineRoot: URL) -> Bool {
         let unixDir = wineLibUnixDir(in: wineRoot)
         let needed = ["d3d11.so", "dxgi.so", "d3d12.so"]
         for name in needed {
             let link = unixDir.appending(path: name)
             guard let dest = symlinkDestination(of: link) else { return false }
-            if !dest.contains("libd3dshared") { return false }
+            if URL(fileURLWithPath: dest).lastPathComponent != "libd3dshared.dylib" { return false }
         }
         let external = wineRoot.appending(path: "lib").appending(path: "external")
         let dylib = external.appending(path: "libd3dshared.dylib")

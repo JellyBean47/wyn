@@ -19,6 +19,8 @@ evaluation/development use, you may point Wyn at that local redist:
 ```bash
 wyn gptk install
 wyn gptk status
+wyn renderer status
+wyn renderer set d3dmetal   # opt-in; install does not select D3DMetal
 ```
 
 Default: `~/Downloads/Game_Porting_Toolkit_3.0.dmg` (or another Game Porting
@@ -28,9 +30,21 @@ never downloads GPTK.
 
 Install FOSS winecx first (`./scripts/build-foss-game-host.sh`, then
 `wyn runtime install --gptk-aware --directory …`).
-`wyn gptk install` overlays Apple D3DMetal 3.0 onto that tree; it is not a Wine
-installer. It mounts the Apple DMG (including the nested Evaluation redist)
-and refuses D3DMetal 2.x.
+`wyn gptk install` copies Apple D3DMetal 3.0 onto that tree so it is
+**selectable**; it is not a Wine installer. It mounts the Apple DMG
+(including the nested Evaluation redist), refuses D3DMetal 2.x, and does
+**not** repoint `d3d11.so`. The default renderer stays **DXMT**
+(D3D11 → Metal). D3D12-only titles still need GPTK:
+
+```bash
+wyn renderer set d3dmetal
+```
+
+Switch back without reinstalling:
+
+```bash
+wyn renderer set dxmt
+```
 
 ## Terms
 
