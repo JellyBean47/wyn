@@ -38,6 +38,20 @@ public enum D3DMetalGpuSettle: Sendable {
         bottleURL.appending(path: ".wyn-d3dmetal-gpu-exit-\(profileId)")
     }
 
+    /// Unreal CrashReportClient / crashpad left after a quit. Not a live game session.
+    public static let reporterExeNames: Set<String> = [
+        "crashreportclient.exe",
+        "crashpad_handler.exe"
+    ]
+
+    /// True when a leftover PE is the game itself. Reporter-only leftovers must not
+    /// block Play — they outlive the session for hours if nobody clicks Close.
+    public static func leftoverIsLiveGame(basename: String, gameExeNames: Set<String>) -> Bool {
+        let base = basename.lowercased()
+        if reporterExeNames.contains(base) { return false }
+        return gameExeNames.contains(base)
+    }
+
     /// Latest Unreal `Saved/Logs/<project>.log` mtime (canary / LogExit).
     public static func latestUnrealSessionLogMtime(project: String, bottleURL: URL) -> Date? {
         guard !project.isEmpty else { return nil }

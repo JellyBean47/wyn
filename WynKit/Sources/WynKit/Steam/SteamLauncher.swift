@@ -2012,7 +2012,7 @@ public enum SteamError: LocalizedError {
             """
         case .previousSessionStillRunning(let summary):
             return """
-            Previous session still running (\(summary)). Close CrashReportClient without sending \
+            Previous session still running (\(summary)). Quit the game from its window \
             (never wineserver -k), then: wyn play
             """
         }

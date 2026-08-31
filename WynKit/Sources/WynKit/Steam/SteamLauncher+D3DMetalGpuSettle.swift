@@ -8,13 +8,6 @@
 import Foundation
 
 extension SteamLauncher {
-    /// Crash reporters left after a quit (Unreal canary / Sentry). Not Steam CEF.
-    /// Steam's crashpad argv0 is `steamwebhelper_real.exe`, which is filtered out.
-    private static let previousSessionReporterExeNames: [String] = [
-        "crashreportclient.exe",
-        "crashpad_handler.exe"
-    ]
-
     private static let gpuSettleMemory = GpuSettleMemory()
 
     private static func profileUsesD3DMetal(_ profile: GameProfile) -> Bool {
@@ -39,7 +32,7 @@ extension SteamLauncher {
     static func scheduleD3DMetalExitStamp(profile: GameProfile, bottle: Bottle) {
         guard profileUsesD3DMetal(profile) else { return }
         let profileId = profile.id
-        let names = previousSessionExeNames(for: profile)
+        let names = gameSessionExeNames(for: profile)
         Task.detached {
             let deadline = Date().addingTimeInterval(60 * 15)
             var sawGame = false
@@ -55,16 +48,17 @@ extension SteamLauncher {
         }
     }
 
-    private static func previousSessionExeNames(for profile: GameProfile, extra: URL? = nil) -> Set<String> {
+    /// Game PEs only. CrashReportClient is not a live session.
+    private static func gameSessionExeNames(for profile: GameProfile, extra: URL? = nil) -> Set<String> {
         var names = Set<String>()
         func insert(_ raw: String) {
-            let base = (raw as NSString).lastPathComponent.lowercased()
+            let base = raw.split(whereSeparator: { $0 == "/" || $0 == "\\" })
+                .last.map(String.init)?.lowercased() ?? raw.lowercased()
             guard base.hasSuffix(".exe") else { return }
             names.insert(base)
         }
         if let extra { insert(extra.lastPathComponent) }
         profile.exePatterns.forEach(insert)
-        previousSessionReporterExeNames.forEach(insert)
         return names
     }
 
@@ -82,7 +76,8 @@ extension SteamLauncher {
         return nil
     }
 
-    /// Previous play still up: game EXE, Win64-Shipping, CrashReportClient.
+    /// Wine PE rows whose first `.exe` basename is in `names`.
+    /// Callers pass game EXE names; CrashReportClient is not a live session.
     /// Never Steam, steamwebhelper, or wineserver. Does not kill anything.
     static func leftoverSessionCommands(matching names: Set<String>) -> [String] {
         guard !names.isEmpty else { return [] }
@@ -99,9 +94,10 @@ extension SteamLauncher {
         }
     }
 
-    /// Quick relaunch after quit must not start until the last session is gone.
-    /// Wait only — never `wineserver -k`, never Send and Restart.
-    /// - Returns: when leftovers became empty; `nil` if nothing was running.
+    /// Quick relaunch after quit must not start until the game EXE is gone.
+    /// CrashReportClient alone is ignored — it can sit for hours. Wait only;
+    /// never `wineserver -k`.
+    /// - Returns: when the game EXE became empty; `nil` if it was already gone.
     @discardableResult
     private static func waitForPreviousSessionToExit(
         profile: GameProfile,
@@ -109,11 +105,22 @@ extension SteamLauncher {
         extraExecutable: URL? = nil,
         timeout: TimeInterval = 90
     ) async throws -> Date? {
-        let names = previousSessionExeNames(for: profile, extra: extraExecutable)
-        func leftovers() -> [String] { leftoverSessionCommands(matching: names) }
+        let names = gameSessionExeNames(for: profile, extra: extraExecutable)
+        func leftovers() -> [String] {
+            leftoverSessionCommands(matching: names).filter { command in
+                guard let base = windowsExeBasename(fromCommand: command) else { return false }
+                return D3DMetalGpuSettle.leftoverIsLiveGame(basename: base, gameExeNames: names)
+            }
+        }
 
         var leftover = leftovers()
-        guard !leftover.isEmpty else { return nil }
+        if leftover.isEmpty {
+            let reporters = leftoverSessionCommands(matching: D3DMetalGpuSettle.reporterExeNames)
+            if !reporters.isEmpty {
+                progress("Ignoring leftover CrashReportClient (game already quit). Close it without sending if it is on screen.")
+            }
+            return nil
+        }
 
         func summary(_ rows: [String]) -> String {
             let short = rows.compactMap { windowsExeBasename(fromCommand: $0) }
@@ -196,7 +203,7 @@ extension SteamLauncher {
         while remaining > 0.5 {
             try Task.checkCancellation()
             let leftovers = leftoverSessionCommands(
-                matching: previousSessionExeNames(for: profile)
+                matching: gameSessionExeNames(for: profile)
             )
             if !leftovers.isEmpty {
                 if let gone = try await waitForPreviousSessionToExit(

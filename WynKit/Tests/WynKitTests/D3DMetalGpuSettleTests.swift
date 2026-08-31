@@ -86,4 +86,36 @@ struct D3DMetalGpuSettleTests {
         )
         #expect(game == "factorygamesteam.exe")
     }
+
+    @Test func windowsExeBasenameReadsRelativeCrashReportClient() {
+        let reporter = SteamLauncher.windowsExeBasename(
+            fromCommand: #"../../../Engine/Binaries/Win64/CrashReportClient.exe /tmp/FactoryGame/Saved/Crashes/UECC -AppName=UE-FactoryGame"#
+        )
+        #expect(reporter == "crashreportclient.exe")
+    }
+
+    @Test func leftoverReporterIsNotALiveGame() {
+        let gameNames: Set<String> = [
+            "factorygamesteam.exe",
+            "factorygame.exe"
+        ]
+        #expect(
+            D3DMetalGpuSettle.leftoverIsLiveGame(
+                basename: "FactoryGameSteam.exe",
+                gameExeNames: gameNames
+            )
+        )
+        #expect(
+            !D3DMetalGpuSettle.leftoverIsLiveGame(
+                basename: "CrashReportClient.exe",
+                gameExeNames: gameNames
+            )
+        )
+        #expect(
+            !D3DMetalGpuSettle.leftoverIsLiveGame(
+                basename: "crashpad_handler.exe",
+                gameExeNames: gameNames.union(["crashpad_handler.exe"])
+            )
+        )
+    }
 }
