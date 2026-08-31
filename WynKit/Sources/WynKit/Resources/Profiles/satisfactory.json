@@ -30,5 +30,5 @@
   ],
   "launchArgs": "-NO_EOS_OVERLAY -dx11 -USEALLAVAILABLECORES -Nosplash -ResX=1280 -ResY=720",
   "unrealProject": "FactoryGame",
-  "notes": "Launch args: -NO_EOS_OVERLAY -dx11 -USEALLAVAILABLECORES -Nosplash -ResX=1280 -ResY=720 (Steam LaunchOptions; was wrongly matched to -NOTEXTURESTREAMING earlier). D3DMetal 3.0 + MetalFX + Metal HUD."
+  "notes": "Launch args: -NO_EOS_OVERLAY -dx11 -USEALLAVAILABLECORES -Nosplash -ResX=1280 -ResY=720 (Steam LaunchOptions; was wrongly matched to -NOTEXTURESTREAMING earlier). D3DMetal 3.0 + MetalFX + Metal HUD. wyn play waits 120s after quit (D3DMetal GPU settle; RHIThread SIGILL on 7s/31s relaunch)."
 }

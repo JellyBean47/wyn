@@ -87,6 +87,12 @@ The FOSS host must ship `winebus.so` with `@loader_path/../..` so libinotify
 loads (`scripts/build-foss-game-host.sh`). Do not pin `FG.InputMode`. Do not
 `xinput*=d`. Never `wineserver -k`. CLI: `./.build/debug/wyn play satisfactory`.
 
+`wyn play` / the Wyn tile wait **120s** after the last D3DMetal session
+(overlay: “Waiting for the GPU to settle”). Immediate relaunch was RHIThread
+`EXCEPTION_ILLEGAL_INSTRUCTION` (7s and 31s gaps failed; ~103s was fine).
+This is Metal/D3DMetal teardown, not a thermal cool-down. Steam’s own Play
+button does not wait. Leave Steam Logged On.
+
 ## GPTK 3.0 (Apple, not Wine)
 
 ```bash
