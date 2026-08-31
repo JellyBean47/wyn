@@ -174,14 +174,29 @@ public enum SteamLauncher {
         return dest
     }
 
-    /// Run SteamSetup.exe inside the bottle (interactive — user completes the wizard).
-    /// Wine Mono is `msiexec /qn` first so wineboot never shows the hung GUI installer.
+    /// Unattended SteamSetup (`/S`). Does not leave SteamSetup's "Run Steam" as
+    /// the first client — that path has no CEF args and no steamwebhelper shim,
+    /// so the HWND is black. Wine Mono is `msiexec /qn` first so wineboot never
+    /// shows the hung GUI installer. Caller then starts Steam via `launchSteam`.
     public static func runSteamInstaller(in bottle: Bottle, installer: URL) async throws {
         try await WineMono.preparePrefix(bottle)
+        Wine.allowMacWindows()
+        print("Installing Steam (unattended)…")
         _ = try await Wine.runWine(
-            [installer.path(percentEncoded: false)],
+            [installer.path(percentEncoded: false), "/S"],
             bottle: bottle
         )
+
+        guard isSteamInstalled(in: bottle) else {
+            throw SteamError.steamSetupFailed
+        }
+
+        // NSIS `/S` still often Exec's steam.exe from .onInstSuccess — unshimmed.
+        if await waitBrieflyForSteamClient(in: bottle, seconds: 8) {
+            print("SteamSetup started the client; stopping it so Wyn can launch with CEF flags…")
+            await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 30)
+            try await requestSteamShutdownUntilExit(in: bottle)
+        }
     }
 
     /// Default game EXE names for Steam AppDefaults isolation when no profile is in scope.
@@ -280,6 +295,63 @@ public enum SteamLauncher {
         options: Wine.LaunchOptions = Wine.LaunchOptions(),
         gameExeNames: [String] = []
     ) async throws {
+        let plan = try makeSteamLaunchPlan(
+            in: bottle, options: options, gameExeNames: gameExeNames
+        )
+        if plan.useGameHost {
+            try await ensureGameHostCEFReady(plan: plan, bottle: bottle)
+            _ = try SteamCEFShim.install(into: bottle, debug: plan.options.debug)
+            if !plan.options.debug {
+                print("Steam UI: game-host Wine (Libraries/ — FOSS winecx + D3DMetal).")
+                print("Press Play in Steam — games inherit this D3DMetal wrapper. wyn play is fallback.")
+            }
+        }
+
+        // Never start a second steam.exe. A leftover `-silent` bootstrap cannot
+        // show a window — shut it down (retried) and fall through to a visible
+        // launch. A windowed client is adopted as-is.
+        if isSteamClientRunning(in: bottle) {
+            if isSilentSteamClientRunning(in: bottle) {
+                print("Steam is running in the background (-silent); asking it to exit so the window can show…")
+                await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
+                try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
+            } else {
+                print("Steam is already running.")
+                return
+            }
+        } else if anySteamClientRunning() {
+            throw SteamError.steamAlreadyRunningElsewhere
+        }
+
+        Wine.allowMacWindows()
+        var launchArgs = plan.args
+        // Stub SteamSetup has no SteamUI.dll. `-noverifyfiles` makes the updater
+        // skip the first client download → "Failed to load steamui.dll".
+        if !steamUILooksReady(in: bottle) {
+            launchArgs = launchArgs.filter { $0.lowercased() != "-noverifyfiles" }
+        }
+        try await Wine.runProgram(
+            at: plan.steamURL,
+            args: launchArgs,
+            bottle: bottle,
+            environment: plan.environment,
+            options: plan.options
+        )
+    }
+
+    private struct SteamLaunchPlan {
+        let steamURL: URL
+        let args: [String]
+        let environment: [String: String]
+        var options: Wine.LaunchOptions
+        let useGameHost: Bool
+    }
+
+    private static func makeSteamLaunchPlan(
+        in bottle: Bottle,
+        options: Wine.LaunchOptions,
+        gameExeNames: [String]
+    ) throws -> SteamLaunchPlan {
         let steamURL = steamExePath(in: bottle)
         guard FileManager.default.fileExists(atPath: steamURL.path(percentEncoded: false)) else {
             throw SteamError.steamNotInstalled
@@ -310,9 +382,6 @@ public enum SteamLauncher {
             if options.debug {
                 print("[wyn:debug] Steam UI → game-host Wine tree (\(WynWineInstaller.libraryFolder.path))")
                 print("[wyn:debug] Play inherits WINEDLLOVERRIDES=\(environment["WINEDLLOVERRIDES"] ?? "(none)")")
-            } else {
-                print("Steam UI: game-host Wine (Libraries/ — FOSS winecx + D3DMetal).")
-                print("Press Play in Steam — games inherit this D3DMetal wrapper. wyn play is fallback.")
             }
         } else {
             if let profile {
@@ -335,9 +404,197 @@ public enum SteamLauncher {
             }
         }
 
-        try await Wine.runProgram(
-            at: steamURL, args: args, bottle: bottle, environment: environment, options: steamOptions
+        return SteamLaunchPlan(
+            steamURL: steamURL,
+            args: args,
+            environment: environment,
+            options: steamOptions,
+            useGameHost: useGameHost
         )
+    }
+
+    /// First install often has no `bin/cef/cef.win*` yet — it appears after Steam's
+    /// win32→win64 self-update. Start Steam with the same CEF args as a normal
+    /// launch **plus `-silent`**, wait until the client is actually up (not merely
+    /// until the helper file appears), shim every `cef.win*` variant, then
+    /// `-shutdown` (retried) so the visible login window is a shimmed process.
+    ///
+    /// `-silent` is the fix that prevents an unshimmed black first HWND on the
+    /// `wyn steam launch` path. Never `wineserver -k`.
+    private static func ensureGameHostCEFReady(plan: SteamLaunchPlan, bottle: Bottle) async throws {
+        // A running client: wait/shim if needed, shut down `-silent` leftovers,
+        // adopt a windowed client. Never start a second steam.exe here.
+        if isSteamClientRunning(in: bottle) {
+            if SteamCEFShim.hasAnyHelper(in: bottle) {
+                _ = try SteamCEFShim.install(into: bottle, debug: plan.options.debug)
+                if isSilentSteamClientRunning(in: bottle) {
+                    print("Steam is running in the background (-silent); asking it to exit so the window can show…")
+                    await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
+                    try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
+                }
+                return
+            }
+            if steamUILooksReady(in: bottle) {
+                print("Steam is preparing the login window (first run)…")
+                let appeared = try await SteamCEFShim.waitUntilHelperExists(
+                    in: bottle, seconds: 180, debug: plan.options.debug
+                )
+                guard appeared else { throw SteamError.cefDidNotAppear }
+                _ = try SteamCEFShim.install(into: bottle, debug: plan.options.debug)
+                if isSilentSteamClientRunning(in: bottle) {
+                    print("Steam is running in the background (-silent); asking it to exit so the window can show…")
+                    await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
+                    try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
+                }
+                return
+            }
+            print("Steam stub cannot load steamui.dll yet; asking it to exit so the first download can run…")
+            try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
+        }
+
+        if SteamCEFShim.hasAnyHelper(in: bottle) {
+            _ = try SteamCEFShim.install(into: bottle, debug: plan.options.debug)
+            return
+        }
+
+        guard SteamCEFShim.bundledShimURL != nil else {
+            throw SteamCEFShimError.shimBinaryMissing
+        }
+
+        print("Steam is preparing the login window (first run)…")
+        var bootstrap = plan.options
+        bootstrap.detachAfterStart = true
+        var bootstrapArgs = plan.args
+        // SteamSetup only unpacks a stub. `-noverifyfiles` then skips the first
+        // client download and Steam dies with "Failed to load steamui.dll".
+        if !steamUILooksReady(in: bottle) {
+            print("Downloading the Steam client (file verify left on until SteamUI.dll exists)…")
+            bootstrapArgs = bootstrapArgs.filter { $0.lowercased() != "-noverifyfiles" }
+        }
+        if !bootstrapArgs.contains(where: { $0.lowercased() == "-silent" }) {
+            bootstrapArgs.append("-silent")
+        }
+        Wine.allowMacWindows()
+        _ = try await Wine.runProgram(
+            at: plan.steamURL,
+            args: bootstrapArgs,
+            bottle: bottle,
+            environment: plan.environment,
+            options: bootstrap
+        )
+
+        let appeared = try await SteamCEFShim.waitUntilHelperExists(
+            in: bottle, seconds: 180, debug: plan.options.debug
+        )
+        guard appeared else {
+            throw SteamError.cefDidNotAppear
+        }
+        _ = try SteamCEFShim.install(into: bottle, debug: plan.options.debug)
+        await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
+        try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
+    }
+
+    /// Ask Steam to exit once. Never `wineserver -k`.
+    /// Prefer `requestSteamShutdownUntilExit` — a single `-shutdown` is often
+    /// ignored during Steam's win32→win64 self-update.
+    public static func requestSteamShutdown(
+        in bottle: Bottle,
+        options: Wine.LaunchOptions = Wine.LaunchOptions()
+    ) async throws {
+        let steamURL = steamExePath(in: bottle)
+        guard FileManager.default.fileExists(atPath: steamURL.path(percentEncoded: false)) else {
+            return
+        }
+        var shutdownOptions = options
+        shutdownOptions.detachAfterStart = false
+        shutdownOptions.useWineBuiltinD3D = true
+        _ = try await Wine.runProgram(
+            at: steamURL,
+            args: ["-shutdown"],
+            bottle: bottle,
+            environment: [:],
+            options: shutdownOptions
+        )
+    }
+
+    /// `-shutdown` two or three times with backoff. Steam ignores the first
+    /// request when the helper file has just appeared mid self-update.
+    private static func requestSteamShutdownUntilExit(
+        in bottle: Bottle,
+        options: Wine.LaunchOptions = Wine.LaunchOptions(),
+        attempts: Int = 3
+    ) async throws {
+        guard isSteamClientRunning(in: bottle) else { return }
+        let pauses: [UInt64] = [0, 2_000_000_000, 5_000_000_000]
+        let waits: [TimeInterval] = [15, 20, 45]
+        let n = min(max(attempts, 1), pauses.count)
+        for i in 0..<n {
+            if !isSteamClientRunning(in: bottle) { return }
+            if i > 0 {
+                print("Steam ignored -shutdown; retrying (\(i + 1)/\(n))…")
+                try await Task.sleep(nanoseconds: pauses[i])
+            } else {
+                print("Asking Steam to exit…")
+            }
+            try await requestSteamShutdown(in: bottle, options: options)
+            if await steamClientDidExit(in: bottle, seconds: waits[i]) {
+                return
+            }
+        }
+        print("Steam did not exit after -shutdown. Use Steam → Exit, then: wyn steam launch")
+        throw SteamError.steamDidNotExit
+    }
+
+    /// Helper-on-disk is not "client fully up". Wait until `steam.exe` has
+    /// stayed running, preferably with SteamUI.dll or a CEF helper present.
+    private static func waitUntilSteamClientReadyForShutdown(
+        in bottle: Bottle,
+        seconds: TimeInterval
+    ) async {
+        let deadline = Date().addingTimeInterval(seconds)
+        var stableSince: Date?
+        while Date() < deadline {
+            if isSteamClientRunning(in: bottle) {
+                if stableSince == nil { stableSince = Date() }
+                let waited = Date().timeIntervalSince(stableSince!)
+                let fullyUp = steamUILooksReady(in: bottle) || SteamCEFShim.hasAnyHelper(in: bottle)
+                if fullyUp && waited >= 5 { return }
+                if waited >= 15 { return }
+            } else {
+                stableSince = nil
+            }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+    }
+
+    private static func steamUILooksReady(in bottle: Bottle) -> Bool {
+        let url = steamExePath(in: bottle)
+            .deletingLastPathComponent()
+            .appending(path: "SteamUI.dll")
+        let path = url.path(percentEncoded: false)
+        guard FileManager.default.fileExists(atPath: path),
+              let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+              let size = attrs[.size] as? NSNumber
+        else { return false }
+        return size.int64Value > 100_000
+    }
+
+    private static func waitBrieflyForSteamClient(in bottle: Bottle, seconds: TimeInterval) async -> Bool {
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            if isSteamClientRunning(in: bottle) { return true }
+            try? await Task.sleep(nanoseconds: 400_000_000)
+        }
+        return false
+    }
+
+    private static func steamClientDidExit(in bottle: Bottle, seconds: TimeInterval) async -> Bool {
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            if !isSteamClientRunning(in: bottle) { return true }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+        return false
     }
 
     /// Write `steam_appid.txt` so Steamworks can initialize when the game exe is started
@@ -599,19 +856,80 @@ public enum SteamLauncher {
         }
     }
 
+    /// `pid` + command from a cheap `ps` (no environ — CEF `ps eww` can deadlock).
+    private static func pidAndCommandRows() -> [(pid: Int, command: String)] {
+        let text = captureProcessOutput(
+            executable: "/bin/ps",
+            arguments: ["-ax", "-o", "pid=,command="]
+        )
+        var rows: [(pid: Int, command: String)] = []
+        for raw in text.split(whereSeparator: \.isNewline) {
+            let line = String(raw).trimmingCharacters(in: .whitespaces)
+            guard let idx = line.firstIndex(where: { $0.isWhitespace }) else { continue }
+            let pidStr = String(line[..<idx])
+            let cmd = String(line[line.index(after: idx)...]).trimmingCharacters(in: .whitespaces)
+            guard let pid = Int(pidStr) else { continue }
+            rows.append((pid, cmd))
+        }
+        return rows
+    }
+
+    private static func wineserverProcessCount() -> Int {
+        captureProcessOutput(executable: "/usr/bin/pgrep", arguments: ["-x", "wineserver"])
+            .split(whereSeparator: \.isNewline)
+            .compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            .count
+    }
+
+    /// Command lines of Wine PE `steam.exe` owned by this bottle.
+    /// Prefers `WINEPREFIX` on that PID; if the PE has no prefix, a single
+    /// `steam.exe` plus a single wineserver is treated as this bottle.
+    private static func steamClientCommandLines(in bottle: Bottle) -> [String] {
+        guard isBottleWineserverRunning(in: bottle) else { return [] }
+        let prefixes = bottlePrefixCandidates(for: bottle)
+        var matched: [String] = []
+        var unmatched: [String] = []
+        for (pid, cmd) in pidAndCommandRows() where lineIsSteamClientExe(cmd) {
+            let envLine = captureProcessOutput(
+                executable: "/bin/ps",
+                arguments: ["eww", "-p", "\(pid)"]
+            )
+            if lineMatchesAnyBottlePrefix(envLine, prefixes: prefixes) {
+                matched.append(cmd)
+            } else {
+                unmatched.append(cmd)
+            }
+        }
+        if !matched.isEmpty { return matched }
+        if unmatched.count == 1, wineserverProcessCount() == 1 {
+            return unmatched
+        }
+        return []
+    }
+
+    private static func commandHasSilentFlag(_ command: String) -> Bool {
+        command.split(whereSeparator: \.isWhitespace).contains {
+            $0.caseInsensitiveCompare("-silent") == .orderedSame
+        }
+    }
+
+    /// True when this bottle's `steam.exe` was started with `-silent`
+    /// (bootstrap that cannot show a login window).
+    private static func isSilentSteamClientRunning(in bottle: Bottle) -> Bool {
+        steamClientCommandLines(in: bottle).contains { commandHasSilentFlag($0) }
+    }
+
+    /// Any Wine PE `steam.exe` on the machine (not bottle-scoped).
+    private static func anySteamClientRunning() -> Bool {
+        pidAndCommandRows().contains { lineIsSteamClientExe($0.command) }
+    }
+
     /// Whether Windows `steam.exe` is running for this bottle.
     ///
     /// Avoids `ps axeww` (huge CEF environs → pipe deadlock with `waitUntilExit` first).
-    /// Bottle ownership: wineserver PID with `WINEPREFIX=<bottle>`.
-    /// Client presence: cheap process list containing Wine PE `steam.exe`.
+    /// Bottle ownership: wineserver `WINEPREFIX=<bottle>`, then `steam.exe` PIDs.
     public static func isSteamClientRunning(in bottle: Bottle) -> Bool {
-        guard isBottleWineserverRunning(in: bottle) else { return false }
-        // Cheap command list — no environ.
-        let commands = captureProcessOutput(
-            executable: "/bin/ps",
-            arguments: ["-ax", "-o", "command="]
-        )
-        return commands.split(whereSeparator: \.isNewline).contains { lineIsSteamClientExe(String($0)) }
+        !steamClientCommandLines(in: bottle).isEmpty
     }
 
     /// Executable path from a wineserver `ps` command line (macOS paths may contain spaces).
@@ -1651,8 +1969,12 @@ public enum SteamLauncher {
 public enum SteamError: LocalizedError {
     case downloadFailed
     case steamNotInstalled
+    case steamSetupFailed
     case steamWineMissing
     case steamNotLoggedOn
+    case steamDidNotExit
+    case steamAlreadyRunningElsewhere
+    case cefDidNotAppear
     case gameNotInstalled(appId: Int)
     case missingSteamAppId(profileId: String)
     case d3dMetalRequiresDirectLaunch
@@ -1663,10 +1985,18 @@ public enum SteamError: LocalizedError {
             return "Failed to download SteamSetup.exe from Steam CDN."
         case .steamNotInstalled:
             return "Steam is not installed in this bottle. Run: wyn steam install"
+        case .steamSetupFailed:
+            return "SteamSetup finished without steam.exe. Re-run: wyn steam install"
         case .steamWineMissing:
             return "Wine tree missing for Steam. One-Wine needs Libraries/ (GPTK-aware); frankea fallback needs Libraries.steam or Libraries.pre-gptk-aware.bak."
         case .steamNotLoggedOn:
             return "Steam is not Logged On. Steamworks requires a logged-in client that owns the game. Run: wyn steam launch → log in (Remember me)."
+        case .steamDidNotExit:
+            return "Steam did not exit after steam.exe -shutdown. Use Steam → Exit (never wineserver -k), then: wyn steam launch"
+        case .steamAlreadyRunningElsewhere:
+            return "Steam is already running in another bottle or session. Use Steam → Exit (never wineserver -k), then retry."
+        case .cefDidNotAppear:
+            return "Steam did not unpack CEF (bin/cef/cef.win*). Quit Steam via Steam → Exit, then: wyn steam launch"
         case .gameNotInstalled(let appId):
             return "Game (Steam app \(appId)) is not installed. Open Steam and install it first."
         case .missingSteamAppId(let profileId):

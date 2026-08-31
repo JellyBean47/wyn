@@ -627,35 +627,57 @@ extension WynCLI {
     struct SteamInstall: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
             commandName: "install",
-            abstract: "Download SteamSetup.exe; msiexec /qn Wine Mono, then run the wizard."
+            abstract: "Download SteamSetup.exe; silent install, then open Steam (CEF-shimmed)."
         )
+
+        @Option(name: .long, help: "Bottle to install into (default: Steam). Must already exist unless this is Steam.")
+        var bottle: String = SteamLauncher.defaultBottleName
+
+        @Flag(name: .long, help: "Stream Wine output.")
+        var debug: Bool = false
 
         mutating func run() async throws {
             guard WynWineInstaller.isWynWineInstalled() else {
                 throw ValidationError("WynWine not installed. Run: wyn install")
             }
 
-            let bottle = try SteamLauncher.ensureSteamBottle()
+            let target = try Self.resolveBottle(named: bottle)
 
-            if SteamLauncher.isSteamInstalled(in: bottle) {
-                print("Steam is already installed. Launch with: wyn steam launch")
+            if SteamLauncher.isSteamInstalled(in: target) {
+                print("Steam is already installed in \"\(bottle)\". Launch with: wyn steam launch --bottle \"\(bottle)\"")
                 return
             }
 
-            print("Wine Mono: msiexec /qn (no installer window), then Steam setup.")
+            print("Wine Mono: msiexec /qn (no installer window), then silent SteamSetup.")
             print("Downloading Steam installer...")
             let installer = try await SteamLauncher.downloadInstaller()
-            print("Starting Steam setup wizard (follow the on-screen prompts)...")
-            print("Install to the default location: C:\\Program Files (x86)\\Steam\n")
+            print("Installing Steam to C:\\Program Files (x86)\\Steam in bottle \"\(bottle)\" (unattended)…\n")
 
-            try await SteamLauncher.runSteamInstaller(in: bottle, installer: installer)
+            try await SteamLauncher.runSteamInstaller(in: target, installer: installer)
 
-            if SteamLauncher.isSteamInstalled(in: bottle) {
-                print("\nSteam installed. Launch with: wyn steam launch")
-            } else {
-                print("\nIf setup finished, launch with: wyn steam launch")
-                print("If the wizard did not appear, try: wyn run Steam \"\(installer.path)\"")
+            guard SteamLauncher.isSteamInstalled(in: target) else {
+                throw ValidationError(
+                    "SteamSetup finished without steam.exe. Re-run: wyn steam install --bottle \"\(bottle)\""
+                )
             }
+
+            print("Steam installed. Opening the client…")
+            var options = Wine.LaunchOptions(debug: debug, echoOutput: debug)
+            let fossWine = !GPTKInstaller.isWineGPTKAware()
+            options.preferFrankeaSteam = fossWine
+            options.preferGPTKSteam = !fossWine
+            try await SteamLauncher.launchSteam(in: target, options: options)
+        }
+
+        static func resolveBottle(named name: String) throws -> Bottle {
+            if name == SteamLauncher.defaultBottleName {
+                return try SteamLauncher.ensureSteamBottle()
+            }
+            var data = BottleData()
+            guard let found = data.loadBottles().first(where: { $0.settings.name == name }) else {
+                throw ValidationError("No bottle named \"\(name)\". Create with: wyn create \"\(name)\"")
+            }
+            return found
         }
     }
 
@@ -664,6 +686,9 @@ extension WynCLI {
             commandName: "launch",
             abstract: "Open the Steam client in the Steam bottle (game-host Libraries/ by default)."
         )
+
+        @Option(name: .long, help: "Bottle to launch (default: Steam).")
+        var bottle: String = SteamLauncher.defaultBottleName
 
         @Flag(name: .long, help: "Stream Wine output (useful when Steam fails to open).")
         var debug: Bool = false
@@ -679,10 +704,10 @@ extension WynCLI {
                 throw ValidationError("WynWine not installed. Run: wyn install")
             }
 
-            let bottle = try SteamLauncher.ensureSteamBottle()
+            let target = try SteamInstall.resolveBottle(named: bottle)
 
-            guard SteamLauncher.isSteamInstalled(in: bottle) else {
-                throw ValidationError("Steam not installed. Run: wyn steam install")
+            guard SteamLauncher.isSteamInstalled(in: target) else {
+                throw ValidationError("Steam not installed. Run: wyn steam install --bottle \"\(bottle)\"")
             }
 
             var options = Wine.LaunchOptions(debug: debug, echoOutput: debug)
@@ -698,9 +723,8 @@ extension WynCLI {
                 print("Launching Windows Steam on game-host Wine (Libraries/ — FOSS winecx + D3DMetal)…")
             }
             print("Log in here and check Remember me. Press Play in Steam — that should start the game.")
-            print("wyn play <game> is fallback if Play hits a launcher/picker instead of the game EXE.")
-            print("(If the window is blank, quit and run again. Use --debug if it exits instantly.)\n")
-            try await SteamLauncher.launchSteam(in: bottle, options: options)
+            print("wyn play <game> is fallback if Play hits a launcher/picker instead of the game EXE.\n")
+            try await SteamLauncher.launchSteam(in: target, options: options)
         }
     }
 }

@@ -16,6 +16,7 @@
 //  If not, see https://www.gnu.org/licenses/.
 //
 
+import ApplicationServices
 import Foundation
 import os.log
 
@@ -189,12 +190,26 @@ public class Wine {
         }
     }
 
+    /// Promote this process to a foreground app so winemac windows are on-screen.
+    /// CLI `wyn` is otherwise `LSBackgroundOnly` / activationPolicy prohibited
+    /// when spawned from a non-GUI parent; Wyn.app is already `.regular`.
+    /// `TransformProcessType` does not need the main thread (avoids a deadlock if
+    /// main is blocked in async CLI).
+    public static func allowMacWindows() {
+        var psn = ProcessSerialNumber(highLongOfPSN: 0, lowLongOfPSN: UInt32(kCurrentProcess))
+        _ = TransformProcessType(
+            &psn,
+            ProcessApplicationTransformState(kProcessTransformToForegroundApplication)
+        )
+    }
+
     /// Execute a `wine start /unix {url}` command. Returns the wine process exit status.
     @discardableResult
     public static func runProgram(
         at url: URL, args: [String] = [], bottle: Bottle, environment: [String: String] = [:],
         options: LaunchOptions = LaunchOptions()
     ) async throws -> Int32 {
+        allowMacWindows()
         let effective = LaunchDiagnostics.effectiveLayer(for: bottle)
         let layer = options.translationLayerOverride ?? effective.layer
         let tree = options.wineTree
@@ -806,17 +821,9 @@ public class Wine {
     /// Remove GPTK-era local d3d/dxgi/wined3d PEs dropped next to Steam/CEF.
     private static func removeLocalSteamGraphicsDLLs(bottle: Bottle, debug: Bool = false) throws {
         let fm = FileManager.default
-        let steamRoot = bottle.url
-            .appending(path: "drive_c")
-            .appending(path: "Program Files (x86)")
-            .appending(path: "Steam")
-        let cefDir = steamRoot
-            .appending(path: "bin")
-            .appending(path: "cef")
-            .appending(path: "cef.win64")
         let localDLLs = ["d3d11.dll", "dxgi.dll", "wined3d.dll", "d3d10core.dll"]
         var removed = 0
-        for dir in [steamRoot, cefDir] {
+        for dir in SteamCEFShim.steamAndCEFDirectories(in: bottle) {
             guard fm.fileExists(atPath: dir.path(percentEncoded: false)) else { continue }
             for name in localDLLs {
                 let url = dir.appending(path: name)
@@ -835,18 +842,9 @@ public class Wine {
     /// Wine 11 pre-GPTK PEs beside Steam are ABI-incompatible with frankea WhiskyWine.
     public static func prepareFrankeaSteamClient(bottle: Bottle, debug: Bool = false) throws {
         let fm = FileManager.default
-        let steamRoot = bottle.url
-            .appending(path: "drive_c")
-            .appending(path: "Program Files (x86)")
-            .appending(path: "Steam")
-        let cefDir = steamRoot
-            .appending(path: "bin")
-            .appending(path: "cef")
-            .appending(path: "cef.win64")
-
         let localDLLs = ["d3d11.dll", "dxgi.dll", "wined3d.dll", "d3d10core.dll"]
         var removed = 0
-        for dir in [steamRoot, cefDir] {
+        for dir in SteamCEFShim.steamAndCEFDirectories(in: bottle) {
             guard fm.fileExists(atPath: dir.path(percentEncoded: false)) else { continue }
             for name in localDLLs {
                 let url = dir.appending(path: name)
@@ -885,14 +883,7 @@ public class Wine {
             .appending(path: "wine")
             .appending(path: "x86_64-windows")
 
-        let steamRoot = bottle.url
-            .appending(path: "drive_c")
-            .appending(path: "Program Files (x86)")
-            .appending(path: "Steam")
-        let cefDir = steamRoot
-            .appending(path: "bin")
-            .appending(path: "cef")
-            .appending(path: "cef.win64")
+        let steamDirs = SteamCEFShim.steamAndCEFDirectories(in: bottle)
 
         // GPTK wire replaces d3d11/dxgi PE with stubs; originals live as *.fly-pre-gptk.
         // Those PEs call wined3d.dll (not GPTK unixlib) — also ship wined3d beside Steam/CEF
@@ -909,7 +900,7 @@ public class Wine {
         let haveWined3d = fm.fileExists(atPath: wined3dSrc.path(percentEncoded: false))
 
         if wineSources.count == wineNames.count {
-            for dir in [steamRoot, cefDir] {
+            for dir in steamDirs {
                 guard fm.fileExists(atPath: dir.path(percentEncoded: false)) else { continue }
                 for (name, src) in wineSources {
                     try fm.installFileIfContentDiffers(at: dir.appending(path: name), from: src)
@@ -938,7 +929,7 @@ public class Wine {
                 throw D3DMetalError.dxvkMissingForSteam
             }
         }
-        for dir in [steamRoot, cefDir] {
+        for dir in steamDirs {
             guard fm.fileExists(atPath: dir.path(percentEncoded: false)) else { continue }
             for name in dxvkNames {
                 try fm.installFileIfContentDiffers(

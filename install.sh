@@ -21,7 +21,7 @@ echo "App:               /Applications/Wyn.app"
 if [[ ":${PATH}:" != *":${BIN_DIR}:"* ]]; then
   echo "Add to ~/.zshrc:  export PATH=\"${BIN_DIR}:\$PATH\""
 fi
-echo "Steam (optional):  wyn steam install   # msiexec /qn Wine Mono, then SteamSetup"
+echo "Steam (optional):  wyn steam install   # silent SteamSetup, then CEF-shimmed client"
 echo "Heroic:            https://heroicgameslauncher.com"
 echo "Game-host (FOSS):  ./scripts/build-foss-game-host.sh && ./scripts/install-foss-game-host.sh --directory <wine-root>"
 echo "GPTK (optional):   wyn gptk install --from <apple-redist>"

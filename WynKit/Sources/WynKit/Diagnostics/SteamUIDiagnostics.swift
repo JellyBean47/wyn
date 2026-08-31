@@ -184,20 +184,17 @@ public enum SteamUIDiagnostics {
 
     private static func dllLines(bottle: Bottle) -> [String] {
         var out = ["── Steam-local graphics DLLs ──"]
-        let steamRoot = bottle.url
-            .appending(path: "drive_c")
-            .appending(path: "Program Files (x86)")
-            .appending(path: "Steam")
-        let cefDir = steamRoot
-            .appending(path: "bin")
-            .appending(path: "cef")
-            .appending(path: "cef.win64")
         let system32 = bottle.url
             .appending(path: "drive_c")
             .appending(path: "windows")
             .appending(path: "system32")
 
-        for (label, dir) in [("Steam/", steamRoot), ("CEF/", cefDir), ("system32/", system32)] {
+        var labeled: [(String, URL)] = [("system32/", system32)]
+        for dir in SteamCEFShim.steamAndCEFDirectories(in: bottle) {
+            let label = dir.lastPathComponent == "Steam" ? "Steam/" : "CEF/\(dir.lastPathComponent)/"
+            labeled.append((label, dir))
+        }
+        for (label, dir) in labeled {
             for name in ["d3d11.dll", "dxgi.dll", "wined3d.dll"] {
                 let url = dir.appending(path: name)
                 out.append("  \(label)\(name): \(classifyDLL(url))")

@@ -39,6 +39,17 @@ ok "swift $(swift --version 2>/dev/null | head -1)"
 command -v xcodebuild >/dev/null || fail "xcodebuild not on PATH"
 ok "xcodebuild present"
 
+if ! command -v x86_64-w64-mingw32-gcc >/dev/null; then
+  # CI only `swift build`s; the shim PE is produced on the Mac by build.sh.
+  if [[ -n "${GITHUB_ACTIONS:-}${CI:-}" ]]; then
+    echo "warning: x86_64-w64-mingw32-gcc missing (Steam CEF shim). Local: brew install mingw-w64" >&2
+  else
+    fail "x86_64-w64-mingw32-gcc missing (Steam CEF shim). Install: brew install mingw-w64"
+  fi
+else
+  ok "mingw: $(x86_64-w64-mingw32-gcc --version | head -1)"
+fi
+
 if [[ ! -f /Library/Apple/usr/share/rosetta/rosetta ]]; then
   echo "warning: Rosetta 2 does not look installed. Wine is x86_64:" >&2
   echo "  softwareupdate --install-rosetta" >&2
