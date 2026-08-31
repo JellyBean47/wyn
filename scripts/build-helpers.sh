@@ -19,16 +19,21 @@ clang -arch x86_64 -dynamiclib -O2 \
     "$ROOT/Tools/winemac_rtld_global.c"
 
 # Steam CEF: --in-process-gpu so login HWND is not black. Not committed.
-if command -v x86_64-w64-mingw32-gcc >/dev/null; then
-  x86_64-w64-mingw32-gcc -O2 -mwindows \
+if ! command -v x86_64-w64-mingw32-gcc >/dev/null; then
+  echo "error: x86_64-w64-mingw32-gcc missing — cannot build steamwebhelper_shim.exe" >&2
+  echo "  brew install mingw-w64" >&2
+  exit 1
+fi
+x86_64-w64-mingw32-gcc -O2 -mwindows \
     -o "$BIN/steamwebhelper_shim.exe" \
     "$ROOT/Tools/steamwebhelper_shim.c"
-else
-  echo "skip steamwebhelper_shim.exe (need x86_64-w64-mingw32-gcc)"
+if [[ ! -s "$BIN/steamwebhelper_shim.exe" ]]; then
+  echo "error: steamwebhelper_shim.exe was not produced" >&2
+  exit 1
 fi
 
 # Names StorefrontLauncher / Connect look for.
 cp -f "$BIN/fly_stretch_epi_bridge.fast.dylib" "$BIN/fly_stretch_epi_bridge.dylib" 2>/dev/null || true
 
 echo "Helpers → $BIN"
-ls -lh "$BIN"/fly_stretch_epi_bridge*.dylib "$BIN"/present_force_inject.dylib "$BIN"/winemac_rtld_global.dylib
+ls -lh "$BIN"/fly_stretch_epi_bridge*.dylib "$BIN"/present_force_inject.dylib "$BIN"/winemac_rtld_global.dylib "$BIN"/steamwebhelper_shim.exe

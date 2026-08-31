@@ -60,13 +60,10 @@ public enum WynInstaller {
             lines.append("Created Steam bottle: \(result.bottle.settings.name)")
         }
 
-        if let installer = result.steamInstallerPath {
+        if result.steamInstallerPath != nil {
             lines.append("")
-            lines.append("Next — install Steam (one-time, ~2 min):")
+            lines.append("Next — install Steam (silent setup, then login window):")
             lines.append("  wyn steam install")
-            lines.append("")
-            lines.append("Or run the installer manually:")
-            lines.append("  wyn run Steam \"\(installer.path)\"")
         } else if SteamLauncher.isSteamInstalled(in: result.bottle) {
             lines.append("")
             lines.append("Steam is already installed. Launch it with:")

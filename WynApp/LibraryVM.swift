@@ -258,19 +258,25 @@ final class LibraryVM: ObservableObject {
             do {
                 let result = try await WynInstaller.setup(installSteamClient: true)
                 // GPTK/D3DMetal is optional and never auto-wired from Desktop/whisky-wine.
+                var justInstalledSteam = false
                 if let installer = result.steamInstallerPath, !SteamLauncher.isSteamInstalled(in: result.bottle) {
-                    setupMessage = "Installing Steam (complete the wizard)…"
+                    setupMessage = "Installing Steam…"
                     try await SteamLauncher.runSteamInstaller(in: result.bottle, installer: installer)
+                    justInstalledSteam = SteamLauncher.isSteamInstalled(in: result.bottle)
                 }
                 refresh()
                 showSetup = GameLibrary.needsSetup()
                 setupMessage = showSetup ? "Setup unfinished." : "Ready."
+                isBusy = false
+                if justInstalledSteam {
+                    launchSteam()
+                }
             } catch {
                 errorText = error.localizedDescription
                 setupMessage = "Setup failed."
                 showSetup = true
+                isBusy = false
             }
-            isBusy = false
         }
     }
 

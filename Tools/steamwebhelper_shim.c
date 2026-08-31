@@ -2,8 +2,9 @@
  * Fly steamwebhelper shim — based on wisnuub/Steam-Win-Silicon + notpop/steam-on-m1-wine.
  *
  * Wine on Apple Silicon fails CEF cross-process frame present (black UI window).
- * Inject --disable-gpu --single-process so CEF stays single-process / software UI.
- * Games are unaffected (separate processes).
+ * Inject --disable-gpu --in-process-gpu so CEF paints into the HWND Wine can
+ * present. Do not use --single-process: it deadlocks under GPTK/Wine
+ * (RtlWaitForCriticalSection / "steamwebhelper is not responding").
  *
  * Override flags with FLY_CEF_FLAGS (or AETHER_CEF_FLAGS for compatibility).
  */

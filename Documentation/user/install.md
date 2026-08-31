@@ -13,7 +13,9 @@ first-game test). Confirm:
 ./scripts/check-environment.sh
 ```
 
-The check fails without `xcodebuild`, even if you only want the CLI.
+The check fails without `xcodebuild`, even if you only want the CLI. It also
+needs `x86_64-w64-mingw32-gcc` so `build.sh` can produce the Steam CEF shim
+(`brew install mingw-w64`).
 
 ## 2. Build Wyn
 
@@ -111,10 +113,13 @@ Steam bottle exist. Default graphics are DXMT and DXVK.
 Wyn never downloads a Steam title. Steam does.
 
 `wyn steam install` stages Wine Mono with `msiexec /qn` (section 4), then
-runs SteamSetup. Keep the Steam wizard; do not use the Wine Mono GUI.
+runs SteamSetup **unattended** (`/S`). It does not leave the wizard's
+"Run Steam" checkbox as the first client — that HWND is black (no CEF
+args, no steamwebhelper shim). Wyn waits for `bin/cef/cef.win*` if needed,
+shims every variant, and opens Steam the same way `wyn steam launch` does.
 
 ```bash
-./.build/release/wyn steam install     # msiexec /qn, then SteamSetup.exe
+./.build/release/wyn steam install     # msiexec /qn, silent SteamSetup, then login window
 ./.build/release/wyn steam launch      # log in, check Remember me
 ```
 
