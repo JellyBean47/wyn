@@ -106,7 +106,9 @@ open /Applications/Wyn.app
 ```
 
 GPTK/D3DMetal is optional. The first-run sheet should clear once Wine and a
-Steam bottle exist. Default graphics are DXMT and DXVK.
+Steam bottle exist. Default graphics are **DXMT** (D3D11 → Metal). D3DMetal is
+an opt-in for D3D12-only titles (`wyn renderer set d3dmetal` after
+`wyn gptk install`).
 
 ## 6. Steam + first game (RV There Yet?)
 
@@ -164,12 +166,17 @@ does not download Wine for `--gptk-aware`. Full path:
    ```bash
    wyn gptk install
    # or: wyn gptk install --from /path/to/redist
+   wyn renderer set d3dmetal   # only if you want D3DMetal; default stays DXMT
    ```
 
    Put Apple’s `Game_Porting_Toolkit_3.0.dmg` in `~/Downloads`. Wyn mounts it
    (including the nested Evaluation redist) and copies `D3DMetal.framework` +
-   `libd3dshared.dylib`. Unix `d3d11.so` must be a **symlink** to
+   `libd3dshared.dylib`. GPTK install does **not** select D3DMetal.
+   `wyn renderer set d3dmetal` repoints unix `d3d11.so` as a **symlink** to
    `libd3dshared`. Wyn never downloads GPTK.
+
+   DXMT is D3D11 → Metal (Satisfactory already uses `-dx11`). D3D12-only
+   titles still need GPTK. D3DMetal is an opt-in upgrade, not a replacement.
 
 Steam UI for 3.0 lives on the game-host wineserver. Isolation AppDefaults for
 `steam.exe` / `steamwebhelper` are `=b`. frankea (`Libraries.steam`) is DXMT /

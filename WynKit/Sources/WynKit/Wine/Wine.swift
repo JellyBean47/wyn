@@ -224,6 +224,10 @@ public class Wine {
                     ? "launch override"
                     : effective.reason
                 print("[wyn:debug] Effective graphics layer: \(layer.rawValue) (\(reason))")
+                if options.translationLayerOverride == nil,
+                   reason.contains("but Libraries") {
+                    print("[wyn:debug] Declared vs wired mismatch — filesystem wins. \(reason)")
+                }
             }
         }
 
@@ -693,6 +697,7 @@ public class Wine {
     public enum D3DMetalError: LocalizedError, Equatable {
         case gptkMissing
         case wineNotGPTKAware
+        case rendererNotSelected
         case dxvkMissingForSteam
 
         public var errorDescription: String? {
@@ -707,6 +712,11 @@ public class Wine {
                 wyn runtime install --gptk-aware --directory <wine-root> \
                 Then: wyn gptk install. \
                 translationLayer=d3dmetal does not fall back to frankea DXVK.
+                """
+            case .rendererNotSelected:
+                return """
+                D3DMetal is installed but not selected. Shared unix d3d*.so still \
+                point at Wine/DXMT, not libd3dshared. Run: wyn renderer set d3dmetal
                 """
             case .dxvkMissingForSteam:
                 return "DXVK payload missing under Libraries/DXVK (needed for Steam UI with D3DMetal games)."
@@ -1033,18 +1043,20 @@ public class Wine {
         return start..<text.endIndex
     }
 
-    /// Install GPTK into the Wine tree (if needed) and put GPTK PE stubs in the bottle.
-    /// Strips leftover DXVK/DXMT natives so Wine loads D3DMetal builtins.
+    /// Put GPTK PE stubs in the bottle. Requires D3DMetal already selected
+    /// (`wyn renderer set d3dmetal`); does not repoint shared unix modules.
     public static func enableD3DMetal(bottle: Bottle) throws {
         if !GPTKInstaller.isInstalled() {
             throw D3DMetalError.gptkMissing
         }
-        guard GPTKInstaller.isWineModulesWired() || GPTKInstaller.shouldWireWineModules else {
+        guard GPTKInstaller.shouldWireWineModules else {
             throw D3DMetalError.wineNotGPTKAware
         }
-        if !GPTKInstaller.isWineModulesWired() {
-            try GPTKInstaller.wireWineModules()
+        let wired = RendererWiring.inspect()
+        guard wired.backend == .d3dMetal else {
+            throw D3DMetalError.rendererNotSelected
         }
+        try RendererWiring.verify(.d3dMetal)
 
         let fm = FileManager.default
         let peDir = GPTKInstaller.wineLibFolder

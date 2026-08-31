@@ -72,10 +72,12 @@ GPTK bolted on. Wyn never downloads winecx or GPTK for `--gptk-aware`. See
 wyn runtime install --gptk-aware --directory /path/to/wine-root
 wyn gptk install
 # default: ~/Downloads/Game_Porting_Toolkit_3.0.dmg
+wyn renderer set d3dmetal   # opt-in; install does not select D3DMetal
 ```
 
-Read Apple’s Game Porting Toolkit license first. Default graphics are DXMT and
-DXVK (`./scripts/setup.sh` frankea), not D3DMetal.
+Read Apple’s Game Porting Toolkit license first. Default graphics are **DXMT**
+(D3D11 → Metal). D3DMetal is an opt-in upgrade for D3D12-only titles, not a
+replacement.
 
 ## Legal
 

@@ -73,7 +73,8 @@ wineloader layouts and Whisky 11 without the ntdll hook.
 | `wine64` | ordinary `wine64` | `wineloader` |
 | `Wine/bin` | ordinary `bin/` | hosted-application layout |
 | Whisky 11 | n/a | `WhiskyWineVersion.plist` / wineserver ~856608 and no ntdll hook |
-| After GPTK overlay | `d3d11.so` / `dxgi.so` / `d3d12.so` → `lib/external/libd3dshared.dylib` beside `D3DMetal.framework` | copied (non-symlink) unix modules |
+| After `wyn gptk install` | `D3DMetal.framework` + `libd3dshared` under `lib/external` (selectable, not selected) | missing external payload |
+| After `wyn renderer set d3dmetal` | `d3d11.so` / `dxgi.so` / `d3d12.so` → `lib/external/libd3dshared.dylib` | copied (non-symlink) unix modules |
 
 Steam tiles and `wyn steam launch` use the game-host when this identity is
 present. Otherwise they stay on frankea. D3DMetal **play** errors if the host
@@ -92,11 +93,16 @@ loads (`scripts/build-foss-game-host.sh`). Do not pin `FG.InputMode`. Do not
 wyn gptk install
 # default: ~/Downloads/Game_Porting_Toolkit_3.0.dmg
 wyn gptk status
+wyn renderer set d3dmetal   # opt-in; GPTK install does not select D3DMetal
 ```
 
 Apple download (Wyn never fetches it):
 https://developer.apple.com/download/all/?q=game%20porting%20toolkit
 
-Read Apple’s SLA. Overlay goes onto the winecx tree (`lib/external`).
-Unix D3D modules must be **symlinks** to `libd3dshared` (`cp -L` breaks
-`dlopen` of D3DMetal).
+Read Apple’s SLA. Overlay goes onto the winecx tree (`lib/external`) as
+**availability**. Unix D3D modules stay on DXMT until
+`wyn renderer set d3dmetal`. Those entries must be **symlinks** to
+`libd3dshared` (`cp -L` breaks `dlopen` of D3DMetal).
+
+DXMT is **D3D11 → Metal**. D3D12-only titles still need this D3DMetal opt-in.
+D3DMetal is not deprecated.

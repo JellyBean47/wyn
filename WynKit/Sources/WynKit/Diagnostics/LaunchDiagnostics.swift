@@ -49,8 +49,9 @@ public enum LaunchDiagnostics {
         "nvapi64.dll", "nvngx.dll"
     ]
 
-    /// Resolve the graphics layer Wyn will actually activate for this bottle.
-    public static func effectiveLayer(for bottle: Bottle) -> (layer: TranslationLayer, reason: String) {
+    /// Declared layer from bottle settings only (legacy `dxvk=true` sticky flag included).
+    /// Does not read unix `d3d*.so` pointers.
+    public static func requestedLayer(for bottle: Bottle) -> (layer: TranslationLayer, reason: String) {
         if bottle.settings.dxvk && bottle.settings.translationLayer != .dxvk {
             return (.dxvk, "legacy dxvk=true sticky flag overrides translationLayer=\(bottle.settings.translationLayer.rawValue)")
         }
@@ -58,6 +59,59 @@ public enum LaunchDiagnostics {
             return (.dxvk, "translationLayer=dxvk or dxvk=true")
         }
         return (bottle.settings.translationLayer, "translationLayer=\(bottle.settings.translationLayer.rawValue)")
+    }
+
+    /// Resolve the graphics layer Wyn will actually activate for this bottle.
+    /// Compares declared settings with the shared Libraries unix wiring; the
+    /// filesystem wins when they disagree.
+    public static func effectiveLayer(for bottle: Bottle) -> (layer: TranslationLayer, reason: String) {
+        let requested = requestedLayer(for: bottle)
+        // Sticky DXVK flag stays settings-only — do not reinterpret via unix modules.
+        if bottle.settings.dxvk && bottle.settings.translationLayer != .dxvk {
+            return requested
+        }
+        if bottle.settings.translationLayer == .dxvk || bottle.settings.dxvk {
+            return requested
+        }
+        return resolveEffectiveLayer(
+            declared: requested.layer,
+            snapshot: RendererWiring.inspect(),
+            gptkInstalled: GPTKInstaller.isInstalled()
+        )
+    }
+
+    static func resolveEffectiveLayer(
+        declared: TranslationLayer,
+        snapshot: RendererWiring.Snapshot,
+        gptkInstalled: Bool
+    ) -> (layer: TranslationLayer, reason: String) {
+        let settingsReason = "translationLayer=\(declared.rawValue)"
+        switch declared {
+        case .dxvk:
+            return (.dxvk, settingsReason)
+        case .dxmt:
+            if snapshot.backend == .d3dMetal,
+               let mismatch = RendererWiring.mismatchReason(declared: .dxmt, snapshot: snapshot) {
+                return (.d3dMetal, mismatch)
+            }
+            if snapshot.backend == .mixed,
+               let mismatch = RendererWiring.mismatchReason(declared: .dxmt, snapshot: snapshot) {
+                return (.dxmt, mismatch)
+            }
+            return (.dxmt, settingsReason)
+        case .d3dMetal:
+            if snapshot.backend == .d3dMetal {
+                return (.d3dMetal, settingsReason)
+            }
+            if !gptkInstalled {
+                return (.d3dMetal, settingsReason)
+            }
+            if let mismatch = RendererWiring.mismatchReason(declared: .d3dMetal, snapshot: snapshot) {
+                let wired: TranslationLayer = snapshot.backend == .wineNative ? .dxmt : declared
+                return (wired, mismatch)
+            }
+            return (.d3dMetal, settingsReason)
+        }
     }
 
     public static func inspect(
@@ -103,15 +157,29 @@ public enum LaunchDiagnostics {
         lines.append("  AVX:               \(bottle.settings.avxEnabled)")
         lines.append("  translationLayer:  \(bottle.settings.translationLayer.rawValue) (\(bottle.settings.translationLayer.displayName))")
         lines.append("  dxvk flag:         \(bottle.settings.dxvk)")
+        let declared = bottle.settings.translationLayer
+        let renderer = RendererWiring.inspect()
         let effective = effectiveLayer(for: bottle)
         lines.append("  EFFECTIVE layer:   \(effective.layer.rawValue) — \(effective.reason)")
-        if effective.layer == .d3dMetal {
+        lines.append("── Renderer (shared unix modules) ──")
+        for line in renderer.statusLines {
+            lines.append("  \(line)")
+        }
+        if declared == .d3dMetal || effective.layer == .d3dMetal {
             if GPTKInstaller.isInstalled() {
-                lines.append("  GPTK/D3DMetal: wired at \(GPTKInstaller.externalFolder.path(percentEncoded: false))")
+                lines.append("  GPTK/D3DMetal files: \(GPTKInstaller.externalFolder.path(percentEncoded: false))")
             } else {
-                lines.append("  ⚠️  D3DMetal selected but GPTK is not wired. Run: wyn gptk install")
+                lines.append("  ⚠️  D3DMetal selected but GPTK is not installed. Run: wyn gptk install")
                 lines.append("     Without GPTK, Wine falls back to wined3d / broken D3D11.")
             }
+        }
+        if (declared == .dxmt || declared == .dxvk), renderer.backend == .d3dMetal {
+            lines.append("  ⚠️  \(declared.rawValue) declared but Libraries d3d11.so -> libd3dshared (D3DMetal).")
+            lines.append("     run: wyn renderer set \(declared.rawValue)")
+        }
+        if declared == .d3dMetal, renderer.backend != .d3dMetal, GPTKInstaller.isInstalled() {
+            lines.append("  ⚠️  D3DMetal declared but unix modules are not libd3dshared.")
+            lines.append("     run: wyn renderer set d3dmetal")
         }
         lines.append("")
 

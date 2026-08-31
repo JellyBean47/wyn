@@ -16,6 +16,10 @@ let package = Package(
             name: "WynKit",
             dependencies: ["SemanticVersion"],
             resources: [.process("Resources")]
+        ),
+        .testTarget(
+            name: "WynKitTests",
+            dependencies: ["WynKit"]
         )
     ],
     swiftLanguageVersions: [.version("6")]

@@ -42,7 +42,8 @@ binaries. See [Documentation/user/game-host.md](Documentation/user/game-host.md)
   or `./scripts/install-foss-game-host.sh --directory …`
 - **Identity:** `ntdll.so` contains `CX_APPLEGPTK_LIBD3DSHARED_PATH` (winecx
   GPTK hook); `wine64` is not wineloader; `Wine/bin` is an ordinary `bin/`.
-  After GPTK overlay, unix `d3d11.so` is a symlink to
+  `wyn gptk install` copies `lib/external` (availability; default ~/Downloads).
+  `wyn renderer set d3dmetal` makes unix `d3d11.so` a symlink to
   `lib/external/libd3dshared.dylib`. Refuses proprietary Wine.app / wineloader
   layouts and Whisky 11 without the ntdll hook.
 - **GPTK 3.0:** user Apple DMG via `wyn gptk install` (default `~/Downloads/Game_Porting_Toolkit_3.0.dmg`) onto that winecx tree.

@@ -24,7 +24,8 @@ struct WynCLI: AsyncParsableCommand {
             Profiles.self,
             Runtime.self,
             Steam.self,
-            GPTK.self
+            GPTK.self,
+            Renderer.self
         ]
     )
 }
@@ -556,9 +557,14 @@ extension WynCLI {
             let bottles = data.loadBottles()
 
             print("Registered bottles: \(bottles.count)")
+            let renderer = RendererWiring.inspect()
+            print("Shared renderer: \(renderer.statusLines[0])")
             for b in bottles {
                 let effective = LaunchDiagnostics.effectiveLayer(for: b)
                 print("  - \(b.settings.name): layer=\(b.settings.translationLayer.rawValue) dxvk=\(b.settings.dxvk) effective=\(effective.layer.rawValue)")
+                if effective.reason.contains("but Libraries") {
+                    print("      \(effective.reason)")
+                }
             }
             print("")
 
@@ -756,7 +762,8 @@ extension WynCLI {
             print("Wine binary: \(status.wineBinary.path(percentEncoded: false))")
             print("GPTK aware:  \(GPTKInstaller.isWineGPTKAware() ? "yes (FOSS winecx + CX_APPLEGPTK)" : "no")")
             print("GPTK files:  \(GPTKInstaller.isInstalled() ? "yes (external/)" : "not installed")")
-            print("GPTK stubs:  \(GPTKInstaller.isWineModulesWired() ? "wired" : "not wired")")
+            print("Renderer:    \(RendererWiring.inspect().statusLines[0])")
+            print("GPTK stubs:  \(GPTKInstaller.isWineModulesWired() ? "D3DMetal selected" : "not selected (DXMT/Wine unix)")")
             let steamOK = WynWineInstaller.isSteamWineInstalled()
             print("Steam Wine:  \(steamOK ? "yes (frankea fallback) — \(WynWineInstaller.steamLibraryFolder.path)" : "no frankea fallback (optional; one-Wine uses Libraries/)")")
             print("")
@@ -883,7 +890,7 @@ extension WynCLI {
     struct GPTKStatus: ParsableCommand {
         static let configuration = CommandConfiguration(
             commandName: "status",
-            abstract: "Show whether D3DMetal is wired into WynWine."
+            abstract: "Show whether GPTK files are installed (availability, not selection)."
         )
 
         mutating func run() throws {
@@ -893,7 +900,7 @@ extension WynCLI {
             if let ver = GPTKInstaller.installedD3DMetalVersion() {
                 print("D3DMetal version:  \(ver)")
             }
-            print("Wine GPTK stubs:   \(GPTKInstaller.isWineModulesWired() ? "yes" : "no")")
+            print("Wine GPTK stubs:   \(GPTKInstaller.isWineModulesWired() ? "yes (D3DMetal selected)" : "no (not selected)")")
             print("MetalFX/nvngx:     \(GPTKInstaller.isMetalFXWired() ? "yes (nvngx + nvapi64)" : "no — re-run wyn gptk install")")
             if GPTKInstaller.isMetalFXWired() {
                 print("nvngx.dll:         \(GPTKInstaller.nvngxDLLURL.path(percentEncoded: false))")
@@ -903,6 +910,10 @@ extension WynCLI {
                 print("Downloads 3.0:     \(dl.path(percentEncoded: false))")
             } else {
                 print("Downloads 3.0:     (none — put \(GPTKInstaller.downloadsFileName) in ~/Downloads)")
+            }
+            let renderer = RendererWiring.inspect()
+            for line in renderer.statusLines {
+                print("Renderer:          \(line)")
             }
             if let src = GPTKInstaller.findLocalSource() {
                 let fw = src.appending(path: "external").appending(path: "D3DMetal.framework")
@@ -920,12 +931,13 @@ extension WynCLI {
                 """)
             } else if !GPTKInstaller.isInstalled() {
                 print("Next: wyn gptk install")
-            } else if !GPTKInstaller.isWineModulesWired() {
-                print("Next: wyn gptk install  (will wire PE/unix stubs on this GPTK-aware Wine)")
             } else if !GPTKInstaller.isMetalFXWired() {
-                print("Next: wyn gptk install  (will wire MetalFX nvngx/nvapi64)")
+                print("Next: wyn gptk install  (will overlay MetalFX nvngx/nvapi64)")
+            } else if renderer.backend != .d3dMetal {
+                print("GPTK is installed. DXMT remains the selected renderer.")
+                print("D3D12-only titles need D3DMetal: wyn renderer set d3dmetal")
             } else {
-                print("Ready for translationLayer=d3dmetal profiles (D3DMetal + MetalFX).")
+                print("D3DMetal is selected. Switch back with: wyn renderer set dxmt")
             }
         }
     }
@@ -961,15 +973,99 @@ extension WynCLI {
             if let ver = GPTKInstaller.installedD3DMetalVersion() {
                 print("D3DMetal version: \(ver)")
             }
-            if GPTKInstaller.isWineModulesWired() {
-                if GPTKInstaller.isWineGPTKAware() {
-                    print("Wine PE/unix stubs overlaid (GPTK-aware Wine).")
-                } else {
-                    print("FLY_GPTK_WIRE_WINE=1 — stubs overlaid on non-aware Wine (may break Steam).")
-                }
-                print("MetalFX/nvngx: \(GPTKInstaller.isMetalFXWired() ? "wired" : "MISSING (redist may lack nvngx-on-metalfx)")")
+            if GPTKInstaller.shouldWireWineModules {
+                print("Wine PE/MetalFX overlay applied (GPTK-aware Wine).")
+                print("MetalFX/nvngx: \(GPTKInstaller.isMetalFXWired() ? "present" : "MISSING (redist may lack nvngx-on-metalfx)")")
             } else {
                 print("Wine stubs not overlaid. Need FOSS winecx: wyn runtime install --gptk-aware --directory <wine-root>")
+            }
+            let renderer = RendererWiring.inspect()
+            print("Renderer: \(renderer.statusLines[0])")
+            if renderer.backend != .d3dMetal {
+                print("GPTK install does not select D3DMetal. DXMT stays selected until: wyn renderer set d3dmetal")
+            }
+        }
+    }
+}
+
+// MARK: - Renderer (shared unix d3d*.so selection)
+
+extension WynCLI {
+    struct Renderer: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "renderer",
+            abstract: "Select the shared Direct3D → Metal backend (DXMT default; D3DMetal opt-in).",
+            discussion: """
+            Unix d3d11.so / d3d10.so / dxgi.so / d3d12.so in Libraries/ are a shared \
+            pointer. Bottle translationLayer is declared intent; if they disagree, \
+            the filesystem wins. wyn gptk install only makes D3DMetal available.
+
+            DXMT is D3D11 → Metal. D3D12-only titles still need GPTK (wyn renderer set d3dmetal).
+            """,
+            subcommands: [RendererStatus.self, RendererSet.self],
+            defaultSubcommand: RendererStatus.self
+        )
+    }
+
+    struct RendererStatus: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "status",
+            abstract: "Show declared vs wired graphics backend."
+        )
+
+        mutating func run() throws {
+            guard WynWineInstaller.isWynWineInstalled() else {
+                print("WynWine is NOT installed. Run: wyn install")
+                return
+            }
+
+            print("GPTK files: \(GPTKInstaller.isInstalled() ? "installed (selectable)" : "not installed")")
+            if let ver = GPTKInstaller.installedD3DMetalVersion() {
+                print("D3DMetal:   \(ver)")
+            }
+            print("Unix dir:   \(RendererWiring.Context.live.unixDirectory.path(percentEncoded: false))")
+            for line in RendererWiring.inspect().statusLines {
+                print(line)
+            }
+            print("")
+
+            var data = BottleData()
+            let bottles = data.loadBottles()
+            if bottles.isEmpty {
+                print("No bottles.")
+                return
+            }
+            print("Bottles:")
+            for bottle in bottles {
+                let effective = LaunchDiagnostics.effectiveLayer(for: bottle)
+                print(
+                    "  \(bottle.settings.name): declared=\(bottle.settings.translationLayer.rawValue) " +
+                    "effective=\(effective.layer.rawValue)"
+                )
+                if effective.reason.contains("but Libraries") {
+                    print("    \(effective.reason)")
+                }
+            }
+        }
+    }
+
+    struct RendererSet: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "set",
+            abstract: "Repoint shared unix d3d*.so at dxmt, dxvk, or d3dmetal and verify."
+        )
+
+        @Argument(help: "Backend: dxmt (default), dxvk, or d3dmetal.")
+        var layer: TranslationLayer
+
+        mutating func run() throws {
+            guard WynWineInstaller.isWynWineInstalled() else {
+                throw ValidationError("WynWine not installed. Run: wyn install")
+            }
+            try RendererWiring.set(layer)
+            print("Renderer → \(layer.displayName)")
+            for line in RendererWiring.inspect().statusLines {
+                print("  \(line)")
             }
         }
     }

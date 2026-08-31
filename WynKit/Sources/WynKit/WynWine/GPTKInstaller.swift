@@ -191,7 +191,8 @@ public enum GPTKInstaller {
         return roots
     }
 
-    /// True when unix D3D modules are symlinks to `libd3dshared.dylib` beside D3DMetal.framework.
+    /// True when unix D3D modules are selected as D3DMetal (`d3d*.so` → `libd3dshared`).
+    /// Distinct from `isInstalled()` (files present, not necessarily selected).
     public static func isWineModulesWired() -> Bool {
         GameHostIdentity.unixD3DMetalWired(
             in: WynWineInstaller.libraryFolder.appending(path: "Wine")
@@ -300,11 +301,12 @@ public enum GPTKInstaller {
         version.split(separator: ".").compactMap { Int($0) }.first ?? 0
     }
 
-    /// Copy GPTK into WynWine `lib/external/`.
-    /// Overlays Wine PE/unix stubs when the Wine tree is GPTK-aware, or when
-    /// `FLY_GPTK_WIRE_WINE=1` (experimental — breaks Steam on non-aware Wine).
-    /// `sourceLibRoot` may be a redist directory or an Apple DMG (including the
-    /// nested Evaluation image). Wyn never downloads GPTK.
+    /// Copy GPTK into WynWine `lib/external/`. Availability only — does **not**
+    /// select D3DMetal. Unix `d3d*.so` pointers are `RendererWiring.set`.
+    /// Overlays Wine PE stubs + MetalFX unix helpers when the Wine tree is
+    /// GPTK-aware, or when `FLY_GPTK_WIRE_WINE=1` (experimental — breaks Steam
+    /// on non-aware Wine). `sourceLibRoot` may be a redist directory or an Apple
+    /// DMG (including the nested Evaluation image). Wyn never downloads GPTK.
     @discardableResult
     public static func install(from sourceLibRoot: URL) throws -> URL {
         let fm = FileManager.default
@@ -470,8 +472,9 @@ public enum GPTKInstaller {
         )
     }
 
-    /// Experimental: replace Wine D3D PE/unix modules with Apple GPTK stubs.
-    /// Also wires MetalFX complement: `nvngx-on-metalfx` → `nvngx`, plus `nvapi64`.
+    /// Overlay GPTK PE stubs and MetalFX unix helpers (`nvngx`, `nvapi64`, `atidxx64`).
+    /// Does **not** repoint `d3d11.so` / `d3d10.so` / `dxgi.so` / `d3d12.so` —
+    /// that is renderer selection (`RendererWiring.set`), not GPTK availability.
     public static func wireWineModules(from sourceLibRoot: URL? = nil) throws {
         let fm = FileManager.default
         let session = DiskImageSession()
@@ -513,8 +516,7 @@ public enum GPTKInstaller {
         let unixDir = wineLibFolder.appending(path: "wine").appending(path: "x86_64-unix")
         try fm.createDirectory(at: unixDir, withIntermediateDirectories: true)
         let soNames = [
-            "d3d11.so", "dxgi.so", "d3d12.so", "d3d10.so", "atidxx64.so",
-            "nvapi64.so", "nvngx.so"
+            "atidxx64.so", "nvapi64.so", "nvngx.so"
         ]
         let relativeTarget = "../../external/libd3dshared.dylib"
         for name in soNames {

@@ -7,11 +7,11 @@ import Foundation
 
 /// Direct3D → Metal translation backend selection.
 public enum TranslationLayer: String, Codable, CaseIterable, Sendable {
-    /// Apple Game Porting Toolkit D3DMetal (default on Apple Silicon).
+    /// Apple Game Porting Toolkit D3DMetal (opt-in; user-supplied GPTK).
     case d3dMetal = "d3dmetal"
     /// DXVK-macOS: D3D9/10/11 → Vulkan → MoltenVK → Metal.
     case dxvk = "dxvk"
-    /// DXMT: D3D11 → Metal (community fork, high compatibility for some titles).
+    /// DXMT: D3D11 → Metal. Default on a fresh install.
     case dxmt = "dxmt"
 
     public var displayName: String {
