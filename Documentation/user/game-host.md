@@ -14,7 +14,7 @@ refused.
 | --- | --- |
 | `Libraries/` (game-host) | FOSS winecx. Steam UI for GPTK 3.0 + games. |
 | `Libraries.steam` (frankea) | `./scripts/setup.sh` WhiskyWine v3.1.1 — DXMT / window rollback only. |
-| Apple GPTK 3.0 | User DMG/redist via `wyn gptk install --from` onto the winecx tree (`D3DMetal.framework` + `libd3dshared`). Not Wine. |
+| Apple GPTK 3.0 | User DMG in `~/Downloads` via `wyn gptk install` onto the winecx tree (`D3DMetal.framework` + `libd3dshared`). Not Wine. |
 
 Steam on the game-host wineserver. Isolation AppDefaults for `steam.exe` and
 `steamwebhelper.exe` are **`=b`** (builtin), not `n,b`.
@@ -89,7 +89,8 @@ loads (`scripts/build-foss-game-host.sh`). Do not pin `FG.InputMode`. Do not
 ## GPTK 3.0 (Apple, not Wine)
 
 ```bash
-wyn gptk install --from /path/to/GPTK/redist-or-dmg
+wyn gptk install
+# default: ~/Downloads/Game_Porting_Toolkit_3.0.dmg
 wyn gptk status
 ```
 

@@ -70,7 +70,8 @@ GPTK bolted on. Wyn never downloads winecx or GPTK for `--gptk-aware`. See
 ```bash
 ./scripts/build-foss-game-host.sh
 wyn runtime install --gptk-aware --directory /path/to/wine-root
-wyn gptk install --from /path/to/GPTK/redist
+wyn gptk install
+# default: ~/Downloads/Game_Porting_Toolkit_3.0.dmg
 ```
 
 Read Apple’s Game Porting Toolkit license first. Default graphics are DXMT and

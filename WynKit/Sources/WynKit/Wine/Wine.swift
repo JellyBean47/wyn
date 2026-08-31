@@ -698,14 +698,14 @@ public class Wine {
         public var errorDescription: String? {
             switch self {
             case .gptkMissing:
-                return "GPTK/D3DMetal not installed. Obtain it from Apple, then: wyn gptk install --from /path/to/redist"
+                return "GPTK/D3DMetal not installed. Download Game Porting Toolkit 3.0 from Apple into ~/Downloads, then: wyn gptk install"
             case .wineNotGPTKAware:
                 return """
                 Installed Wine is not the D3DMetal game-host (need FOSS winecx with \
                 ntdll CX_APPLEGPTK, not Whisky 11). \
                 ./scripts/build-foss-game-host.sh then \
                 wyn runtime install --gptk-aware --directory <wine-root> \
-                Then: wyn gptk install --from /path/to/redist. \
+                Then: wyn gptk install. \
                 translationLayer=d3dmetal does not fall back to frankea DXVK.
                 """
             case .dxvkMissingForSteam:

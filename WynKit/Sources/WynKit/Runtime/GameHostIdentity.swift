@@ -34,7 +34,8 @@ public enum GameHostIdentity {
     that script). Then:
 
       wyn runtime install --gptk-aware --directory /path/to/wine-prefix-or-Libraries
-      wyn gptk install --from /path/to/Apple/GPTK/redist-or-dmg
+      wyn gptk install
+      # default: ~/Downloads/Game_Porting_Toolkit_3.0.dmg
 
     Identity:
       ntdll.so contains CX_APPLEGPTK_LIBD3DSHARED_PATH (winecx GPTK hook)
@@ -271,6 +272,7 @@ public enum GameHostIdentity {
         try materialize(from: sourceRoot, link: link)
         try ensureWine64Symlink()
         try writeFOSSVersionPlist()
+        try WynWineInstaller.ensureSteamWineTree()
         try assertGameHost()
         // frankea share/wine/mono is gone with the parked Libraries/. Restore the
         // winecx-matching MSI from ~/Library/Caches/wyn so wineboot does not GUI.
@@ -280,22 +282,17 @@ public enum GameHostIdentity {
     public static func parkNonFOSSGameHostLibraries() throws {
         let fm = FileManager.default
         let libraries = WynWineInstaller.libraryFolder
-        guard fm.fileExists(atPath: libraries.path(percentEncoded: false)) else { return }
-        if inspect(libraryFolder: libraries).isFOSSGPTKHost { return }
-
         let bak = WynWineInstaller.preGPTKAwareBackupFolder
-        if fm.fileExists(atPath: bak.path(percentEncoded: false)) {
-            let steamWine = WynWineInstaller.applicationFolder
-                .appending(path: "Libraries.steam")
-                .appending(path: "Wine")
-                .appending(path: "bin")
-                .appending(path: "wine64")
-            if !fm.fileExists(atPath: steamWine.path(percentEncoded: false)) {
+        if fm.fileExists(atPath: libraries.path(percentEncoded: false)) {
+            if inspect(libraryFolder: libraries).isFOSSGPTKHost {
                 try WynWineInstaller.ensureSteamWineTree()
+                return
             }
-            try fm.removeItem(at: libraries)
-        } else {
-            try fm.moveItem(at: libraries, to: bak)
+            if fm.fileExists(atPath: bak.path(percentEncoded: false)) {
+                try fm.removeItem(at: libraries)
+            } else {
+                try fm.moveItem(at: libraries, to: bak)
+            }
         }
         try WynWineInstaller.ensureSteamWineTree()
     }

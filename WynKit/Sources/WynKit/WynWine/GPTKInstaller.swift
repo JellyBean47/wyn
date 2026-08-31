@@ -15,6 +15,9 @@ public enum GPTKInstaller {
         case payloadIncomplete(String)
         case wineTreeMissing
         case requiresExplicitSource
+        case notFoundInDownloads
+        case d3dMetalTooOld(String)
+        case diskImageFailed(String)
 
         public var errorDescription: String? {
             switch self {
@@ -24,15 +27,77 @@ public enum GPTKInstaller {
                 return "GPTK payload incomplete: \(detail)"
             case .wineTreeMissing:
                 return "WynWine is not installed. Run: wyn install"
-            case .requiresExplicitSource:
+            case .requiresExplicitSource, .notFoundInDownloads:
                 return """
-                GPTK/D3DMetal is not bundled. Download Game Porting Toolkit from Apple, then:
-                  wyn gptk install --from /path/to/redist
-                https://developer.apple.com/download/all/?q=game%20porting%20toolkit
+                GPTK/D3DMetal is not bundled. Download Game Porting Toolkit 3.0 from Apple \
+                into ~/Downloads (Game_Porting_Toolkit_3.0.dmg), then:
+                  wyn gptk install
+                Or pass a redist/DMG: wyn gptk install --from /path
+                \(GPTKInstaller.appleDownloadURL)
                 Wyn never downloads GPTK.
                 """
+            case .d3dMetalTooOld(let version):
+                return """
+                This redist is D3DMetal \(version). Wyn needs Game Porting Toolkit 3.0 \
+                (D3DMetal 3.x). Put Game_Porting_Toolkit_3.0.dmg in ~/Downloads, then:
+                  wyn gptk install
+                \(GPTKInstaller.appleDownloadURL)
+                """
+            case .diskImageFailed(let detail):
+                return "Could not open GPTK disk image: \(detail)"
             }
         }
+    }
+
+    public static let appleDownloadURL =
+        "https://developer.apple.com/download/all/?q=game%20porting%20toolkit"
+
+    /// Auto-detect and install refuse D3DMetal 2.x. GPTK 3.0 is the product overlay.
+    public static let minimumD3DMetalMajor = 3
+
+    /// Canonical filename the user drops in ~/Downloads.
+    public static let downloadsFileName = "Game_Porting_Toolkit_3.0.dmg"
+
+    /// GPTK 3.0 in ~/Downloads: `Game_Porting_Toolkit_3.0.dmg` first, then other
+    /// Game Porting Toolkit 3.x DMGs or extracted folders. Does not mount.
+    public static func preferredDownloadsCandidate() -> URL? {
+        let fm = FileManager.default
+        let downloads = fm.homeDirectoryForCurrentUser.appending(path: "Downloads")
+        let exact = downloads.appending(path: downloadsFileName)
+        if fm.fileExists(atPath: exact.path(percentEncoded: false)) {
+            return exact
+        }
+
+        guard let kids = try? fm.contentsOfDirectory(
+            at: downloads,
+            includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else { return nil }
+
+        func looksLikeGPTK(_ url: URL) -> Bool {
+            let n = url.lastPathComponent.lowercased()
+            return n.contains("game_porting") || n.contains("game porting")
+                || n.contains("gptk")
+        }
+
+        func score(_ url: URL) -> Int {
+            let n = url.lastPathComponent.lowercased()
+            let isDmg = n.hasSuffix(".dmg")
+            if n.contains("3.0") && isDmg { return 400 }
+            if n.contains("3.0") { return 350 }
+            if n.contains("3") && isDmg { return 300 }
+            if n.contains("3") { return 250 }
+            if isDmg { return 150 }
+            return 100
+        }
+
+        return kids.filter(looksLikeGPTK).max { score($0) < score($1) }
+    }
+
+    /// Same as `preferredDownloadsCandidate()`, then mounted volumes / GPTK.app.
+    public static func preferredLocalSource() -> URL? {
+        if let downloads = preferredDownloadsCandidate() { return downloads }
+        return findLocalSource()
     }
 
     /// `…/Libraries/Wine/lib`
@@ -77,8 +142,8 @@ public enum GPTKInstaller {
         return obj["CFBundleVersion"] as? String
     }
 
-    /// Candidate GPTK redist roots (directory that contains `lib/external` or `external`).
-    /// Used only by `wyn gptk status`. Install requires `--from`.
+    /// Candidate GPTK redist roots (directory, DMG, or mounted volume).
+    /// `wyn gptk install` with no `--from` uses `preferredLocalSource()` (Downloads 3.0 first).
     /// Never searches the Wyn git tree or `whisky-wine/` (those must not be a
     /// redistribution channel).
     public static func defaultSearchRoots() -> [URL] {
@@ -89,7 +154,10 @@ public enum GPTKInstaller {
         // Official Apple GPTK.app layout (user-installed from Apple).
         roots.append(URL(fileURLWithPath: "/Applications/Game Porting Toolkit.app/Contents/Resources/wine"))
 
-        // Downloads: extracted folders / mounted DMG names.
+        // Downloads: 3.0 DMG first, then extracted folders / other GPTK names.
+        if let preferred = preferredDownloadsCandidate() {
+            roots.append(preferred)
+        }
         let downloads = home.appending(path: "Downloads")
         if let kids = try? fm.contentsOfDirectory(
             at: downloads,
@@ -177,12 +245,14 @@ public enum GPTKInstaller {
     }
 
     /// Resolve a redist root to the folder that contains `external/libd3dshared.dylib`.
+    /// Directories only — DMGs are opened by `resolveAndMount`.
     public static func resolveLibRoot(from candidate: URL) -> URL? {
         let fm = FileManager.default
         let probes = [
             candidate.appending(path: "lib"),
             candidate,
-            candidate.appending(path: "redist").appending(path: "lib")
+            candidate.appending(path: "redist").appending(path: "lib"),
+            candidate.appending(path: "redist")
         ]
         for root in probes {
             let external = root.appending(path: "external").appending(path: "libd3dshared.dylib")
@@ -194,12 +264,14 @@ public enum GPTKInstaller {
     }
 
     public static func findLocalSource() -> URL? {
-        // Prefer the newest D3DMetal among discoverable redists (skip 2.1 if 3+/4 present).
+        if let downloads = preferredDownloadsCandidate() { return downloads }
+        // Prefer the newest D3DMetal among already-extracted / mounted redists.
         var best: (url: URL, version: String)?
         for root in defaultSearchRoots() {
             guard let lib = resolveLibRoot(from: root) else { continue }
             let fw = lib.appending(path: "external").appending(path: "D3DMetal.framework")
             let ver = versionFromFramework(at: fw) ?? "0"
+            if majorVersion(ver) < minimumD3DMetalMajor { continue }
             if let current = best {
                 if compareVersions(ver, current.version) > 0 {
                     best = (lib, ver)
@@ -224,10 +296,15 @@ public enum GPTKInstaller {
         return 0
     }
 
+    private static func majorVersion(_ version: String) -> Int {
+        version.split(separator: ".").compactMap { Int($0) }.first ?? 0
+    }
+
     /// Copy GPTK into WynWine `lib/external/`.
     /// Overlays Wine PE/unix stubs when the Wine tree is GPTK-aware, or when
     /// `FLY_GPTK_WIRE_WINE=1` (experimental — breaks Steam on non-aware Wine).
-    /// `sourceLibRoot` is required — Wyn never auto-picks Desktop/whisky-wine.
+    /// `sourceLibRoot` may be a redist directory or an Apple DMG (including the
+    /// nested Evaluation image). Wyn never downloads GPTK.
     @discardableResult
     public static func install(from sourceLibRoot: URL) throws -> URL {
         let fm = FileManager.default
@@ -235,7 +312,9 @@ public enum GPTKInstaller {
             throw GPTKError.wineTreeMissing
         }
 
-        guard let source = resolveLibRoot(from: sourceLibRoot) else {
+        let session = DiskImageSession()
+        defer { session.detachAll() }
+        guard let source = try resolveAndMount(sourceLibRoot, session: session) else {
             throw GPTKError.sourceMissing(sourceLibRoot)
         }
 
@@ -247,6 +326,11 @@ public enum GPTKInstaller {
         }
         guard fm.fileExists(atPath: srcFramework.path(percentEncoded: false)) else {
             throw GPTKError.payloadIncomplete("missing external/D3DMetal.framework")
+        }
+
+        let version = versionFromFramework(at: srcFramework) ?? "unknown"
+        if majorVersion(version) < minimumD3DMetalMajor {
+            throw GPTKError.d3dMetalTooOld(version)
         }
 
         // 1) external/ — preserve external → external-VER.bak symlink layout when present.
@@ -261,6 +345,51 @@ public enum GPTKInstaller {
         }
 
         return externalFolder
+    }
+
+    /// Open a directory or Apple DMG (and nested Evaluation DMG) to a lib root.
+    private static func resolveAndMount(_ candidate: URL, session: DiskImageSession) throws -> URL? {
+        let fm = FileManager.default
+        let path = candidate.path(percentEncoded: false)
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: path, isDirectory: &isDir) else { return nil }
+
+        if !isDir.boolValue, candidate.pathExtension.lowercased() == "dmg" {
+            let volume = try session.attach(candidate)
+            if let lib = resolveLibRoot(from: volume) { return lib }
+            for nested in diskImages(in: volume, maxDepth: 2) {
+                let inner = try session.attach(nested)
+                if let lib = resolveLibRoot(from: inner) { return lib }
+            }
+            return nil
+        }
+
+        if let lib = resolveLibRoot(from: candidate) { return lib }
+        return nil
+    }
+
+    private static func diskImages(in root: URL, maxDepth: Int) -> [URL] {
+        var results: [URL] = []
+        func walk(_ dir: URL, depth: Int) {
+            guard depth <= maxDepth else { return }
+            guard let kids = try? FileManager.default.contentsOfDirectory(
+                at: dir,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            ) else { return }
+            for child in kids {
+                if child.pathExtension.lowercased() == "dmg" {
+                    results.append(child)
+                    continue
+                }
+                let isDirectory = (try? child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+                if isDirectory {
+                    walk(child, depth: depth + 1)
+                }
+            }
+        }
+        walk(root, depth: 1)
+        return results
     }
 
     /// True when `lib/external` is a symlink whose destination name looks like `external-*.bak`.
@@ -345,15 +474,19 @@ public enum GPTKInstaller {
     /// Also wires MetalFX complement: `nvngx-on-metalfx` → `nvngx`, plus `nvapi64`.
     public static func wireWineModules(from sourceLibRoot: URL? = nil) throws {
         let fm = FileManager.default
+        let session = DiskImageSession()
+        defer { session.detachAll() }
         let source: URL
-        if let sourceLibRoot, let resolved = resolveLibRoot(from: sourceLibRoot) {
+        if let sourceLibRoot, let resolved = try resolveAndMount(sourceLibRoot, session: session) {
             source = resolved
         } else if isInstalled() {
-            // PE stubs still need the GPTK redist wine/ folder from the original source.
-            guard let found = findLocalSource() else {
-                throw GPTKError.payloadIncomplete("need GPTK redist with wine/ to wire modules")
+            guard let found = preferredLocalSource() else {
+                throw GPTKError.payloadIncomplete("need GPTK 3.0 redist with wine/ to wire modules")
             }
-            source = found
+            guard let resolved = try resolveAndMount(found, session: session) else {
+                throw GPTKError.sourceMissing(found)
+            }
+            source = resolved
         } else {
             throw GPTKError.payloadIncomplete("install GPTK external/ first")
         }
@@ -445,5 +578,68 @@ public enum GPTKInstaller {
         }
         if isLink { return }
         try fm.copyItem(at: url, to: backup)
+    }
+
+    /// Mount Apple GPTK DMGs (and nested Evaluation images) for the install copy, then detach.
+    fileprivate final class DiskImageSession {
+        private var mountPoints: [URL] = []
+
+        func attach(_ dmg: URL) throws -> URL {
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+            proc.arguments = [
+                "attach", "-nobrowse", "-readonly", "-plist",
+                dmg.path(percentEncoded: false)
+            ]
+            let out = Pipe()
+            let err = Pipe()
+            proc.standardOutput = out
+            proc.standardError = err
+            try proc.run()
+            proc.waitUntilExit()
+            let data = out.fileHandleForReading.readDataToEndOfFile()
+            if proc.terminationStatus != 0 {
+                let msg = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                throw GPTKError.diskImageFailed(
+                    "hdiutil attach failed for \(dmg.lastPathComponent)\(msg.isEmpty ? "" : ": \(msg)")"
+                )
+            }
+            guard let mount = Self.mountPoint(fromPlist: data) else {
+                throw GPTKError.diskImageFailed(
+                    "no mount-point in hdiutil output for \(dmg.lastPathComponent)"
+                )
+            }
+            mountPoints.append(mount)
+            return mount
+        }
+
+        func detachAll() {
+            for mount in mountPoints.reversed() {
+                let proc = Process()
+                proc.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+                proc.arguments = ["detach", mount.path(percentEncoded: false), "-quiet"]
+                proc.standardOutput = Pipe()
+                proc.standardError = Pipe()
+                try? proc.run()
+                proc.waitUntilExit()
+            }
+            mountPoints.removeAll()
+        }
+
+        private static func mountPoint(fromPlist data: Data) -> URL? {
+            guard let obj = try? PropertyListSerialization.propertyList(from: data, format: nil)
+                    as? [String: Any],
+                  let entities = obj["system-entities"] as? [[String: Any]]
+            else { return nil }
+            var found: URL?
+            for entity in entities {
+                if let path = entity["mount-point"] as? String,
+                   FileManager.default.fileExists(atPath: path) {
+                    found = URL(fileURLWithPath: path)
+                }
+            }
+            return found
+        }
     }
 }

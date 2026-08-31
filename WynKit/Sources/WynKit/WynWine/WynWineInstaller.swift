@@ -76,37 +76,52 @@ public class WynWineInstaller {
         return FileManager.default.fileExists(atPath: wine64.path(percentEncoded: false))
     }
 
+    /// `FileManager.fileExists` is false for a dangling symlink; `removeItem` still needs it gone.
+    private static func pathExistsOrIsSymlink(_ url: URL) -> Bool {
+        let path = url.path(percentEncoded: false)
+        if FileManager.default.fileExists(atPath: path) { return true }
+        return (try? FileManager.default.destinationOfSymbolicLink(atPath: path)) != nil
+    }
+
     /// Ensure `Libraries.steam` exists (symlink to pre-GPTK bak when needed). Returns the tree root.
     /// Also repairs missing `libvulkan.1.dylib` → MoltenVK (required for DXVK on frankea).
+    /// When bak exists, always point `Libraries.steam` at bak — never at live `Libraries/`
+    /// (that becomes winecx after `--gptk-aware` and a leftover `Libraries.steam → Libraries`
+    /// symlink goes dangling the moment frankea is parked).
     @discardableResult
     public static func ensureSteamWineTree() throws -> URL {
         let fm = FileManager.default
         let dedicated = applicationFolder.appending(path: "Libraries.steam")
-        let dedicatedWine = dedicated.appending(path: "Wine").appending(path: "bin").appending(path: "wine64")
-        let root: URL
-        if fm.fileExists(atPath: dedicatedWine.path(percentEncoded: false)) {
-            root = dedicated
-        } else {
-            let bak = preGPTKAwareBackupFolder
-            let bakWine = bak.appending(path: "Wine").appending(path: "bin").appending(path: "wine64")
-            let fossWine = libraryFolder.appending(path: "Wine").appending(path: "bin").appending(path: "wine64")
-            // Fresh FOSS setup only has Libraries/. The pre-GPTK bak exists
-            // only after a later GPTK-aware install.
-            let source: URL
-            if fm.fileExists(atPath: bakWine.path(percentEncoded: false)) {
-                source = bak
-            } else if fm.fileExists(atPath: fossWine.path(percentEncoded: false)) {
-                source = libraryFolder
-            } else {
-                throw CocoaError(.fileNoSuchFile)
-            }
+        let dedicatedPath = dedicated.path(percentEncoded: false)
+        let bak = preGPTKAwareBackupFolder
+        let bakWine = bak.appending(path: "Wine").appending(path: "bin").appending(path: "wine64")
+        let fossWine = libraryFolder.appending(path: "Wine").appending(path: "bin").appending(path: "wine64")
 
-            if fm.fileExists(atPath: dedicated.path(percentEncoded: false)) {
+        let source: URL
+        if fm.fileExists(atPath: bakWine.path(percentEncoded: false)) {
+            source = bak
+        } else if fm.fileExists(atPath: fossWine.path(percentEncoded: false)) {
+            source = libraryFolder
+        } else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+
+        let existingDest = try? fm.destinationOfSymbolicLink(atPath: dedicatedPath)
+        let destURL = existingDest.map { URL(fileURLWithPath: $0).standardizedFileURL }
+        let alreadyCorrect = destURL == source.standardizedFileURL
+            && fm.fileExists(
+                atPath: dedicated.appending(path: "Wine").appending(path: "bin").appending(path: "wine64")
+                    .path(percentEncoded: false)
+            )
+
+        if !alreadyCorrect {
+            if pathExistsOrIsSymlink(dedicated) {
                 try fm.removeItem(at: dedicated)
             }
             try fm.createSymbolicLink(at: dedicated, withDestinationURL: source)
-            root = dedicated
         }
+
+        let root = dedicated
         try ensureFrankeaVulkanLinks(in: root)
         try ensureFrankeaDXVKPayload(in: root)
         return root

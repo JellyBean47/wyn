@@ -17,16 +17,20 @@ If you already obtained Game Porting Toolkit from Apple for your own
 evaluation/development use, you may point Wyn at that local redist:
 
 ```bash
-wyn gptk install --from /path/to/redist
+wyn gptk install
 wyn gptk status
 ```
 
-`--from` is required. Wyn does not search `~/Desktop/wyn/whisky-wine`.
+Default: `~/Downloads/Game_Porting_Toolkit_3.0.dmg` (or another Game Porting
+Toolkit 3.x DMG / extracted folder there). `--from` is only needed for a
+redist somewhere else. Wyn does not search `~/Desktop/wyn/whisky-wine` and
+never downloads GPTK.
 
 Install FOSS winecx first (`./scripts/build-foss-game-host.sh`, then
 `wyn runtime install --gptk-aware --directory …`).
 `wyn gptk install` overlays Apple D3DMetal 3.0 onto that tree; it is not a Wine
-installer.
+installer. It mounts the Apple DMG (including the nested Evaluation redist)
+and refuses D3DMetal 2.x.
 
 ## Terms
 

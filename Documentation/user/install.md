@@ -162,12 +162,14 @@ does not download Wine for `--gptk-aware`. Full path:
 3. Apple GPTK 3.0 is separate (user DMG). Read the SLA, then:
 
    ```bash
-   wyn gptk install --from /path/to/redist
+   wyn gptk install
+   # or: wyn gptk install --from /path/to/redist
    ```
 
-   The folder must contain `lib/external` or `external` with
-   `D3DMetal.framework` and `libd3dshared.dylib`. Unix `d3d11.so` must be a
-   **symlink** to `libd3dshared`. Wyn never downloads GPTK.
+   Put Apple’s `Game_Porting_Toolkit_3.0.dmg` in `~/Downloads`. Wyn mounts it
+   (including the nested Evaluation redist) and copies `D3DMetal.framework` +
+   `libd3dshared.dylib`. Unix `d3d11.so` must be a **symlink** to
+   `libd3dshared`. Wyn never downloads GPTK.
 
 Steam UI for 3.0 lives on the game-host wineserver. Isolation AppDefaults for
 `steam.exe` / `steamwebhelper` are `=b`. frankea (`Libraries.steam`) is DXMT /

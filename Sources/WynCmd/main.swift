@@ -797,7 +797,7 @@ extension WynCLI {
                 let report = GameHostIdentity.inspect()
                 print(report.rendered)
                 try GameHostIdentity.assertGameHost()
-                print("Game-host identity ok. Next: wyn gptk install --from /path/to/Apple/GPTK/redist")
+                print("Game-host identity ok. Next: wyn gptk install  # GPTK 3.0 from ~/Downloads")
                 return
             }
 
@@ -819,7 +819,7 @@ extension WynCLI {
                 print("Staging Wine Mono MSI for winecx (WineHQ; msiexec /qn at wyn steam install)…")
                 try await WineMono.ensureDatadirPackage()
                 print(GameHostIdentity.inspect().rendered)
-                print("FOSS GPTK game-host installed. Next: wyn gptk install --from /path/to/Apple/GPTK/redist")
+                print("FOSS GPTK game-host installed. Next: wyn gptk install  # GPTK 3.0 from ~/Downloads")
                 return
             }
 
@@ -851,7 +851,7 @@ extension WynCLI {
 
         private func printGPTKHint() {
             if GPTKInstaller.isWineGPTKAware() {
-                print("Wine is FOSS GPTK-aware. Next: wyn gptk install --from /path/to/redist")
+                print("Wine is FOSS GPTK-aware. Next: wyn gptk install  # GPTK 3.0 from ~/Downloads")
             } else {
                 print("Wine is not the D3DMetal game-host (DXMT/DXVK only).")
                 print("For D3DMetal: ./scripts/build-foss-game-host.sh then wyn runtime install --gptk-aware --directory <wine-root>")
@@ -899,26 +899,31 @@ extension WynCLI {
                 print("nvngx.dll:         \(GPTKInstaller.nvngxDLLURL.path(percentEncoded: false))")
             }
             print("external/:         \(GPTKInstaller.externalFolder.path(percentEncoded: false))")
+            if let dl = GPTKInstaller.preferredDownloadsCandidate() {
+                print("Downloads 3.0:     \(dl.path(percentEncoded: false))")
+            } else {
+                print("Downloads 3.0:     (none — put \(GPTKInstaller.downloadsFileName) in ~/Downloads)")
+            }
             if let src = GPTKInstaller.findLocalSource() {
                 let fw = src.appending(path: "external").appending(path: "D3DMetal.framework")
                 let srcVer = GPTKInstaller.versionFromFramework(at: fw).map { " (D3DMetal \($0))" } ?? ""
                 print("Auto-detect src:   \(src.path(percentEncoded: false))\(srcVer)")
             } else {
-                print("Auto-detect src:   (none — pass --from)")
+                print("Auto-detect src:   (none — wyn gptk install uses ~/Downloads)")
             }
             if !GPTKInstaller.isWineGPTKAware() {
                 print("""
                 Note: current Wine cannot load D3DMetal. Build FOSS winecx:
                   ./scripts/build-foss-game-host.sh
                   wyn runtime install --gptk-aware --directory <wine-root>
-                Then: wyn gptk install --from /path/to/redist
+                Then: wyn gptk install
                 """)
             } else if !GPTKInstaller.isInstalled() {
-                print("Next: wyn gptk install --from /path/to/redist")
+                print("Next: wyn gptk install")
             } else if !GPTKInstaller.isWineModulesWired() {
-                print("Next: wyn gptk install --from /path/to/redist  (will wire PE/unix stubs on this GPTK-aware Wine)")
+                print("Next: wyn gptk install  (will wire PE/unix stubs on this GPTK-aware Wine)")
             } else if !GPTKInstaller.isMetalFXWired() {
-                print("Next: wyn gptk install --from /path/to/redist  (will wire MetalFX nvngx/nvapi64)")
+                print("Next: wyn gptk install  (will wire MetalFX nvngx/nvapi64)")
             } else {
                 print("Ready for translationLayer=d3dmetal profiles (D3DMetal + MetalFX).")
             }
@@ -928,17 +933,29 @@ extension WynCLI {
     struct GPTKInstall: ParsableCommand {
         static let configuration = CommandConfiguration(
             commandName: "install",
-            abstract: "Copy a local GPTK redist into WynWine lib/external (D3DMetal.framework + libd3dshared)."
+            abstract: "Copy local GPTK 3.0 into WynWine lib/external. Default: ~/Downloads/Game_Porting_Toolkit_3.0.dmg."
         )
 
-        @Option(name: .long, help: "Path to a local GPTK redist (required). Wyn never downloads Apple GPTK.")
-        var from: String
+        @Option(
+            name: .long,
+            help: "Path to a GPTK redist or DMG. Default: Game Porting Toolkit 3.0 in ~/Downloads. Wyn never downloads Apple GPTK."
+        )
+        var from: String?
 
         mutating func run() throws {
             guard WynWineInstaller.isWynWineInstalled() else {
                 throw ValidationError("WynWine not installed. Run: wyn install")
             }
-            let source = URL(fileURLWithPath: from)
+            let source: URL
+            if let from {
+                source = URL(fileURLWithPath: from)
+                print("GPTK source: \(source.path(percentEncoded: false))")
+            } else if let found = GPTKInstaller.preferredLocalSource() {
+                source = found
+                print("Using \(found.path(percentEncoded: false))")
+            } else {
+                throw ValidationError(GPTKInstaller.GPTKError.notFoundInDownloads.errorDescription ?? "")
+            }
             let installed = try GPTKInstaller.install(from: source)
             print("GPTK/D3DMetal files → \(installed.path(percentEncoded: false))")
             if let ver = GPTKInstaller.installedD3DMetalVersion() {

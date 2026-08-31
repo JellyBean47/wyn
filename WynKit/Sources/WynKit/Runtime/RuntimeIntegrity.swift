@@ -72,7 +72,7 @@ public enum RuntimeIntegrity {
             case .hashMismatch(let expected, let actual):
                 return "Wine tarball SHA-256 mismatch (expected \(expected), got \(actual)). Refusing to install. See DEPENDENCIES.md."
             case .containsAppleGPTK(let name):
-                return "Archive or directory contains Apple GPTK file \(name). Wyn will not unpack or copy it. Obtain GPTK from Apple and use: wyn gptk install --from <path>"
+                return "Archive or directory contains Apple GPTK file \(name). Wyn will not unpack or copy it. Obtain GPTK 3.0 from Apple into ~/Downloads and use: wyn gptk install"
             case .tarListFailed(let detail):
                 return "Could not list tarball contents: \(detail)"
             }
