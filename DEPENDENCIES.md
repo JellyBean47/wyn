@@ -45,7 +45,7 @@ binaries. See [Documentation/user/game-host.md](Documentation/user/game-host.md)
   After GPTK overlay, unix `d3d11.so` is a symlink to
   `lib/external/libd3dshared.dylib`. Refuses proprietary Wine.app / wineloader
   layouts and Whisky 11 without the ntdll hook.
-- **GPTK 3.0:** user Apple DMG via `wyn gptk install --from` onto that winecx tree.
+- **GPTK 3.0:** user Apple DMG via `wyn gptk install` (default `~/Downloads/Game_Porting_Toolkit_3.0.dmg`) onto that winecx tree.
 
 The former EricSpencer `wine-v26.1.0-foss-phase1l` WhiskyWine tarball is **not**
 the game-host. Do not install it as `Libraries/` for D3DMetal.
@@ -96,4 +96,4 @@ when the user runs the matching install command or clicks Install. They are
 
 - **Wyn never downloads this.**
 - https://developer.apple.com/download/all/?q=game%20porting%20toolkit
-- Install: `wyn gptk install --from /path/to/redist`
+- Install: `wyn gptk install` (default `~/Downloads/Game_Porting_Toolkit_3.0.dmg`)

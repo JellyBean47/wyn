@@ -109,7 +109,7 @@ public enum LaunchDiagnostics {
             if GPTKInstaller.isInstalled() {
                 lines.append("  GPTK/D3DMetal: wired at \(GPTKInstaller.externalFolder.path(percentEncoded: false))")
             } else {
-                lines.append("  ⚠️  D3DMetal selected but GPTK is not wired. Run: wyn gptk install --from /path")
+                lines.append("  ⚠️  D3DMetal selected but GPTK is not wired. Run: wyn gptk install")
                 lines.append("     Without GPTK, Wine falls back to wined3d / broken D3D11.")
             }
         }
@@ -180,8 +180,8 @@ public enum LaunchDiagnostics {
             let libd3d = GPTKInstaller.libd3dsharedURL
             lines.append("  D3DMetal.framework: \(exists(external) ? "present" : "MISSING")")
             lines.append("  libd3dshared.dylib: \(exists(libd3d) ? "present" : "MISSING")")
-            lines.append("  GPTK wired: \(GPTKInstaller.isInstalled() ? "yes" : "NO — run: wyn gptk install --from /path")")
-            lines.append("  MetalFX/nvngx: \(GPTKInstaller.isMetalFXWired() ? "yes" : "NO — re-run: wyn gptk install --from /path")")
+            lines.append("  GPTK wired: \(GPTKInstaller.isInstalled() ? "yes" : "NO — run: wyn gptk install")")
+            lines.append("  MetalFX/nvngx: \(GPTKInstaller.isMetalFXWired() ? "yes" : "NO — re-run: wyn gptk install")")
             if GPTKInstaller.isMetalFXWired() {
                 lines.append("  nvngx.dll: \(GPTKInstaller.nvngxDLLURL.path(percentEncoded: false))")
             }

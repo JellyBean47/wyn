@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Wire a *user-provided* Apple GPTK redist or DMG into WynWine.
-# Wyn never downloads GPTK. You must pass the DMG or extracted redist.
+# Wyn never downloads GPTK. With no args, uses GPTK 3.0 from ~/Downloads.
 #
 # Usage:
+#   Tools/install-gptk-upgrade.sh
 #   Tools/install-gptk-upgrade.sh /path/to/Game_Porting_Toolkit.dmg
 #   Tools/install-gptk-upgrade.sh /path/to/redist
 set -euo pipefail
@@ -12,10 +13,15 @@ FLY_BIN="${FLY_BIN:-$FLY_ROOT/.build/release/wyn}"
 
 die() { echo "error: $*" >&2; exit 1; }
 
-[[ $# -ge 1 ]] || die "Pass a local GPTK DMG or redist directory.
-  Download from Apple (Wyn will not fetch it):
-  https://developer.apple.com/download/all/?q=game%20porting%20toolkit
-  $0 ~/Downloads/Game_Porting_Toolkit_*.dmg"
+if [[ $# -eq 0 ]]; then
+  if [[ ! -x "$FLY_BIN" ]]; then
+    echo "Building wyn…"
+    (cd "$FLY_ROOT" && swift build -c release)
+  fi
+  "$FLY_BIN" gptk install
+  "$FLY_BIN" gptk status
+  exit 0
+fi
 
 find_lib_root() {
   local candidate="$1"

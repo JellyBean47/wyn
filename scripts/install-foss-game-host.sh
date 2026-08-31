@@ -40,7 +40,7 @@ Identity:
   wine64 is not wineloader
   Wine/bin is an ordinary bin/ directory
 
-GPTK 3.0 is separate: wyn gptk install --from <Apple redist or DMG>
+GPTK 3.0 is separate: wyn gptk install  (default ~/Downloads/Game_Porting_Toolkit_3.0.dmg)
 frankea (./scripts/setup.sh) stays DXMT / window rollback as Libraries.steam.
 EOF
 }
@@ -257,7 +257,7 @@ Run ./scripts/setup.sh for frankea, or this script --directory for the game-host
   inspect_and_print "$LIBRARIES/Wine"
   refuse_if_bad "$LIBRARIES/Wine"
   echo "FOSS GPTK host:    yes"
-  echo "Next: wyn gptk install --from /path/to/Apple/GPTK/redist  (GPTK 3.0, not Wine)"
+  echo "Next: wyn gptk install  (GPTK 3.0 from ~/Downloads, not Wine)"
   exit 0
 fi
 
@@ -336,6 +336,6 @@ echo "FOSS GPTK host:    yes"
 echo "==> Wine Mono into live winecx datadir (wineboot GUI hang otherwise)"
 "$ROOT/scripts/install-wine-mono.sh"
 echo
-echo "Next: wyn gptk install --from /path/to/Apple/GPTK/redist"
+echo "Next: wyn gptk install  (GPTK 3.0 from ~/Downloads)"
 echo "Steam UI for D3DMetal 3.0 uses this wineserver. Isolation AppDefaults =b"
 echo "for steam.exe / steamwebhelper. frankea remains Libraries.steam (DXMT rollback)."

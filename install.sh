@@ -24,4 +24,4 @@ fi
 echo "Steam (optional):  wyn steam install   # silent SteamSetup, then CEF-shimmed client"
 echo "Heroic:            https://heroicgameslauncher.com"
 echo "Game-host (FOSS):  ./scripts/build-foss-game-host.sh && ./scripts/install-foss-game-host.sh --directory <wine-root>"
-echo "GPTK (optional):   wyn gptk install --from <apple-redist>"
+echo "GPTK (optional):   wyn gptk install   # GPTK 3.0 from ~/Downloads"

@@ -10,7 +10,7 @@ Wyn does not include, and must never ship, Apple Game Porting Toolkit,
 D3DMetal.framework, libd3dshared.dylib, or libmetalirconverter.dylib.
 Those components are Apple proprietary software. Users who want D3DMetal
 must obtain Game Porting Toolkit from Apple and install it locally
-(`wyn gptk install --from <path>`). See DEPENDENCIES.md.
+(`wyn gptk install`; default `~/Downloads/Game_Porting_Toolkit_3.0.dmg`). See DEPENDENCIES.md.
 
 Wine, DXVK, DXMT, MoltenVK, and other third-party runtimes are fetched
 at install time from the publishers listed in DEPENDENCIES.md. They are
