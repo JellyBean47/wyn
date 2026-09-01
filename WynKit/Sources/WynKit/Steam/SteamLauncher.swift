@@ -330,6 +330,7 @@ public enum SteamLauncher {
         if !steamUILooksReady(in: bottle) {
             launchArgs = launchArgs.filter { $0.lowercased() != "-noverifyfiles" }
         }
+        let baseline = connectionLogFingerprint(in: bottle)
         try await Wine.runProgram(
             at: plan.steamURL,
             args: launchArgs,
@@ -338,24 +339,31 @@ public enum SteamLauncher {
             options: plan.options
         )
         if plan.options.detachAfterStart {
-            await waitUntilLoggedOnThenReturn(in: bottle)
+            await waitUntilLoggedOnThenReturn(in: bottle, baseline: baseline)
         }
     }
 
     /// Overlay callers detach so they do not wait for Steam to quit. Stay up until
-    /// Logged On (Remember me) or a short timeout (login window still open).
-    /// Never throws — Steam is already running.
+    /// a **fresh** Logged On (Remember me), the user Exits, or a short timeout.
+    /// Never throws and never starts Steam again after Exit.
     private static func waitUntilLoggedOnThenReturn(
         in bottle: Bottle,
+        baseline: ConnectionLogFingerprint,
         seconds: TimeInterval = 90
     ) async {
-        if isSteamLoggedOn(in: bottle) { return }
+        var sawClient = false
         progress("Waiting for Steam Logged On…")
         let deadline = Date().addingTimeInterval(seconds)
         while Date() < deadline {
             if Task.isCancelled { return }
-            if isSteamLoggedOn(in: bottle) {
+            let running = isSteamClientRunning(in: bottle)
+            if running { sawClient = true }
+            if running, isSteamLoggedOn(in: bottle, baseline: baseline) {
                 progress("Steam Logged On.")
+                return
+            }
+            if sawClient, !running {
+                progress("Steam exited.")
                 return
             }
             try? await Task.sleep(nanoseconds: 400_000_000)
@@ -1158,12 +1166,15 @@ public enum SteamLauncher {
     /// Whether Steam's connection log shows a logged-on account (Steamworks requires this for Init).
     /// See: partner.steamgames.com/doc/api/steam_api — license on the currently active Steam account.
     ///
+    /// `steam.exe` must still be running — a leftover `[Logged On]` line from last night
+    /// must not light the header or dismiss the overlay while Steam is dead.
     /// When `baseline` is set (post-migrate / post-restart), require a **new** login-state line
     /// so a pre-kill frankea `[Logged On]` cannot unlock GPTK D3DMetal.
     public static func isSteamLoggedOn(
         in bottle: Bottle,
         baseline: ConnectionLogFingerprint? = nil
     ) -> Bool {
+        guard isSteamClientRunning(in: bottle) else { return false }
         let snap = LaunchDiagnostics.steamLoginSnapshot(bottle: bottle, baseline: baseline)
         return snap.loggedOn
     }
