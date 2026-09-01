@@ -50,6 +50,16 @@ stops before doing any work and prints the licence URL, so nothing involving
 Apple's toolkit happens by accident. It compiles Wine from source, so it is
 much slower than the standard install.
 
+The game-host build also needs `ccache` and `mingw-w64`, which the standard
+install does not. Those are checked **before** anything is installed, so a
+missing package costs you a message rather than a wasted build and a 317 MB
+download. Wyn prints the `brew` command and stops; add
+`--install-missing-tools` to let it run `brew install` for you.
+
+Consistent with `WYN_ALLOW_BREW_HEROIC`, Wyn never runs `brew` unless asked.
+It will not install Homebrew itself either — if `brew` is absent, it points at
+<https://brew.sh> and stops.
+
 ## 3. FOSS Wine runtime
 
 ```bash
