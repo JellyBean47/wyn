@@ -87,6 +87,24 @@ The FOSS host must ship `winebus.so` with `@loader_path/../..` so libinotify
 loads (`scripts/build-foss-game-host.sh`). Do not pin `FG.InputMode`. Do not
 `xinput*=d`. Never `wineserver -k`. CLI: `./.build/debug/wyn play satisfactory`.
 
+`wyn play` / the Wyn tile wait **120s** after the last D3DMetal session
+(overlay: “Waiting for the GPU to settle”). Immediate relaunch was RHIThread
+`EXCEPTION_ILLEGAL_INSTRUCTION` (7s and 31s gaps failed; ~103s was fine).
+This is Metal/D3DMetal teardown, not a thermal cool-down. Steam’s own Play
+button does not wait. Leave Steam Logged On.
+
+Unreal **CrashReportClient** left after a crash is not a live session. After
+the game EXE is gone, Play continues even if that dialog is still up (GPU
+settle still applies if you quit less than 120s ago). Close it without
+sending if you want; never `wineserver -k`.
+
+Shipped D3DMetal env is crash-avoidance, not taste: `D3DM_ENABLE_METALFX=0`,
+`D3DM_ENABLE_ASYNC_COMMIT=0`, `MTL_HUD_ENABLED=0`, `D3DM_SHOW_HUD_STATS=0`,
+`metalHud: false`. MetalFX on is ~0.1–2 fps then `RHIThread`
+`EXCEPTION_ILLEGAL_INSTRUCTION` in `D3DMCommandQueue::ExecuteCommandLists`.
+MetalFX off alone also SIGILL'd — set all three together. `avxEnabled` stays
+true until that trio is shown not to hold.
+
 ## GPTK 3.0 (Apple, not Wine)
 
 ```bash

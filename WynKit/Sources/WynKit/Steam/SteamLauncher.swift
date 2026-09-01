@@ -650,6 +650,8 @@ public enum SteamLauncher {
             throw SteamError.steamNotInstalled
         }
 
+        try await waitOutPreviousD3DMetalSession(profile: profile, bottle: bottle)
+
         var options = options
         if profile.needsUbisoftConnectPlay {
             try await prepareUbisoftConnectThenFrankeaSteam(in: bottle, options: &options)
@@ -815,7 +817,7 @@ public enum SteamLauncher {
     }
 
     /// Wine PE `steam.exe` (not steamwebhelper lines that only mention steampath=…steam.exe).
-    private static func lineIsSteamClientExe(_ line: String) -> Bool {
+    static func lineIsSteamClientExe(_ line: String) -> Bool {
         let lower = line.lowercased()
         if lower.contains("steamwebhelper") { return false }
         if lower.contains("steampath=") { return false }
@@ -857,7 +859,7 @@ public enum SteamLauncher {
     }
 
     /// `pid` + command from a cheap `ps` (no environ — CEF `ps eww` can deadlock).
-    private static func pidAndCommandRows() -> [(pid: Int, command: String)] {
+    static func pidAndCommandRows() -> [(pid: Int, command: String)] {
         let text = captureProcessOutput(
             executable: "/bin/ps",
             arguments: ["-ax", "-o", "pid=,command="]
@@ -970,7 +972,7 @@ public enum SteamLauncher {
         return false
     }
 
-    private static func progress(_ message: String) {
+    static func progress(_ message: String) {
         LaunchProgress.emit(message)
     }
 
@@ -1674,6 +1676,7 @@ public enum SteamLauncher {
             environment: environment,
             options: playOptions
         )
+        scheduleD3DMetalExitStamp(profile: profile, bottle: bottle)
         LaunchDiagnostics.printAuthSignal(
             bottle: bottle,
             profile: profile,
@@ -1978,6 +1981,7 @@ public enum SteamError: LocalizedError {
     case gameNotInstalled(appId: Int)
     case missingSteamAppId(profileId: String)
     case d3dMetalRequiresDirectLaunch
+    case previousSessionStillRunning(summary: String)
 
     public var errorDescription: String? {
         switch self {
@@ -2005,6 +2009,11 @@ public enum SteamError: LocalizedError {
             return """
             D3DMetal profiles use GPTK direct game EXE with Steam co-resident (Apple model). \
             Log in with: wyn steam launch → Remember me → wyn play <profile> (leave Steam running)
+            """
+        case .previousSessionStillRunning(let summary):
+            return """
+            Previous session still running (\(summary)). Quit the game from its window \
+            (never wineserver -k), then: wyn play
             """
         }
     }
