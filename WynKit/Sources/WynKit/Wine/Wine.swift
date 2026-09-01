@@ -164,7 +164,8 @@ public class Wine {
         /// Steam UI on game-host Wine (`Libraries/` — FOSS winecx after P0-c). Default when not frankea.
         public var preferGPTKSteam: Bool
         /// Return after `wine start` has spawned instead of waiting for process exit.
-        /// The library overlay uses this so Play is not stuck until the game quits.
+        /// The library overlay uses this so Play / the Steam tile are not stuck until
+        /// the process quits.
         public var detachAfterStart: Bool
 
         public init(
