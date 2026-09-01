@@ -99,6 +99,11 @@ required: Wyn will not assume you have accepted Apple's terms. Put
 `Game_Porting_Toolkit_3.0.dmg` in `~/Downloads` first, or Wyn will ask you to
 browse for it.
 
+The game-host build needs `ccache` and `mingw-w64`. Wyn checks for them before
+installing anything and tells you the `brew` command if they are missing. Add
+`--install-missing-tools` to let Wyn run `brew install` for you — Wyn never runs
+`brew` unless you ask, and never installs Homebrew itself.
+
 The same thing by hand:
 
 ```bash

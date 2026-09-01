@@ -13,6 +13,7 @@ GPTK_LICENCE_URL="https://developer.apple.com/download/all/?q=game%20porting%20t
 
 WITH_D3DMETAL=0
 ACCEPT_GPTK=0
+INSTALL_MISSING_TOOLS=0
 
 usage() {
   cat <<EOF
@@ -27,6 +28,10 @@ Options:
   --accept-gptk-licence    Required with --with-d3dmetal. Confirms you have read
                            and accepted Apple's Game Porting Toolkit licence:
                            $GPTK_LICENCE_URL
+  --install-missing-tools  Let Wyn run 'brew install' for build tools it needs
+                           and cannot find (ccache, mingw-w64). Without this,
+                           Wyn prints the brew command and stops. Wyn never runs
+                           brew unless you ask, and never installs Homebrew.
   -h, --help               This message.
 
 The standard install gives you DXMT (D3D11 to Metal), which is the default
@@ -39,10 +44,16 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --with-d3dmetal) WITH_D3DMETAL=1; shift ;;
     --accept-gptk-licence|--accept-gptk-license) ACCEPT_GPTK=1; shift ;;
+    --install-missing-tools) INSTALL_MISSING_TOOLS=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "error: unknown option: $1" >&2; echo; usage >&2; exit 1 ;;
   esac
 done
+
+if [[ "$INSTALL_MISSING_TOOLS" -eq 1 && "$WITH_D3DMETAL" -eq 0 ]]; then
+  echo "note: --install-missing-tools does nothing without --with-d3dmetal." >&2
+  echo "      The standard install needs no extra build tools." >&2
+fi
 
 # Fail before the standard install rather than after it: a user who asked for
 # D3DMetal should not sit through setup.sh only to be stopped at the licence.
@@ -75,20 +86,67 @@ if [[ "$WITH_D3DMETAL" -eq 1 ]]; then
   if [[ ${#missing[@]} -gt 0 ]]; then
     # Same package can be named twice above (mingw-w64 ships both compilers).
     unique=$(printf '%s\n' "${missing[@]}" | sort -u | tr '\n' ' ')
-    cat >&2 <<EOF
+    packages="${unique% }"
+
+    if [[ "$INSTALL_MISSING_TOOLS" -eq 0 ]]; then
+      cat >&2 <<EOF
 error: --with-d3dmetal needs tools this Mac does not have.
 
-Missing: ${unique% }
+Missing: $packages
 
 Install them:
-  brew install ${unique% }
+  brew install $packages
 
 Then re-run:
   ./install.sh --with-d3dmetal --accept-gptk-licence
 
+Or let Wyn install them for you:
+  ./install.sh --with-d3dmetal --accept-gptk-licence --install-missing-tools
+
 The standard install (./install.sh, DXMT) does not need these.
 EOF
-    exit 1
+      exit 1
+    fi
+
+    # Opted in. Wyn still never installs Homebrew itself — that is a large,
+    # sudo-requiring change to someone's machine and not ours to make.
+    if ! command -v brew >/dev/null; then
+      cat >&2 <<EOF
+error: --install-missing-tools needs Homebrew, which is not installed.
+
+Wyn will not install Homebrew for you. Get it from:
+  https://brew.sh
+
+Then either:
+  brew install $packages
+  ./install.sh --with-d3dmetal --accept-gptk-licence
+EOF
+      exit 1
+    fi
+
+    echo "==> brew install $packages  (--install-missing-tools)"
+    echo "    mingw-w64 is a full GCC toolchain; this can take several minutes."
+    # shellcheck disable=SC2086
+    brew install $packages
+
+    # Trust the tools, not the exit code: a formula can succeed while leaving
+    # nothing on PATH (already-installed-but-unlinked is the common one).
+    still_missing=()
+    command -v ccache >/dev/null || still_missing+=("ccache")
+    command -v i686-w64-mingw32-gcc >/dev/null || still_missing+=("i686-w64-mingw32-gcc")
+    command -v x86_64-w64-mingw32-gcc >/dev/null || still_missing+=("x86_64-w64-mingw32-gcc")
+
+    if [[ ${#still_missing[@]} -gt 0 ]]; then
+      cat >&2 <<EOF
+error: brew finished but these are still not on PATH:
+$(printf '  %s\n' "${still_missing[@]}")
+
+If Homebrew says they are installed, they may just need linking:
+  brew link ccache mingw-w64
+Check that Homebrew's bin directory is on your PATH, then re-run.
+EOF
+      exit 1
+    fi
   fi
 
   arch -x86_64 /usr/bin/true >/dev/null 2>&1 || {
