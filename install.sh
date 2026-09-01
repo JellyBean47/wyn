@@ -62,6 +62,42 @@ EOF
   exit 1
 fi
 
+# check-environment.sh covers the standard install. The game-host build needs
+# more than that, and it runs LAST — so without this a user would build the
+# CLI, download ~317 MB of Wine and install Wine Mono before being told to
+# brew install ccache. Check the extra tools now, while nothing has happened.
+if [[ "$WITH_D3DMETAL" -eq 1 ]]; then
+  missing=()
+  command -v ccache >/dev/null || missing+=("ccache")
+  command -v i686-w64-mingw32-gcc >/dev/null || missing+=("mingw-w64")
+  command -v x86_64-w64-mingw32-gcc >/dev/null || missing+=("mingw-w64")
+
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    # Same package can be named twice above (mingw-w64 ships both compilers).
+    unique=$(printf '%s\n' "${missing[@]}" | sort -u | tr '\n' ' ')
+    cat >&2 <<EOF
+error: --with-d3dmetal needs tools this Mac does not have.
+
+Missing: ${unique% }
+
+Install them:
+  brew install ${unique% }
+
+Then re-run:
+  ./install.sh --with-d3dmetal --accept-gptk-licence
+
+The standard install (./install.sh, DXMT) does not need these.
+EOF
+    exit 1
+  fi
+
+  arch -x86_64 /usr/bin/true >/dev/null 2>&1 || {
+    echo "error: --with-d3dmetal needs Rosetta 2 (the Wine unix half is x86_64)." >&2
+    echo "  softwareupdate --install-rosetta" >&2
+    exit 1
+  }
+fi
+
 ./scripts/check-environment.sh
 ./scripts/build.sh
 ./scripts/setup.sh
