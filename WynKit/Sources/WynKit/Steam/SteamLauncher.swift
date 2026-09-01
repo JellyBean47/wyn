@@ -337,6 +337,29 @@ public enum SteamLauncher {
             environment: plan.environment,
             options: plan.options
         )
+        if plan.options.detachAfterStart {
+            await waitUntilLoggedOnThenReturn(in: bottle)
+        }
+    }
+
+    /// Overlay callers detach so they do not wait for Steam to quit. Stay up until
+    /// Logged On (Remember me) or a short timeout (login window still open).
+    /// Never throws — Steam is already running.
+    private static func waitUntilLoggedOnThenReturn(
+        in bottle: Bottle,
+        seconds: TimeInterval = 90
+    ) async {
+        if isSteamLoggedOn(in: bottle) { return }
+        progress("Waiting for Steam Logged On…")
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            if Task.isCancelled { return }
+            if isSteamLoggedOn(in: bottle) {
+                progress("Steam Logged On.")
+                return
+            }
+            try? await Task.sleep(nanoseconds: 400_000_000)
+        }
     }
 
     private struct SteamLaunchPlan {

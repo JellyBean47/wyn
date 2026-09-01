@@ -510,9 +510,12 @@ public enum PlatformCatalog {
         switch item.kind {
         case .steam:
             // Game-host when Libraries/ is FOSS winecx + GPTK; else frankea (SteamLauncher gate).
+            // Detach after spawn — without this the library overlay waits until steam.exe
+            // exits, so Wyn keeps spinning after the header already says Logged On.
             var options = Wine.LaunchOptions()
             options.wineTree = .game
             options.preferGPTKSteam = true
+            options.detachAfterStart = true
             try await SteamLauncher.launchSteam(in: bottle, options: options)
         case .ubisoft:
             try await ConnectLauncher.launch(in: bottle)
