@@ -35,10 +35,40 @@ else
   echo "note: Nix not installed (sudo required). Using frankea x86_64 dylibs for"
   echo "      freetype/gnutls and skipping gstreamer/ffmpeg. Install Nix with"
   echo "      extra-platforms = x86_64-darwin for a CI-matching build."
-  FRANKEA_LIB="${WINECX_X86_LIB:-$HOME/Library/Application Support/com.fly.gaming/Libraries.pre-gptk-aware.bak/Wine/lib}"
-  [[ -f "$FRANKEA_LIB/libgnutls.30.dylib" ]] || fail "no x86_64 libgnutls at $FRANKEA_LIB
-Install Nix, or restore frankea via ./scripts/setup.sh first."
-  file "$FRANKEA_LIB/libgnutls.30.dylib" | grep -q x86_64 || fail "$FRANKEA_LIB/libgnutls.30.dylib is not x86_64"
+  # Where setup.sh's frankea tree actually is, in the order it can occur:
+  #   Libraries/                     fresh machine — setup.sh and nothing else yet
+  #   Libraries.steam/               after a gptk-aware install (symlink to the .bak)
+  #   Libraries.pre-gptk-aware.bak/  the parked original
+  # Only the last of those existed here before, so on a first-run machine this
+  # step demanded a path that cannot exist yet and told the user to run
+  # setup.sh — which they had already run. Probe all three.
+  #
+  # A winecx tree at Libraries/ is skipped for free: it ships no libgnutls,
+  # which is the whole reason we borrow frankea's.
+  SUPPORT="$HOME/Library/Application Support/com.fly.gaming"
+  frankea_candidates=()
+  [[ -n "${WINECX_X86_LIB:-}" ]] && frankea_candidates+=("$WINECX_X86_LIB")
+  frankea_candidates+=(
+    "$SUPPORT/Libraries/Wine/lib"
+    "$SUPPORT/Libraries.steam/Wine/lib"
+    "$SUPPORT/Libraries.pre-gptk-aware.bak/Wine/lib"
+  )
+
+  for candidate in "${frankea_candidates[@]}"; do
+    [[ -f "$candidate/libgnutls.30.dylib" ]] || continue
+    file "$candidate/libgnutls.30.dylib" | grep -q x86_64 || continue
+    FRANKEA_LIB="$candidate"
+    break
+  done
+
+  if [[ -z "$FRANKEA_LIB" ]]; then
+    fail "no x86_64 libgnutls in any frankea Wine tree. Looked in:
+$(printf '  %s\n' "${frankea_candidates[@]}")
+Run ./scripts/setup.sh to install the frankea runtime, or install Nix with
+extra-platforms = x86_64-darwin for a CI-matching build. To point at a tree
+somewhere else: WINECX_X86_LIB=/path/to/Wine/lib $0"
+  fi
+  echo "    frankea x86_64 dylibs: $FRANKEA_LIB"
   # Autoconf splits LDFLAGS on spaces; "Application Support" would break -L.
 fi
 
