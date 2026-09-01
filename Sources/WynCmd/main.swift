@@ -909,7 +909,12 @@ extension WynCLI {
             if let dl = GPTKInstaller.preferredDownloadsCandidate() {
                 print("Downloads 3.0:     \(dl.path(percentEncoded: false))")
             } else {
-                print("Downloads 3.0:     (none — put \(GPTKInstaller.downloadsFileName) in ~/Downloads)")
+                print("Downloads 3.0:     (none — put \(GPTKInstaller.downloadsFileName) in ~/Downloads, or: wyn gptk install --pick)")
+            }
+            if let remembered = GPTKSourcePicker.rememberedFolder {
+                let hit = GPTKSourcePicker.rememberedCandidate()
+                    .map { " → \($0.lastPathComponent)" } ?? " (no GPTK there now)"
+                print("Remembered src:    \(remembered.path(percentEncoded: false))\(hit)")
             }
             let renderer = RendererWiring.inspect()
             for line in renderer.statusLines {
@@ -954,21 +959,67 @@ extension WynCLI {
         )
         var from: String?
 
+        @Flag(name: .long, help: "Browse for the GPTK file in Finder instead of auto-detecting.")
+        var pick: Bool = false
+
+        @Flag(name: .long, help: "Never open Finder; fail with instructions instead. For scripts and CI.")
+        var noPrompt: Bool = false
+
+        @Flag(name: .long, help: "Forget the remembered GPTK folder and exit. Auto-detect goes back to ~/Downloads.")
+        var forgetSource: Bool = false
+
         mutating func run() throws {
+            // Maintenance flag: clearing remembered state and installing in one
+            // command would be ambiguous about which source the install used.
+            if forgetSource {
+                let had = GPTKSourcePicker.rememberedFolder
+                GPTKSourcePicker.forget()
+                if let had {
+                    print("Forgot \(had.path(percentEncoded: false)). Auto-detect starts at ~/Downloads again.")
+                } else {
+                    print("No remembered GPTK folder. Auto-detect already starts at ~/Downloads.")
+                }
+                return
+            }
             guard WynWineInstaller.isWynWineInstalled() else {
                 throw ValidationError("WynWine not installed. Run: wyn install")
+            }
+            if pick && noPrompt {
+                throw ValidationError("--pick opens Finder and --no-prompt forbids it. Pick one.")
             }
             let source: URL
             if let from {
                 source = URL(fileURLWithPath: from)
                 print("GPTK source: \(source.path(percentEncoded: false))")
+            } else if pick {
+                guard GPTKSourcePicker.isInteractive else {
+                    throw ValidationError("--pick needs a terminal. Pass --from <path> instead.")
+                }
+                guard let chosen = GPTKSourcePicker.chooseSource() else {
+                    throw ValidationError("No file chosen.")
+                }
+                source = chosen
+                print("GPTK source: \(chosen.path(percentEncoded: false))")
             } else if let found = GPTKInstaller.preferredLocalSource() {
                 source = found
                 print("Using \(found.path(percentEncoded: false))")
+            } else if !noPrompt, GPTKSourcePicker.isInteractive {
+                // Nothing where we look. Rather than telling the user to move
+                // their download, let them point at it.
+                let start = GPTKSourcePicker.pickerStartFolder()
+                print("No Game Porting Toolkit found in \(start.path(percentEncoded: false)).")
+                print("Opening Finder — choose the GPTK disk image (Cancel to abort).")
+                guard let chosen = GPTKSourcePicker.chooseSource(startingAt: start) else {
+                    throw ValidationError(GPTKInstaller.GPTKError.notFoundInDownloads.errorDescription ?? "")
+                }
+                source = chosen
+                print("GPTK source: \(chosen.path(percentEncoded: false))")
             } else {
                 throw ValidationError(GPTKInstaller.GPTKError.notFoundInDownloads.errorDescription ?? "")
             }
             let installed = try GPTKInstaller.install(from: source)
+            // Only a source that survived install is worth remembering.
+            GPTKSourcePicker.remember(source: source)
             print("GPTK/D3DMetal files → \(installed.path(percentEncoded: false))")
             if let ver = GPTKInstaller.installedD3DMetalVersion() {
                 print("D3DMetal version: \(ver)")

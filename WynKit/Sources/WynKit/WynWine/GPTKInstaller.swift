@@ -29,10 +29,12 @@ public enum GPTKInstaller {
                 return "WynWine is not installed. Run: wyn install"
             case .requiresExplicitSource, .notFoundInDownloads:
                 return """
-                GPTK/D3DMetal is not bundled. Download Game Porting Toolkit 3.0 from Apple \
-                into ~/Downloads (Game_Porting_Toolkit_3.0.dmg), then:
+                GPTK/D3DMetal is not bundled. Download Game Porting Toolkit 3.0 from Apple, \
+                then either drop it in ~/Downloads (Game_Porting_Toolkit_3.0.dmg) and run:
                   wyn gptk install
-                Or pass a redist/DMG: wyn gptk install --from /path
+                Or point Wyn straight at it, wherever it landed:
+                  wyn gptk install --pick        # browse for it in Finder
+                  wyn gptk install --from /path  # if you already know the path
                 \(GPTKInstaller.appleDownloadURL)
                 Wyn never downloads GPTK.
                 """
@@ -61,15 +63,25 @@ public enum GPTKInstaller {
     /// GPTK 3.0 in ~/Downloads: `Game_Porting_Toolkit_3.0.dmg` first, then other
     /// Game Porting Toolkit 3.x DMGs or extracted folders. Does not mount.
     public static func preferredDownloadsCandidate() -> URL? {
+        let downloads = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Downloads")
+        return gptkCandidate(in: downloads)
+    }
+
+    /// Best-looking GPTK candidate in an arbitrary folder, by the same rules
+    /// ~/Downloads gets: exact `Game_Porting_Toolkit_3.0.dmg` first, then the
+    /// highest-scoring GPTK-ish name. Does not mount, does not recurse.
+    ///
+    /// Shared so a folder the user browsed to is judged exactly like Downloads —
+    /// where the DMG happens to sit should not change which file wins.
+    public static func gptkCandidate(in folder: URL) -> URL? {
         let fm = FileManager.default
-        let downloads = fm.homeDirectoryForCurrentUser.appending(path: "Downloads")
-        let exact = downloads.appending(path: downloadsFileName)
+        let exact = folder.appending(path: downloadsFileName)
         if fm.fileExists(atPath: exact.path(percentEncoded: false)) {
             return exact
         }
 
         guard let kids = try? fm.contentsOfDirectory(
-            at: downloads,
+            at: folder,
             includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey],
             options: [.skipsHiddenFiles]
         ) else { return nil }
@@ -94,8 +106,14 @@ public enum GPTKInstaller {
         return kids.filter(looksLikeGPTK).max { score($0) < score($1) }
     }
 
-    /// Same as `preferredDownloadsCandidate()`, then mounted volumes / GPTK.app.
+    /// Auto-detect order: the folder the last install actually used, then
+    /// ~/Downloads, then mounted volumes / GPTK.app.
+    ///
+    /// The remembered folder leads because a user who keeps GPTK in Documents or
+    /// on an external drive told us so by browsing there once; re-searching
+    /// Downloads first would ignore that every time.
     public static func preferredLocalSource() -> URL? {
+        if let remembered = GPTKSourcePicker.rememberedCandidate() { return remembered }
         if let downloads = preferredDownloadsCandidate() { return downloads }
         return findLocalSource()
     }
