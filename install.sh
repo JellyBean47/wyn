@@ -142,6 +142,7 @@ echo "App:               /Applications/Wyn.app"
 if [[ ":${PATH}:" != *":${BIN_DIR}:"* ]]; then
   echo "Add to ~/.zshrc:  export PATH=\"${BIN_DIR}:\$PATH\""
 fi
+echo "Check setup:       ./scripts/doctor.sh"
 echo "Steam (optional):  wyn steam install   # silent SteamSetup, then CEF-shimmed client"
 echo "Heroic:            https://heroicgameslauncher.com"
 if [[ "$WITH_D3DMETAL" -eq 1 ]]; then

@@ -50,6 +50,29 @@ stops before doing any work and prints the licence URL, so nothing involving
 Apple's toolkit happens by accident. It compiles Wine from source, so it is
 much slower than the standard install.
 
+## Diagnosing a broken setup
+
+```bash
+./scripts/doctor.sh
+```
+
+Reports what is installed against what should be, and prints the exact command
+to fix each problem. It covers build prerequisites, the Wyn build, the Wine
+runtime and which tree it is, D3DMetal/GPTK, renderer wiring, bottles and
+Steam's CEF shim.
+
+Written in plain bash with no dependency on the Wyn CLI, because the case it
+exists for is a machine where nothing has been built yet. Checks that would
+need the CLI are skipped with a reason rather than failing.
+
+It only reports — it never installs or rewires anything, so it is safe to run
+at any time and safe to paste into an issue. Exit status is 0 when nothing is
+broken and 1 when something is, so CI can use it too.
+
+Distinct from `wyn doctor`, which is a deep per-bottle dump (DLL probes,
+launch environment, log tails) for when Wyn is working but a specific game is
+not.
+
 ## 3. FOSS Wine runtime
 
 ```bash

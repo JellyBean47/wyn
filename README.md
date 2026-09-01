@@ -55,6 +55,17 @@ swift build -c release
 ./.build/release/wyn install --skip-steam-download
 ```
 
+## Something not working?
+
+```bash
+./scripts/doctor.sh
+```
+
+Checks what you have against what you should have — build tools, Wine runtime,
+D3DMetal, renderer wiring, bottles, Steam — and prints the exact command to fix
+anything that is wrong. It needs nothing but bash, so it works before Wyn is
+built, and it only reports: it never installs or rewires anything.
+
 ## Optional pieces (you obtain these)
 
 **Heroic (Epic / GOG):** install from
