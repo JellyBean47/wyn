@@ -34,7 +34,21 @@ cd wyn
   quarantine, so Gatekeeper does not block it.
 
 `./install.sh` runs check + build + setup + Wine Mono, then copies the CLI to
-`~/.local/bin/wyn` (and a `fly` symlink).
+`~/.local/bin/wyn` (and a `fly` symlink). That single command is the whole
+standard install; the sections below are what it does for you.
+
+To also build the D3DMetal game-host, read Apple's Game Porting Toolkit licence
+and add both flags:
+
+```bash
+./install.sh --with-d3dmetal --accept-gptk-licence
+```
+
+That chains the winecx build, `runtime install --gptk-aware`, `gptk install`
+and `renderer set d3dmetal`. Both flags are required — `--with-d3dmetal` alone
+stops before doing any work and prints the licence URL, so nothing involving
+Apple's toolkit happens by accident. It compiles Wine from source, so it is
+much slower than the standard install.
 
 ## 3. FOSS Wine runtime
 

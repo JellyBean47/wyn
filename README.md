@@ -21,6 +21,16 @@ Game Porting Toolkit / D3DMetal, store clients, or game files.
 ```bash
 git clone https://github.com/JellyBean47/wyn.git
 cd wyn
+./install.sh
+```
+
+That is the whole install. It checks your Mac can build Wyn, builds the CLI and
+`Wyn.app`, downloads the hash-pinned Wine runtime, adds Wine Mono, and puts
+`wyn` on your path at `~/.local/bin/wyn`.
+
+Prefer to run the steps yourself:
+
+```bash
 ./scripts/check-environment.sh
 ./scripts/build.sh
 ./scripts/setup.sh
@@ -67,11 +77,25 @@ path (use Heroic).
 GPTK bolted on. Wyn never downloads winecx or GPTK for `--gptk-aware`. See
 [Documentation/user/game-host.md](Documentation/user/game-host.md).
 
+Read Apple's licence first, then one command does all of it:
+
+```bash
+./install.sh --with-d3dmetal --accept-gptk-licence
+```
+
+This compiles Wine from source, so expect it to take a while. Both flags are
+required: Wyn will not assume you have accepted Apple's terms. Put
+`Game_Porting_Toolkit_3.0.dmg` in `~/Downloads` first, or Wyn will ask you to
+browse for it.
+
+The same thing by hand:
+
 ```bash
 ./scripts/build-foss-game-host.sh
 wyn runtime install --gptk-aware --directory /path/to/wine-root
 wyn gptk install
 # default: ~/Downloads/Game_Porting_Toolkit_3.0.dmg
+# elsewhere: wyn gptk install --pick   (browse in Finder)
 wyn renderer set d3dmetal   # opt-in; install does not select D3DMetal
 ```
 
