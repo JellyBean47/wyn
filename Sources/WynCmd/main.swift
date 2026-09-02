@@ -736,8 +736,25 @@ extension WynCLI {
             try await SteamLauncher.launchSteam(in: target, options: options)
         }
 
-        static func resolveBottle(named name: String) throws -> Bottle {
+        /// `createIfMissing: false` for read-only commands. `ensureSteamBottle()`
+        /// creates and *registers* a bottle when none is named "Steam" — fine
+        /// for `steam install`, wrong for a query like `steam quit`, which
+        /// would leave a stray empty bottle behind and then report that Steam
+        /// is not running. That is very likely where unexplained empty bottles
+        /// come from.
+        static func resolveBottle(named name: String, createIfMissing: Bool = true) throws -> Bottle {
             if name == SteamLauncher.defaultBottleName {
+                guard createIfMissing else {
+                    var data = BottleData()
+                    guard let found = data.loadBottles()
+                        .first(where: { $0.settings.name == name })
+                    else {
+                        throw ValidationError(
+                            "No bottle named \"\(name)\" yet. Create one with: wyn steam install"
+                        )
+                    }
+                    return found
+                }
                 return try SteamLauncher.ensureSteamBottle()
             }
             var data = BottleData()
@@ -811,7 +828,7 @@ extension WynCLI {
             guard WynWineInstaller.isWynWineInstalled() else {
                 throw ValidationError("WynWine not installed. Run: wyn install")
             }
-            let target = try SteamInstall.resolveBottle(named: bottle)
+            let target = try SteamInstall.resolveBottle(named: bottle, createIfMissing: false)
 
             guard SteamLauncher.isSteamClientRunning(in: target) else {
                 print("Steam is not running.")
