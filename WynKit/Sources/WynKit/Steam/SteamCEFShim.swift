@@ -23,8 +23,12 @@ public enum SteamCEFShimError: LocalizedError {
         case .shimBinaryMissing:
             return """
             steamwebhelper_shim.exe is missing (Tools/bin/). \
-            Build it with: ./scripts/build-helpers.sh \
+            Wyn.app carries this helper in its bundle, so a missing one usually \
+            means the app was built before the helper was. Rebuild and reinstall:
+              ./scripts/build.sh
+            Building the helper on its own: ./scripts/build-helpers.sh \
             (needs x86_64-w64-mingw32-gcc, e.g. brew install mingw-w64)
+            Without it Steam's login window paints black.
             """
         }
     }
@@ -34,19 +38,39 @@ public enum SteamCEFShim {
     private static let maxShimBytes = 500_000
 
     /// Bundled / repo-built shim PE (x86_64 Windows).
+    ///
+    /// The app bundle comes first. Wyn.app is installed to /Applications and
+    /// must not depend on a source checkout still existing at the path it was
+    /// compiled from — `#filePath` is baked in at compile time, so for an
+    /// installed app it points at someone else's Desktop, and even on the build
+    /// machine reading it needs TCC consent the app never asks for. Missing the
+    /// shim is not cosmetic: without it Steam's login window paints black.
+    ///
+    /// The source-relative and cwd paths stay as developer conveniences for
+    /// `swift run` out of a checkout.
     public static var bundledShimURL: URL? {
+        var candidates: [URL] = []
+
+        if let bundled = Bundle.main.url(forResource: "steamwebhelper_shim", withExtension: "exe") {
+            candidates.append(bundled)
+        }
+
         // #filePath = .../WynKit/Sources/WynKit/Steam/SteamCEFShim.swift
-        let fromSource = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent() // Steam
-            .deletingLastPathComponent() // WynKit
-            .deletingLastPathComponent() // Sources
-            .deletingLastPathComponent() // WynKit pkg
-            .appending(path: "Tools/bin/steamwebhelper_shim.exe")
+        candidates.append(
+            URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent() // Steam
+                .deletingLastPathComponent() // WynKit
+                .deletingLastPathComponent() // Sources
+                .deletingLastPathComponent() // WynKit pkg
+                .appending(path: "Tools/bin/steamwebhelper_shim.exe")
+        )
 
-        let fromCwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            .appending(path: "Tools/bin/steamwebhelper_shim.exe")
+        candidates.append(
+            URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                .appending(path: "Tools/bin/steamwebhelper_shim.exe")
+        )
 
-        return [fromSource, fromCwd].first {
+        return candidates.first {
             FileManager.default.fileExists(atPath: $0.path(percentEncoded: false))
         }
     }
