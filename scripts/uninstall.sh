@@ -133,7 +133,15 @@ if [[ "$CLEAN_BUILD" -eq 1 ]]; then
   # scripts/build.sh copies in, yet Spotlight indexes it as "Wyn" alongside the
   # real one — launch that by mistake and Steam's CEF shim is reported missing
   # on a perfectly good install.
-  add_target "/tmp/WynDerivedData"        "Xcode build products (scripts/build.sh)"
+  # /tmp/WynDerivedData is scripts/build.sh's, but ad-hoc builds over the years
+  # have also left WynBottleBuild, WynDoctorBuild, WynMergeCheck and friends.
+  # Three of the four found on this machine had no bundled helpers, so each was
+  # a launchable Wyn.app that reports steamwebhelper_shim.exe missing — 1.8 GB
+  # of bundles all called "Wyn". #35 only named WynDerivedData; glob instead.
+  for td in /tmp/Wyn*; do
+    [[ -d "$td" ]] || continue
+    add_target "$td"                      "Xcode build products — unfinished Wyn.app bundles"
+  done
   for dd in "$HOME/Library/Developer/Xcode/DerivedData"/Wyn-*; do
     [[ -d "$dd" ]] || continue
     add_target "$dd"                      "Xcode DerivedData — unfinished Wyn.app bundles"
@@ -452,6 +460,28 @@ if (( failed > 0 )); then
   echo "  $failed item(s) could not be removed — something may still be running." >&2
   echo "  Quit Wyn and Steam, then run this again." >&2
   exit 1
+fi
+
+# Deleting a bundle does not unregister it. LaunchServices keeps the record, so
+# Spotlight, Launchpad and the Dock go on offering a "Wyn" that is not there —
+# and launching one gives "Wyn is damaged and can't be opened", which reads as a
+# broken install rather than a stale entry. Six were registered on this machine,
+# five of them gone or unfinished. Sweep whatever no longer exists.
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
+if [[ -x "$LSREGISTER" ]]; then
+  unregistered=0
+  while IFS= read -r bundle; do
+    [[ -n "$bundle" ]] || continue
+    [[ -d "$bundle" ]] && continue
+    "$LSREGISTER" -u "$bundle" 2>/dev/null && unregistered=$((unregistered + 1))
+  done < <(
+    "$LSREGISTER" -dump 2>/dev/null \
+      | sed -n 's|^[[:space:]]*path:[[:space:]]*\(.*/Wyn\.app\) (0x.*|\1|p' \
+      | sort -u
+  )
+  if (( unregistered > 0 )); then
+    echo "  removed  $unregistered stale Wyn.app record(s) from LaunchServices"
+  fi
 fi
 
 printf '  %sWyn is off this Mac.%s\n' "$C_HEAD" "$C_OFF"
