@@ -264,8 +264,11 @@ if [[ -d "$PREFIX/opt/whiskywine" ]]; then
       fi
       install_name_tool -change libinotify.dylib '@rpath/libinotify.dylib' "$winebus" 2>/dev/null || true
       codesign -f -s - "$winebus" || fail "winebus rpath: codesign failed"
-      otool -l "$winebus" | awk '/cmd LC_RPATH/{getline; getline; print $2}' \
-        | grep -qx '@loader_path/../..' \
+      # Capture first, then match. A grep -qx on the far end of the otool|awk
+      # pipeline can exit before awk finishes writing, and pipefail turns that
+      # SIGPIPE into 141 -- which would trip `fail` on a rpath fix that worked.
+      winebus_rpaths_after=$(otool -l "$winebus" | awk '/cmd LC_RPATH/{getline; getline; print $2}')
+      printf '%s\n' "$winebus_rpaths_after" | grep -qx '@loader_path/../..' \
         || fail "winebus rpath fix FAILED: missing @loader_path/../.. (libinotify would not load)"
     fi
     unix="$PREFIX/wine-root/lib/wine/x86_64-unix"
