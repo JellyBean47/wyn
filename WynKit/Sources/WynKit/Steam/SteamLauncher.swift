@@ -300,7 +300,9 @@ public enum SteamLauncher {
         )
         if plan.useGameHost {
             try await ensureGameHostCEFReady(plan: plan, bottle: bottle)
-            _ = try SteamCEFShim.install(into: bottle, debug: plan.options.debug)
+            _ = try await SteamCEFShim.installUntilVariantsSettle(
+                into: bottle, debug: plan.options.debug
+            )
             if !plan.options.debug {
                 print("Steam UI: game-host Wine (Libraries/ — FOSS winecx + D3DMetal).")
                 print("Press Play in Steam — games inherit this D3DMetal wrapper. wyn play is fallback.")
@@ -457,7 +459,9 @@ public enum SteamLauncher {
         // adopt a windowed client. Never start a second steam.exe here.
         if isSteamClientRunning(in: bottle) {
             if SteamCEFShim.hasAnyHelper(in: bottle) {
-                _ = try SteamCEFShim.install(into: bottle, debug: plan.options.debug)
+                _ = try await SteamCEFShim.installUntilVariantsSettle(
+                into: bottle, debug: plan.options.debug
+            )
                 if isSilentSteamClientRunning(in: bottle) {
                     print("Steam is running in the background (-silent); asking it to exit so the window can show…")
                     await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
@@ -471,7 +475,9 @@ public enum SteamLauncher {
                     in: bottle, seconds: 180, debug: plan.options.debug
                 )
                 guard appeared else { throw SteamError.cefDidNotAppear }
-                _ = try SteamCEFShim.install(into: bottle, debug: plan.options.debug)
+                _ = try await SteamCEFShim.installUntilVariantsSettle(
+                into: bottle, debug: plan.options.debug
+            )
                 if isSilentSteamClientRunning(in: bottle) {
                     print("Steam is running in the background (-silent); asking it to exit so the window can show…")
                     await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
@@ -484,7 +490,9 @@ public enum SteamLauncher {
         }
 
         if SteamCEFShim.hasAnyHelper(in: bottle) {
-            _ = try SteamCEFShim.install(into: bottle, debug: plan.options.debug)
+            _ = try await SteamCEFShim.installUntilVariantsSettle(
+                into: bottle, debug: plan.options.debug
+            )
             return
         }
 
@@ -520,7 +528,9 @@ public enum SteamLauncher {
         guard appeared else {
             throw SteamError.cefDidNotAppear
         }
-        _ = try SteamCEFShim.install(into: bottle, debug: plan.options.debug)
+        _ = try await SteamCEFShim.installUntilVariantsSettle(
+                into: bottle, debug: plan.options.debug
+            )
         await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
         try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
     }
