@@ -1316,6 +1316,27 @@ public enum SteamLauncher {
             options: startOptions,
             gameExeNames: gameExeNames
         )
+        // ensureSteamRunningForAuth returns once the *client process* exists, but
+        // Steamworks needs it Logged On, and logging on is a separate ~20-25s of
+        // network round-trips after that. Checking once here meant a cold start
+        // always lost the race: the first Play after a reboot threw
+        // steamNotLoggedOn and you had to click a second time once Steam settled.
+        //
+        // waitForSteamLoggedOn already existed for exactly this, but only the
+        // frankea fallback used it — so the fallback path waited patiently for
+        // login while the primary D3DMetal path did not. 60s matches that caller
+        // and is generous against the observed gap.
+        // Only the timeout is swallowed: falling through re-uses the existing
+        // Logged-On check and its message below. Cancellation must still
+        // propagate — the app's Cancel button relies on it.
+        do {
+            try await waitForSteamLoggedOn(in: bottle, seconds: 60)
+        } catch let cancellation as CancellationError {
+            throw cancellation
+        } catch {
+            // Timed out waiting for login — handled below.
+        }
+
         if isSteamLoggedOn(in: bottle) {
             let tree = isBottleWineserverFromTree(in: bottle, tree: .game) ? "game-host" : "frankea"
             progress("\(tree) Steam Logged On — ready for SteamAPI.")
