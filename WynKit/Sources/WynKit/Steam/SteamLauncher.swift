@@ -548,6 +548,52 @@ public enum SteamLauncher {
         )
     }
 
+    /// Quit Steam the way Steam's own Exit menu item does: `steam.exe
+    /// -shutdown`, retried with backoff.
+    ///
+    /// Deliberately never `wineserver -k`. That kills every process in the
+    /// prefix — the running game included — and skips the D3DMetal exit
+    /// bookkeeping, which is what the 120 s GPU settle depends on. Callers that
+    /// want to stop a game ask the player to quit it from its own window;
+    /// `runningGameNames(among:)` tells them whether to ask.
+    ///
+    /// Returns `true` when Steam is gone (including when it was not running).
+    @discardableResult
+    public static func quitSteam(
+        in bottle: Bottle,
+        options: Wine.LaunchOptions = Wine.LaunchOptions()
+    ) async throws -> Bool {
+        guard isSteamInstalled(in: bottle) else { return true }
+        guard isSteamClientRunning(in: bottle) else { return true }
+        try await requestSteamShutdownUntilExit(in: bottle, options: options)
+        return !isSteamClientRunning(in: bottle)
+    }
+
+    /// Display names of the given profiles whose game EXE is running right now.
+    ///
+    /// Detection only — nothing is signalled or killed. Steam, steamwebhelper
+    /// and wineserver rows are excluded by `leftoverSessionCommands`, so a
+    /// running Steam client on its own is not reported as a game.
+    public static func runningGameNames(among profiles: [GameProfile]) -> [String] {
+        var nameForExe: [String: String] = [:]
+        for profile in profiles {
+            for pattern in profile.exePatterns {
+                // windowsExeBasename lowercases; exePatterns are authored that
+                // way too, but do not rely on the author for a match.
+                nameForExe[pattern.lowercased()] = profile.name
+            }
+        }
+        guard !nameForExe.isEmpty else { return [] }
+
+        var running: Set<String> = []
+        for command in leftoverSessionCommands(matching: Set(nameForExe.keys)) {
+            guard let base = windowsExeBasename(fromCommand: command),
+                  let name = nameForExe[base] else { continue }
+            running.insert(name)
+        }
+        return running.sorted()
+    }
+
     /// `-shutdown` two or three times with backoff. Steam ignores the first
     /// request when the helper file has just appeared mid self-update.
     private static func requestSteamShutdownUntilExit(

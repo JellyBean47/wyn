@@ -22,6 +22,8 @@ final class LibraryVM: ObservableObject {
     @Published var ubisoftRunning = false
     @Published var rockstarRunning = false
     @Published var runningKinds: Set<PlatformKind> = []
+    /// Names of library games whose EXE is running. Drives the Quit warning.
+    @Published var runningGameNames: [String] = []
     @Published var platformRow: [PlatformRowItem] = []
     @Published var isBusy = false
     @Published var busyMessage = ""
@@ -128,6 +130,46 @@ final class LibraryVM: ObservableObject {
         steamInstalled = SteamLauncher.isSteamInstalled(in: bottle)
         steamRunning = SteamLauncher.isSteamClientRunning(in: bottle)
         steamLoggedOn = SteamLauncher.isSteamLoggedOn(in: bottle)
+        runningGameNames = SteamLauncher.runningGameNames(among: games.map(\.profile))
+    }
+
+    /// True when Quit has something to close.
+    var canQuit: Bool {
+        steamRunning || !runningKinds.isEmpty
+    }
+
+    /// Quit Steam the way Steam's own Exit does.
+    ///
+    /// A running game is never force-closed. Killing a game mid-frame loses
+    /// unsaved progress, and on D3DMetal it is exactly the case the 120 s GPU
+    /// settle exists to avoid — so if one is up, say so and stop. Steam itself
+    /// behaves the same way.
+    func quitSteam() {
+        guard let bottle else { return }
+
+        let playing = runningGameNames
+        if !playing.isEmpty {
+            errorText = """
+            \(playing.joined(separator: ", ")) is still running. \
+            Quit it from its own window first, then Quit here.
+
+            Wyn will not force-close a game: you would lose unsaved progress, \
+            and on D3DMetal a killed session can make the next launch crash.
+            """
+            return
+        }
+
+        startLaunch("Asking Steam to exit…") {
+            let stopped = try await SteamLauncher.quitSteam(in: bottle)
+            if !stopped {
+                await MainActor.run {
+                    self.errorText = """
+                    Steam did not exit. Try Steam → Exit from its own window.
+                    """
+                }
+            }
+            await MainActor.run { self.pollStatus() }
+        }
     }
 
     func launchPlatform(_ item: InstalledPlatform) {

@@ -39,6 +39,19 @@ struct LibraryView: View {
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
+                        vm.quitSteam()
+                    } label: {
+                        Label("Quit", systemImage: "stop.fill")
+                    }
+                    // Enabled only when there is something to close, so it
+                    // never reads as a way to quit Wyn itself.
+                    .disabled(!vm.canQuit || vm.isBusy)
+                    .help(vm.runningGameNames.isEmpty
+                          ? "Exit Steam, like Steam's own Exit"
+                          : "Quit \(vm.runningGameNames.joined(separator: ", ")) from its own window first")
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
                         vm.playSelected()
                     } label: {
                         Label("Play", systemImage: "play.fill")
