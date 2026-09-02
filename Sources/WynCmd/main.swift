@@ -626,7 +626,7 @@ extension WynCLI {
     struct Steam: ParsableCommand {
         static let configuration = CommandConfiguration(
             abstract: "Install and launch the Steam client.",
-            subcommands: [SteamInstall.self, SteamLaunch.self]
+            subcommands: [SteamInstall.self, SteamLaunch.self, SteamQuit.self]
         )
     }
 
@@ -731,6 +731,51 @@ extension WynCLI {
             print("Log in here and check Remember me. Press Play in Steam — that should start the game.")
             print("wyn play <game> is fallback if Play hits a launcher/picker instead of the game EXE.\n")
             try await SteamLauncher.launchSteam(in: target, options: options)
+        }
+    }
+
+    struct SteamQuit: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "quit",
+            abstract: "Exit the Steam client the way Steam's own Exit does (never wineserver -k)."
+        )
+
+        @Option(name: .long, help: "Bottle to quit Steam in (default: Steam).")
+        var bottle: String = SteamLauncher.defaultBottleName
+
+        @Flag(name: .long, help: "Quit Steam even while a game is running (the game keeps running).")
+        var evenWhilePlaying: Bool = false
+
+        mutating func run() async throws {
+            guard WynWineInstaller.isWynWineInstalled() else {
+                throw ValidationError("WynWine not installed. Run: wyn install")
+            }
+            let target = try SteamInstall.resolveBottle(named: bottle)
+
+            guard SteamLauncher.isSteamClientRunning(in: target) else {
+                print("Steam is not running.")
+                return
+            }
+
+            // Quitting Steam does not close a game, so warn rather than
+            // surprise someone mid-session. Wyn never force-closes a game:
+            // unsaved progress, and a killed D3DMetal session makes the next
+            // launch crash.
+            let playing = SteamLauncher.runningGameNames(among: ProfileStore.loadAll())
+            if !playing.isEmpty && !evenWhilePlaying {
+                throw ValidationError("""
+                \(playing.joined(separator: ", ")) is still running.
+                Quit the game from its own window first, then: wyn steam quit
+                To close Steam anyway and leave the game running: wyn steam quit --even-while-playing
+                """)
+            }
+
+            if try await SteamLauncher.quitSteam(in: target) {
+                print("Steam exited.")
+            } else {
+                print("Steam did not exit. Use Steam → Exit from its own window.")
+                throw ExitCode.failure
+            }
         }
     }
 }
