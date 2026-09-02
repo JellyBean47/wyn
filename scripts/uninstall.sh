@@ -9,8 +9,9 @@
 #   - Homebrew packages (mingw-w64, ccache). Those are yours, not Wyn's, and
 #     other things on your Mac use them.
 #   - Anything in ~/Downloads, including the Apple GPTK disk image.
-#   - The source checkout. --clean-build handles build artifacts, opt-in;
-#     --fresh-machine additionally makes it match a fresh clone.
+#   - The source checkout, unless --remove-checkout. --clean-build handles
+#     build artifacts, --fresh-machine makes the checkout match a fresh clone,
+#     and --remove-checkout deletes it outright for "leave no trace".
 #
 # Reports before it removes, and asks you to type the word.
 set -uo pipefail
@@ -23,6 +24,7 @@ KEEP_CACHE=0
 CLEAN_BUILD=0
 FRESH_MACHINE=0
 DROP_CCACHE=0
+REMOVE_CHECKOUT=0
 ASSUME_YES=0
 DRY_RUN=0
 
@@ -45,6 +47,12 @@ Options:
                    checkout matches a fresh clone. Use before testing the
                    clone -> install -> compile path. Deletes untracked files
                    in the checkout — they are listed before you confirm.
+  --remove-checkout
+                   Also delete this checkout itself, so nothing named wyn is
+                   left on the Mac. Implies --fresh-machine. Refuses if the
+                   repository has uncommitted changes or unpushed commits —
+                   deleting those loses work that exists nowhere else. You
+                   get it back with: git clone <url>
   --drop-ccache    Also clear ccache. Without this a "cold" winecx rebuild is
                    not cold: ccache serves most of the compile, so it finishes
                    in minutes instead of hours and the timing means nothing.
@@ -54,9 +62,9 @@ Options:
   -y, --yes        Do not ask for confirmation. Required when not on a terminal.
   -h, --help       This message.
 
-Never removed: Homebrew packages (mingw-w64, ccache), anything in ~/Downloads,
-or your source checkout itself. --fresh-machine reports what still differs
-from a genuinely new Mac.
+Never removed: Homebrew packages (mingw-w64, ccache) and anything in
+~/Downloads. The source checkout survives unless --remove-checkout.
+--fresh-machine reports what still differs from a genuinely new Mac.
 EOF
 }
 
@@ -67,6 +75,7 @@ while [[ $# -gt 0 ]]; do
     --clean-build)  CLEAN_BUILD=1; shift ;;
     --fresh-machine) FRESH_MACHINE=1; CLEAN_BUILD=1; shift ;;
     --drop-ccache)  DROP_CCACHE=1; shift ;;
+    --remove-checkout) REMOVE_CHECKOUT=1; FRESH_MACHINE=1; CLEAN_BUILD=1; shift ;;
     --dry-run)      DRY_RUN=1; shift ;;
     -y|--yes)       ASSUME_YES=1; shift ;;
     -h|--help)      usage; exit 0 ;;
@@ -175,6 +184,44 @@ while read -r pspid pscmd; do
   esac
 done < <(ps -ax -o pid=,command= 2>/dev/null)
 
+# --remove-checkout deletes the directory this script is running from, so the
+# checks are worth more than the feature. Refuse unless ROOT really is a Wyn
+# checkout, and refuse to destroy work that exists only here.
+CHECKOUT_SIZE=""
+CHECKOUT_REFUSAL=""
+if [[ "$REMOVE_CHECKOUT" -eq 1 ]]; then
+  case "$ROOT" in
+    "" | / | /Users | /Users/* )
+      # /Users/<name> alone is a home directory; anything deeper is fine.
+      if [[ "$ROOT" == "$HOME" || "$ROOT" == "/Users" || "$ROOT" == "/" ]]; then
+        echo "error: --remove-checkout refuses to delete $ROOT" >&2
+        exit 1
+      fi
+      ;;
+  esac
+  for marker in install.sh scripts/uninstall.sh .git; do
+    if [[ ! -e "$ROOT/$marker" ]]; then
+      echo "error: $ROOT does not look like a Wyn checkout (missing $marker)." >&2
+      echo "Refusing to delete it." >&2
+      exit 1
+    fi
+  done
+
+  if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+    # Collected, not raised, so --dry-run can report "this would refuse"
+    # instead of erroring out. A dry run should never fail.
+    dirty="$(git -C "$ROOT" status --porcelain=v1 --untracked-files=no 2>/dev/null)"
+    if [[ -n "$dirty" ]]; then
+      CHECKOUT_REFUSAL="uncommitted changes:"$'\n'"$dirty"$'\n\n'"Commit or discard them before --remove-checkout."
+    fi
+    unpushed="$(git -C "$ROOT" log --branches --not --remotes --oneline 2>/dev/null)"
+    if [[ -z "$CHECKOUT_REFUSAL" && -n "$unpushed" ]]; then
+      CHECKOUT_REFUSAL="commits that are not on any remote:"$'\n'"$unpushed"$'\n\n'"Push them before --remove-checkout — deleting loses them for good."
+    fi
+  fi
+  CHECKOUT_SIZE="$(du -sh "$ROOT" 2>/dev/null | cut -f1)"
+fi
+
 # Preference domains. Deleting the plist alone is not enough: cfprefsd caches
 # them in memory and writes them straight back, which is how a "clean" install
 # ends up reading a previous one's FlyRuntimeSource.
@@ -190,7 +237,8 @@ done
 # simulate a clean machine. Only bail when there is genuinely nothing left.
 if [[ ${#TARGETS[@]} -eq 0 && ${#PREF_DOMAINS[@]} -eq 0 \
       && ${#GIT_CLEAN_PATHS[@]} -eq 0 && "$DROP_CCACHE" -eq 0 \
-      && ${#TEST_PREF_PLISTS[@]} -eq 0 && ${#RUNNING_WINE_PIDS[@]} -eq 0 ]]; then
+      && ${#TEST_PREF_PLISTS[@]} -eq 0 && ${#RUNNING_WINE_PIDS[@]} -eq 0 \
+      && "$REMOVE_CHECKOUT" -eq 0 ]]; then
   echo "Nothing to remove — Wyn is not installed on this Mac."
   exit 0
 fi
@@ -259,12 +307,32 @@ elif [[ "$FRESH_MACHINE" -eq 1 ]]; then
   printf '  %sFor a real cold-build measurement add: --drop-ccache%s\n' "$C_DIM" "$C_OFF"
 fi
 
-printf '\n  %sKept: Homebrew packages (mingw-w64, ccache), ~/Downloads, this checkout.%s\n' \
-  "$C_DIM" "$C_OFF"
+if [[ "$REMOVE_CHECKOUT" -eq 1 ]]; then
+  printf '\n  %sTHE CHECKOUT ITSELF WILL BE DELETED%s' "$C_WARN" "$C_OFF"
+  [[ -n "$CHECKOUT_SIZE" ]] && printf ' %s(%s)%s' "$C_DIM" "$CHECKOUT_SIZE" "$C_OFF"
+  printf '\n    %s%s%s\n' "$C_DIM" "$ROOT" "$C_OFF"
+  if [[ -n "$CHECKOUT_REFUSAL" ]]; then
+    printf '  %s-> but this will REFUSE: %s%s\n' "$C_WARN" "${CHECKOUT_REFUSAL%%$'\n'*}" "$C_OFF"
+  else
+    printf '  %sEverything in it is on the remote; get it back with: git clone <url>%s\n' \
+      "$C_DIM" "$C_OFF"
+  fi
+  printf '\n  %sKept: Homebrew packages (mingw-w64, ccache), ~/Downloads.%s\n' \
+    "$C_DIM" "$C_OFF"
+else
+  printf '\n  %sKept: Homebrew packages (mingw-w64, ccache), ~/Downloads, this checkout.%s\n' \
+    "$C_DIM" "$C_OFF"
+fi
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
   printf '\n  Dry run — nothing was removed.\n'
   exit 0
+fi
+
+if [[ -n "$CHECKOUT_REFUSAL" ]]; then
+  echo >&2
+  echo "error: this checkout has $CHECKOUT_REFUSAL" >&2
+  exit 1
 fi
 
 # A running game is the one thing worth stopping for: deleting the runtime
@@ -415,4 +483,32 @@ if [[ "$FRESH_MACHINE" -eq 1 ]]; then
   for gap in ${gaps[@]+"${gaps[@]}"}; do
     printf '    %s- %s%s\n' "$C_DIM" "$gap" "$C_OFF"
   done
+fi
+
+# Last act, and it has to be done from outside the tree. bash reads a script
+# incrementally, so a script that deletes its own file mid-run can end up
+# executing garbage — and the cwd would vanish underneath it too. Hand the job
+# to a helper in the temp dir and exec it, so nothing left in this process
+# depends on ROOT still existing.
+if [[ "$REMOVE_CHECKOUT" -eq 1 ]]; then
+  helper="$(mktemp -t wyn-remove-checkout)" || exit 1
+  cat > "$helper" <<'HELPER'
+#!/usr/bin/env bash
+set -uo pipefail
+target="$1"
+self="$2"
+rm -rf "$target"
+if [[ -e "$target" ]]; then
+  echo "  FAILED   could not remove $target" >&2
+  rm -f "$self"
+  exit 1
+fi
+echo
+echo "  removed  $target"
+echo "  Nothing named wyn is left on this Mac."
+rm -f "$self"
+HELPER
+  chmod +x "$helper"
+  cd /
+  exec "$helper" "$ROOT" "$helper"
 fi
