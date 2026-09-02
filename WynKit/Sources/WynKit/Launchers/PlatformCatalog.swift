@@ -565,18 +565,35 @@ public enum PlatformCatalog {
             .deletingLastPathComponent()
     }
 
+    /// Where the native present/rtld helpers live.
+    ///
+    /// The app bundle's Resources come first, so an installed Wyn.app does not
+    /// depend on a source checkout still being there. The source-relative and
+    /// cwd paths follow for `swift run` out of a checkout.
+    ///
+    /// The old `~/Desktop/wyn` fallback is gone: CONTRIBUTING says not to
+    /// require it, and it only ever worked on a machine whose checkout happened
+    /// to be in that exact place.
     static func toolsBinURL() -> URL? {
         let fm = FileManager.default
-        let candidates = [
-            repoRootFromSource().appending(path: "Tools").appending(path: "bin"),
-            URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-                .appending(path: "Tools").appending(path: "bin"),
-            URL(fileURLWithPath: NSHomeDirectory())
-                .appending(path: "Desktop").appending(path: "wyn")
+        var candidates: [URL] = []
+
+        if let resources = Bundle.main.resourceURL {
+            candidates.append(resources)
+        }
+        candidates.append(repoRootFromSource().appending(path: "Tools").appending(path: "bin"))
+        candidates.append(
+            URL(fileURLWithPath: fm.currentDirectoryPath)
                 .appending(path: "Tools").appending(path: "bin")
-        ]
-        return candidates.first {
-            fm.fileExists(atPath: $0.path(percentEncoded: false))
+        )
+
+        // A directory only counts when it actually holds a helper — Resources
+        // always exists, so testing the directory alone would match an app
+        // bundle that ships none and stop the real search.
+        return candidates.first { dir in
+            fm.fileExists(
+                atPath: dir.appending(path: "winemac_rtld_global.dylib").path(percentEncoded: false)
+            )
         }
     }
 
