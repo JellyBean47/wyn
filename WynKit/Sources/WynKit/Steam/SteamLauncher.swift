@@ -1139,6 +1139,12 @@ public enum SteamLauncher {
         if useGameHost {
             steamOptions.translationLayerOverride = .d3dMetal
         }
+        // steam.exe -silent stays resident for the whole session, so awaiting its
+        // exit never returns: the readiness loop below — and its 90s warning —
+        // become unreachable and `wyn play` hangs on "Launching Steam…" forever.
+        // Every other launchSteam caller already detaches; this one was the
+        // outlier. Detach, then let the loop decide when Steam is actually up.
+        steamOptions.detachAfterStart = true
 
         progress(options.debug
             ? "[wyn:debug] Launching \(treeLabel) steam.exe -silent…"

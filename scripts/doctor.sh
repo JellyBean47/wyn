@@ -287,29 +287,97 @@ fi
 
 section "6. Bottles and Steam"
 
-if [[ ! -d "$BOTTLES" ]]; then
+# A bottle is *registered*, not merely present: the CLI reads BottleVM.plist
+# (BottleData.swift), so a directory scan disagrees with `wyn list` the moment a
+# bottle lives outside the Bottles folder — e.g. a large bottle kept on an
+# external volume and symlinked in. Two separate reasons the old scan missed it:
+# `find -type d` does not match a symlink, and find does not follow one without
+# -L. That reported "1 bottle(s)" against `wyn list`'s two, and declared "Steam
+# not installed yet" about a bottle whose Steam logs in fine.
+REGISTRY="$(dirname "$BOTTLES")/BottleVM.plist"
+
+registered_bottle_paths() {
+  [[ -f "$REGISTRY" ]] || return 0
+  # plutil is in the base system, so this stays dependency-free.
+  plutil -convert xml1 -o - "$REGISTRY" 2>/dev/null \
+    | sed -n 's|.*<string>file://\(.*\)</string>.*|\1|p' \
+    | while IFS= read -r enc; do
+        case "$enc" in
+          *%*) printf '%b\n' "${enc//%/\\x}" ;;
+          *)   printf '%s\n' "$enc" ;;
+        esac
+      done
+}
+
+bottle_paths=()
+while IFS= read -r bp; do
+  [[ -n "$bp" ]] && bottle_paths+=("$bp")
+done < <(registered_bottle_paths)
+
+# Fall back to a scan only when the registry is missing or empty (fresh install,
+# or doctor run before the CLI has ever written it). -L so symlinks are seen.
+if (( ${#bottle_paths[@]} == 0 )) && [[ -d "$BOTTLES" ]]; then
+  while IFS= read -r bp; do
+    [[ -n "$bp" ]] && bottle_paths+=("$bp")
+  done < <(find -L "$BOTTLES" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
+fi
+
+if (( ${#bottle_paths[@]} == 0 )); then
   info "no bottles yet — created on first use (wyn steam install)"
 else
-  bottle_count="$(find "$BOTTLES" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
-  if [[ "$bottle_count" == "0" ]]; then
-    info "no bottles yet — created on first use (wyn steam install)"
-  else
-    ok "$bottle_count bottle(s)"
+  ok "${#bottle_paths[@]} bottle(s)"
+
+  unavailable=0
+  for bp in "${bottle_paths[@]}"; do
+    [[ -f "$bp/Metadata.plist" ]] || unavailable=$((unavailable + 1))
+  done
+  if (( unavailable > 0 )); then
+    warn "$unavailable registered bottle(s) not readable — external volume not mounted?" "wyn list"
   fi
 
-  steam_exe="$(find "$BOTTLES" -maxdepth 6 -name steam.exe -path '*Steam*' 2>/dev/null | head -1)"
-  if [[ -n "$steam_exe" ]]; then
-    ok "Steam installed in a bottle"
-    bottle_root="${steam_exe%%/drive_c/*}"
-    if [[ -n "$(find "$bottle_root" -maxdepth 8 -type d -name 'cef.win*' 2>/dev/null)" ]]; then
-      if [[ -n "$(find "$bottle_root" -maxdepth 9 -name '.fly-cef-shim' 2>/dev/null)" ]]; then
-        ok "Steam CEF shim applied (login window paints)"
-      else
-        warn "Steam CEF is not shimmed — the login window is likely to be black" "wyn steam launch"
+  # Probe known paths rather than walking the bottle. Following symlinks into a
+  # bottle that holds an installed game means `find` crosses tens of gigabytes of
+  # game data; doctor is meant to be instant and must not depend on how big
+  # someone's library is. Steam's layout here is fixed, so address it directly.
+  steam_roots=()
+  for bp in "${bottle_paths[@]}"; do
+    for candidate in \
+      "$bp/drive_c/Program Files (x86)/Steam/steam.exe" \
+      "$bp/drive_c/Program Files/Steam/steam.exe"; do
+      if [[ -f "$candidate" ]]; then
+        steam_roots+=("${candidate%/steam.exe}")
+        break
       fi
-    fi
-  else
+    done
+  done
+
+  if (( ${#steam_roots[@]} == 0 )); then
     info "Steam not installed yet — wyn steam install"
+  else
+    ok "Steam installed in ${#steam_roots[@]} bottle(s)"
+    # Check every cef.win* dir in every Steam bottle. The old probe stopped at
+    # the first bottle containing a steam.exe and asked only whether some
+    # .fly-cef-shim existed somewhere beneath it. That reports on whichever
+    # bottle happens to sort first — often a bare installer stub with no CEF at
+    # all — and passes a half-shimmed install, when one unshimmed cef.win* dir
+    # is enough to give you the black login window.
+    cef_checked=0
+    cef_unshimmed=0
+    for steam_root in "${steam_roots[@]}"; do
+      cef_dirs=("$steam_root"/bin/cef/cef.win*)
+      [[ -e "${cef_dirs[0]}" ]] || continue
+      for cef_dir in "${cef_dirs[@]}"; do
+        cef_checked=$((cef_checked + 1))
+        [[ -f "$cef_dir/.fly-cef-shim" ]] || cef_unshimmed=$((cef_unshimmed + 1))
+      done
+    done
+    if (( cef_checked == 0 )); then
+      info "Steam CEF not unpacked yet — the shim is applied on first launch"
+    elif (( cef_unshimmed == 0 )); then
+      ok "Steam CEF shim applied to all $cef_checked cef.win* dir(s)"
+    else
+      warn "Steam CEF unshimmed in $cef_unshimmed of $cef_checked cef.win* dir(s) — login window likely black" "wyn steam launch"
+    fi
   fi
 fi
 

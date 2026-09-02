@@ -169,42 +169,49 @@ public enum UnrealCompatibility {
         try mutateConfigIni(in: bottle, projectName: projectName, fileName: "Engine.ini", body)
     }
 
-    private static func upsertKey(
+    /// The file's dominant line ending. UE writes these inis CRLF inside a Wine
+    /// prefix; splicing bare "\n" into one leaves mixed endings behind.
+    static func lineEnding(of contents: String) -> String {
+        contents.contains("\r\n") ? "\r\n" : "\n"
+    }
+
+    static func upsertKey(
         in file: URL, section: String, key: String, value: String
     ) throws {
         var contents = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
-        let beforeRepair = contents
-        // Repair "]Key=" smash from earlier writers.
+        let original = contents
+        let eol = lineEnding(of: contents)
+
+        // Repair "[Section]Key=" smashes written by earlier versions of this file.
         contents = contents.replacingOccurrences(
             of: "\(section)\(key)=",
-            with: "\(section)\n\(key)="
+            with: "\(section)\(eol)\(key)="
         )
 
         if let updated = replaceKey(in: contents, section: section, key: key, value: value) {
-            if updated != beforeRepair {
+            if updated != original {
                 try updated.write(to: file, atomically: true, encoding: .utf8)
             }
             return
         }
 
-        var body = contents.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !body.isEmpty { body += "\n\n" }
-        body += """
-        ; Written by Wyn
-        \(section)
-        \(key)=\(value)
-
-        """
+        // Section absent: append it. Trim only trailing line breaks — the old
+        // code trimmed all whitespace, which ate the last line's own ending and
+        // converted it to the separator's.
+        var body = contents
+        while body.hasSuffix("\n") || body.hasSuffix("\r") { body.removeLast() }
+        if !body.isEmpty { body += eol + eol }
+        body += "; Written by Wyn\(eol)\(section)\(eol)\(key)=\(value)\(eol)"
         try body.write(to: file, atomically: true, encoding: .utf8)
     }
 
-    private static func removeKey(in file: URL, section: String, key: String) throws {
+    static func removeKey(in file: URL, section: String, key: String) throws {
         guard var contents = try? String(contentsOf: file, encoding: .utf8), !contents.isEmpty else {
             return
         }
         contents = contents.replacingOccurrences(
             of: "\(section)\(key)=",
-            with: "\(section)\n\(key)="
+            with: "\(section)\(lineEnding(of: contents))\(key)="
         )
         guard let sectionRange = contents.range(of: section) else { return }
 
@@ -212,8 +219,11 @@ public enum UnrealCompatibility {
         let nextSection = afterSection.range(of: "\n[")?.lowerBound ?? afterSection.endIndex
         let sectionBody = String(afterSection[..<nextSection])
 
+        // `[ \t]` not `\s`: \s matches newlines, so `^\s*KEY=` reaches back over the
+        // line break before the key and deletes it too, merging this line into
+        // the one above — the same defect that produced "[Section]Key=value".
         guard let regex = try? NSRegularExpression(
-            pattern: "(?m)^\\s*\(NSRegularExpression.escapedPattern(for: key))\\s*=.*\\n?"
+            pattern: "(?m)^[ \\t]*\(NSRegularExpression.escapedPattern(for: key))[ \\t]*=[^\\r\\n]*\\r?\\n?"
         ) else { return }
 
         let full = NSRange(location: 0, length: (sectionBody as NSString).length)
@@ -226,21 +236,33 @@ public enum UnrealCompatibility {
     }
 
     /// Replace `key=…` inside an existing UE ini section, or return nil if section is missing.
-    private static func replaceKey(
+    static func replaceKey(
         in contents: String, section: String, key: String, value: String
     ) -> String? {
         guard let sectionRange = contents.range(of: section) else { return nil }
+        let eol = lineEnding(of: contents)
 
         let afterSection = contents[sectionRange.upperBound...]
         let nextSection = afterSection.range(of: "\n[")?.lowerBound ?? afterSection.endIndex
         var sectionBody = String(afterSection[..<nextSection])
-        // Always keep a leading newline after the section header.
-        if !sectionBody.hasPrefix("\n") {
-            sectionBody = "\n" + sectionBody
+        // Always keep a line break between the section header and the first key.
+        // CRLF files start this run with "\r\n", which the old "\n"-only check
+        // missed — it then prepended a bare "\n", leaving mixed endings.
+        if !sectionBody.hasPrefix("\n") && !sectionBody.hasPrefix("\r\n") {
+            sectionBody = eol + sectionBody
         }
 
+        // Two deliberate details:
+        //  * `[ \t]` not `\s` — \s matches newlines, so `^\s*KEY` matched the line
+        //    break before the key and the replacement was spliced onto the
+        //    section header. That is how "[SystemSettings]r.GPUStats=0" and
+        //    "[/Script/…WindowsTargetSettings]DefaultGraphicsRHI=…" were written,
+        //    and why the "]Key=" repair above could never win: this regex
+        //    re-smashed the line on the very next pass.
+        //  * `[^\r\n]*` not `.*$` — `.` matches \r, so `.*$` swallowed the CR and
+        //    silently converted that one line to LF inside a CRLF file.
         guard let regex = try? NSRegularExpression(
-            pattern: "(?m)^\\s*\(NSRegularExpression.escapedPattern(for: key))\\s*=.*$"
+            pattern: "(?m)^[ \\t]*\(NSRegularExpression.escapedPattern(for: key))[ \\t]*=[^\\r\\n]*"
         ) else { return nil }
 
         let full = NSRange(location: 0, length: (sectionBody as NSString).length)
@@ -253,8 +275,8 @@ public enum UnrealCompatibility {
             )
         } else {
             var inserted = sectionBody
-            if !inserted.hasSuffix("\n") { inserted += "\n" }
-            inserted += "\(replacement)\n"
+            if !inserted.hasSuffix("\n") { inserted += eol }
+            inserted += "\(replacement)\(eol)"
             newBody = inserted
         }
 
