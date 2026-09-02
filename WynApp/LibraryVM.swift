@@ -24,6 +24,9 @@ final class LibraryVM: ObservableObject {
     @Published var runningKinds: Set<PlatformKind> = []
     /// Names of library games whose EXE is running. Drives the Quit warning.
     @Published var runningGameNames: [String] = []
+    /// Every registered bottle, for the Bottles section.
+    @Published var bottles: [BottleRowItem] = []
+    @Published var showNewBottle = false
     @Published var platformRow: [PlatformRowItem] = []
     @Published var isBusy = false
     @Published var busyMessage = ""
@@ -69,12 +72,14 @@ final class LibraryVM: ObservableObject {
 
     init() {
         refreshMetadata()
+        refreshBottles()
         showSetup = GameLibrary.needsSetup()
         Task { await refreshGamesOffMainThread() }
     }
 
     func refresh() {
         refreshMetadata()
+        refreshBottles()
         Task { await refreshGamesOffMainThread() }
     }
 
@@ -131,6 +136,40 @@ final class LibraryVM: ObservableObject {
         steamRunning = SteamLauncher.isSteamClientRunning(in: bottle)
         steamLoggedOn = SteamLauncher.isSteamLoggedOn(in: bottle)
         runningGameNames = SteamLauncher.runningGameNames(among: games.map(\.profile))
+    }
+
+    /// Reload the Bottles section from BottleData.
+    ///
+    /// Cheap — reads BottleVM.plist and each bottle's Metadata.plist, no Wine.
+    func refreshBottles() {
+        var data = BottleData()
+        bottles = data.loadBottles().map(BottleRowItem.init)
+    }
+
+    /// Create a bottle and show it immediately.
+    ///
+    /// Metadata only; the Wine prefix is initialised on first use. Nothing here
+    /// runs Wine, so it cannot hang and there is no busy overlay.
+    func createBottle(name: String, windows: WinVersion, graphics: TranslationLayer) {
+        do {
+            _ = try BottleFactory.create(name: name, windows: windows, graphics: graphics)
+            showNewBottle = false
+            refreshBottles()
+        } catch {
+            errorText = error.localizedDescription
+        }
+    }
+
+    func openCDrive(for item: BottleRowItem) {
+        let drive = item.url.appending(path: "drive_c")
+        guard FileManager.default.fileExists(atPath: drive.path(percentEncoded: false)) else {
+            errorText = """
+            \(item.name) has no C: drive yet. Wyn sets the Wine prefix up the \
+            first time something runs in the bottle.
+            """
+            return
+        }
+        NSWorkspace.shared.open(drive)
     }
 
     /// True when Quit has something to close.
