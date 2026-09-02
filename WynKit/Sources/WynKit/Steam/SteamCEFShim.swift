@@ -21,6 +21,31 @@ public enum SteamCEFShimError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .shimBinaryMissing:
+            // Name the bundle we are actually running from. The usual cause of
+            // this error is not a bad build at all — it is running a *different*
+            // Wyn.app: a bare `xcodebuild` (without scripts/build.sh's
+            // -derivedDataPath) leaves an unfinished bundle in Xcode's default
+            // DerivedData, Spotlight indexes it under the same name, and
+            // launching that one produces exactly this message. Without the
+            // path there is nothing to tell the two apart.
+            let bundlePath = Bundle.main.bundleURL.path(percentEncoded: false)
+            let installed = "/Applications/Wyn.app"
+            var hint = ""
+            if bundlePath.contains("/DerivedData/") {
+                hint = """
+
+                    This is a build-products bundle, not an installed one:
+                      \(bundlePath)
+                    Quit it and open \(installed) instead. Only scripts/build.sh
+                    copies the helpers in, so a bundle built by a bare xcodebuild
+                    never has them.
+                    """
+            } else if bundlePath != installed {
+                hint = """
+
+                    Running from: \(bundlePath)
+                    """
+            }
             return """
             steamwebhelper_shim.exe is missing (Tools/bin/). \
             Wyn.app carries this helper in its bundle, so a missing one usually \
@@ -28,7 +53,7 @@ public enum SteamCEFShimError: LocalizedError {
               ./scripts/build.sh
             Building the helper on its own: ./scripts/build-helpers.sh \
             (needs x86_64-w64-mingw32-gcc, e.g. brew install mingw-w64)
-            Without it Steam's login window paints black.
+            Without it Steam's login window paints black.\(hint)
             """
         }
     }

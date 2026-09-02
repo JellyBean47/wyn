@@ -127,6 +127,17 @@ if [[ "$CLEAN_BUILD" -eq 1 ]]; then
   add_target "$ROOT/.build"               "Swift build products"
   add_target "$ROOT/Tools/bin"            "native helpers"
   add_target "$ROOT/.scratch"             "compiled winecx — rebuilding this takes hours"
+  # Xcode build output lives outside the checkout, so `git clean` never sees it
+  # and a "fresh machine" still had it. Worse than wasted disk: a bundle built
+  # by a bare `xcodebuild` (no -derivedDataPath) is missing the helpers
+  # scripts/build.sh copies in, yet Spotlight indexes it as "Wyn" alongside the
+  # real one — launch that by mistake and Steam's CEF shim is reported missing
+  # on a perfectly good install.
+  add_target "/tmp/WynDerivedData"        "Xcode build products (scripts/build.sh)"
+  for dd in "$HOME/Library/Developer/Xcode/DerivedData"/Wyn-*; do
+    [[ -d "$dd" ]] || continue
+    add_target "$dd"                      "Xcode DerivedData — unfinished Wyn.app bundles"
+  done
 fi
 
 # What `git clean` would take. `-ff` (not `-f`) on purpose: .scratch holds a
