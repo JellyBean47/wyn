@@ -221,6 +221,54 @@ public enum SteamCEFShim {
         return installed > 0
     }
 
+    /// Keep shimming until every CEF variant on disk is shimmed *and* no new one
+    /// has appeared for `settle` seconds.
+    ///
+    /// Steam unpacks its variants at different times. On a first run cef.win7x64
+    /// can land first, a single install() pass shims it and reports success, and
+    /// cef.win64 — the variant a Windows 10 bottle actually loads — is unpacked
+    /// seconds later and never shimmed. The visible result is the black login
+    /// window on an otherwise perfect install, which is indistinguishable from
+    /// the shim being broken. Observed on a clean install: cef.win7x64 shimmed
+    /// at install time, cef.win64 still carrying Valve's 7.4 MB helper.
+    ///
+    /// install() is idempotent and only touches dirs that need it, so polling it
+    /// costs nothing and closes the race whichever order Steam unpacks in.
+    @discardableResult
+    public static func installUntilVariantsSettle(
+        into bottle: Bottle,
+        seconds: TimeInterval = 45,
+        settle: TimeInterval = 6,
+        debug: Bool = false
+    ) async throws -> Bool {
+        let deadline = Date().addingTimeInterval(seconds)
+        var knownCount = cefVariantDirectories(in: bottle).count
+        // Backdated so an already-settled bottle returns on the first pass. The
+        // settle window is meant to wait *after* a variant appears, not to add
+        // six seconds to every launch that had nothing to do.
+        var lastChange = Date().addingTimeInterval(-settle)
+        var everInstalled = false
+
+        while Date() < deadline {
+            try Task.checkCancellation()
+            if try install(into: bottle, debug: debug) { everInstalled = true }
+
+            let count = cefVariantDirectories(in: bottle).count
+            if count != knownCount {
+                if debug {
+                    print("[wyn:debug] CEF shim: variant count \(knownCount) → \(count); re-shimming")
+                }
+                knownCount = count
+                lastChange = Date()
+            }
+            if isInstalled(in: bottle), Date().timeIntervalSince(lastChange) >= settle {
+                return true
+            }
+            try await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+        return everInstalled || isInstalled(in: bottle)
+    }
+
     /// Restore Valve's steamwebhelper in every variant when using frankea Steam Wine.
     @discardableResult
     public static func uninstall(from bottle: Bottle, debug: Bool = false) throws -> Bool {
