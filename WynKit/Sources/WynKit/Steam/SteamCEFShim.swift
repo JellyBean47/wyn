@@ -198,6 +198,18 @@ public enum SteamCEFShim {
     /// Returns false when CEF is not on disk yet (first self-update).
     @discardableResult
     public static func install(into bottle: Bottle, debug: Bool = false) throws -> Bool {
+        // Invariant, not a caller's concern: the shim never goes on disk while a
+        // Steam client is running. Steam verifies its own files on any launch
+        // without `-noverifyfiles`, and a 151,908-byte steamwebhelper.exe where
+        // the manifest says 7,488,152 makes it re-extract the package over the
+        // shim and restart — measured ten times in a hundred seconds on a fresh
+        // bottle, 3 Sep 2026 00:14, with no exit. Callers stop Steam first.
+        guard !SteamLauncher.anySteamClientRunning() else {
+            if debug {
+                print("[wyn:debug] CEF shim: a Steam client is running — refusing to write the shim")
+            }
+            return false
+        }
         let dirs = cefVariantDirectories(in: bottle)
         let pending = dirs.filter { helperPresent(in: $0) }
         guard !pending.isEmpty else {
@@ -314,18 +326,17 @@ public enum SteamCEFShim {
         return attrs?[.modificationDate] as? Date
     }
 
-    // MARK: - Readiness
+    // MARK: - Has Steam's CEF layout stopped moving?
 
-    enum Readiness: Equatable {
-        /// Safe to stop shimming. `variant` is the one Steam named, when it has.
-        case ready(variant: String?)
+    enum LayoutState: Equatable {
+        /// Steam is done unpacking `cef.win*`. `variant` is the one it named.
+        case settled(variant: String?)
         case keepWaiting(String)
     }
 
     /// Everything the decision needs, so it can be decided without touching disk.
-    struct ReadinessInputs: Equatable {
+    struct LayoutInputs: Equatable {
         var helperVariants: Set<String>
-        var shimmedVariants: Set<String>
         /// From `webhelper.txt`; nil until Steam has launched a helper even once.
         var steamVariant: String?
         var now: Date
@@ -337,32 +348,33 @@ public enum SteamCEFShim {
         var settle: TimeInterval
     }
 
-    /// Is the shim work finished?
+    /// Has Steam finished laying out `bin/cef`?
     ///
-    /// The old rule — "every variant that has a helper is shimmed" — is true on a
-    /// fresh bottle the instant `cef.win7x64` lands, ~47 s before `cef.win64`
-    /// exists at all. It reported success, the bootstrap shut down, and Steam
-    /// then launched Valve's unshimmed helper out of `cef.win64`. Recorded
-    /// 2 Sep 2026: win7x64 created **and** shimmed 23:50:23; win64 created
-    /// 23:51:10; unshimmed helper launched 23:51:25 → black login window.
+    /// This is deliberately *not* a question about shims. Shimming a running
+    /// client that verifies its files is a loop (see `waitForVariantsToSettle`),
+    /// so the shim goes on after Steam is stopped, and the only thing worth
+    /// waiting for while it runs is the layout itself.
     ///
-    /// So: when Steam has told us which variant it loads, that variant decides
-    /// and nothing else does. Until then, being "all shimmed" is not enough —
-    /// a variant that appeared moments ago, or a Steam still writing
-    /// `bootstrap_log.txt`, means more is coming.
-    static func readiness(_ input: ReadinessInputs) -> Readiness {
+    /// The old rule — "every variant that has a helper is shimmed" — was true on
+    /// a fresh bottle the instant `cef.win7x64` landed, ~47 s before `cef.win64`
+    /// existed at all. Recorded 2 Sep 2026: win7x64 created **and** shimmed
+    /// 23:50:23; win64 created 23:51:10; Valve's unshimmed helper launched out
+    /// of it 23:51:25 → black login window. Reproduced 3 Sep 2026 with the same
+    /// 47-second gap, so it is the shape of a first run, not a fluke.
+    ///
+    /// When Steam has named its variant, that variant decides and nothing else
+    /// does. Until then, having a helper on disk is not enough: a variant that
+    /// appeared moments ago, or a Steam still writing `bootstrap_log.txt`, means
+    /// more is coming.
+    static func layoutState(_ input: LayoutInputs) -> LayoutState {
         if let steam = input.steamVariant {
-            if input.shimmedVariants.contains(steam) {
-                return .ready(variant: steam)
+            if input.helperVariants.contains(steam) {
+                return .settled(variant: steam)
             }
-            return .keepWaiting("Steam loads \(steam) and it is not shimmed yet")
+            return .keepWaiting("Steam loads \(steam) and it is not on disk yet")
         }
         if input.helperVariants.isEmpty {
             return .keepWaiting("no cef.win* helper on disk yet")
-        }
-        let unshimmed = input.helperVariants.subtracting(input.shimmedVariants)
-        if !unshimmed.isEmpty {
-            return .keepWaiting("unshimmed: \(unshimmed.sorted().joined(separator: ", "))")
         }
         if input.now.timeIntervalSince(input.lastVariantChange) < input.settle {
             return .keepWaiting("a variant appeared less than \(Int(input.settle))s ago")
@@ -371,34 +383,47 @@ public enum SteamCEFShim {
            input.now.timeIntervalSince(mtime) < input.settle {
             return .keepWaiting("Steam is still writing bootstrap_log.txt")
         }
-        return .ready(variant: nil)
+        return .settled(variant: nil)
     }
 
-    /// Keep shimming until the variant **Steam itself loads** is shimmed.
+    /// Wait until Steam has finished laying out `bin/cef` — **without touching it**.
     ///
-    /// `install()` is idempotent and only touches dirs that need it, so polling
-    /// it costs nothing and closes the race whichever order Steam unpacks in.
-    /// On a warm bottle `webhelper.txt` already names a shimmed variant and this
-    /// returns on the first pass — the wait is paid only by a first run, which
-    /// is the only run that has ever needed it.
+    /// > Never shim a running Steam client. Steam verifies its own files on any
+    /// > launch that does not carry `-noverifyfiles`, and the shim is 151,908
+    /// > bytes where the manifest says 7,488,152. Measured on a fresh bottle,
+    /// > 3 Sep 2026 00:14:
+    /// >
+    /// >     BVerifyInstalledFiles: bin\cef\cef.win64\steamwebhelper.exe
+    /// >       is 151908 bytes, expected 7488152
+    /// >
+    /// > Steam then re-extracts the package over the shim and restarts — ten
+    /// > times in a hundred seconds, and it does not stop. The bootstrap
+    /// > `-silent` launches are exactly the ones that verify: `-noverifyfiles`
+    /// > is stripped until `SteamUI.dll` exists, or the first client download
+    /// > never happens. So the shim can only be written while Steam is **down**,
+    /// > and the first process to load it must be a launch carrying
+    /// > `-noverifyfiles`.
+    ///
+    /// Which is why this function waits and reports, and `install(into:)` is
+    /// called by the caller afterwards, once the client has exited.
+    ///
+    /// Returns the variant Steam named in `webhelper.txt`, if it named one.
     @discardableResult
-    public static func installUntilSteamsVariantIsShimmed(
-        into bottle: Bottle,
+    public static func waitForVariantsToSettle(
+        in bottle: Bottle,
         seconds: TimeInterval = 240,
         settle: TimeInterval = 15,
         debug: Bool = false
-    ) async throws -> Bool {
+    ) async throws -> String? {
         let deadline = Date().addingTimeInterval(seconds)
         var knownHelpers = helperBearingVariants(in: bottle)
-        // Backdated so a bottle that has nothing to do is not charged the settle
-        // window. It is armed the moment a variant actually appears.
+        // Backdated so a bottle that has nothing to wait for is not charged the
+        // settle window. It is armed the moment a variant actually appears.
         var lastChange = Date().addingTimeInterval(-settle)
-        var everInstalled = false
         var lastReason = ""
 
         while true {
             try Task.checkCancellation()
-            if try install(into: bottle, debug: debug) { everInstalled = true }
 
             let helpers = helperBearingVariants(in: bottle)
             if helpers != knownHelpers {
@@ -409,10 +434,9 @@ public enum SteamCEFShim {
                 lastChange = Date()
             }
 
-            let state = readiness(
-                ReadinessInputs(
+            let state = layoutState(
+                LayoutInputs(
                     helperVariants: helpers,
-                    shimmedVariants: shimmedVariants(in: bottle),
                     steamVariant: lastWebHelperLaunch(in: bottle)?.variant,
                     now: Date(),
                     lastVariantChange: lastChange,
@@ -422,12 +446,12 @@ public enum SteamCEFShim {
             )
 
             switch state {
-            case .ready(let variant):
+            case .settled(let variant):
                 if debug {
                     let named = variant ?? "no webhelper launch recorded yet"
-                    print("[wyn:debug] CEF shim: ready (\(named))")
+                    print("[wyn:debug] CEF shim: layout settled (\(named))")
                 }
-                return everInstalled || isInstalled(in: bottle)
+                return variant
             case .keepWaiting(let reason):
                 if reason != lastReason {
                     if debug { print("[wyn:debug] CEF shim: waiting — \(reason)") }
@@ -439,8 +463,8 @@ public enum SteamCEFShim {
             try await Task.sleep(nanoseconds: 1_000_000_000)
         }
 
-        print("Steam's CEF helper did not settle in \(Int(seconds))s (\(lastReason)).")
-        return everInstalled || isInstalled(in: bottle)
+        print("Steam's CEF layout did not settle in \(Int(seconds))s (\(lastReason)).")
+        return lastWebHelperLaunch(in: bottle)?.variant
     }
 
     /// Restore Valve's steamwebhelper in every variant when using frankea Steam Wine.

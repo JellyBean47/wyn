@@ -299,10 +299,10 @@ public enum SteamLauncher {
             in: bottle, options: options, gameExeNames: gameExeNames
         )
         if plan.useGameHost {
+            // No second shim pass here: ensureGameHostCEFReady already left the
+            // bottle shimmed with Steam stopped, and re-running it against a
+            // client it chose to adopt is exactly the verify/re-extract loop.
             try await ensureGameHostCEFReady(plan: plan, bottle: bottle)
-            _ = try await SteamCEFShim.installUntilSteamsVariantIsShimmed(
-                into: bottle, debug: plan.options.debug
-            )
             if !plan.options.debug {
                 print("Steam UI: game-host Wine (Libraries/ — FOSS winecx + D3DMetal).")
                 print("Press Play in Steam — games inherit this D3DMetal wrapper. wyn play is fallback.")
@@ -446,79 +446,79 @@ public enum SteamLauncher {
         )
     }
 
-    /// The disk is right and the process is wrong.
+    /// Leave `bin/cef` shimmed and Steam **stopped**, so the launch that follows
+    /// is the first process to load the shim.
     ///
-    /// Shimming a variant does nothing to a `steamwebhelper` that is *already*
-    /// running out of it — only a restart repaints the login window. Two states
-    /// need one: a `-silent` bootstrap client, which can never show a window at
-    /// all, and a client whose live helper was launched before the shim reached
-    /// its variant. The second is the black login window users work around by
-    /// hand — stop Steam, launch it again. Do it for them.
-    private static func restartSteamIfItsWindowCannotPaint(
-        plan: SteamLaunchPlan,
-        bottle: Bottle
-    ) async throws {
-        let staleHelper = SteamCEFShim.lastWebHelperLaunch(in: bottle).map { launch in
-            !launch.shimmed && SteamCEFShim.shimmedVariants(in: bottle).contains(launch.variant)
-        } ?? false
-
-        if staleHelper {
-            print("Steam's login window is running an unshimmed CEF helper; restarting Steam so it paints…")
-        } else if isSilentSteamClientRunning(in: bottle) {
-            print("Steam is running in the background (-silent); asking it to exit so the window can show…")
-        } else {
-            return
-        }
-        await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
-        try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
-    }
-
-    /// First install often has no `bin/cef/cef.win*` yet — it appears after Steam's
-    /// win32→win64 self-update. Start Steam with the same CEF args as a normal
-    /// launch **plus `-silent`**, wait until the client is actually up (not merely
-    /// until the helper file appears), shim the variant Steam itself loads, then
-    /// `-shutdown` (retried) so the visible login window is a shimmed process.
+    /// A first install has no `bin/cef/cef.win*` at all — it appears after
+    /// Steam's win32→win64 self-update, and the variants land up to a minute
+    /// apart (47 s, measured twice). So: bootstrap `-silent`, wait for the
+    /// layout to stop moving, stop the client, *then* shim.
     ///
-    /// `-silent` is the fix that prevents an unshimmed black first HWND on the
-    /// `wyn steam launch` path. Never `wineserver -k`.
+    /// The order is the whole point. Shimming a running client is a loop —
+    /// Steam verifies its files on any launch without `-noverifyfiles`, sees a
+    /// 151,908-byte helper where its manifest says 7,488,152, re-extracts the
+    /// package over the shim and restarts, about every ten seconds, forever.
+    /// `SteamCEFShim.waitForVariantsToSettle` carries the measurement.
+    ///
+    /// `-silent` keeps the unshimmed bootstrap from putting a black first HWND
+    /// on screen. Never `wineserver -k`.
     private static func ensureGameHostCEFReady(plan: SteamLaunchPlan, bottle: Bottle) async throws {
-        // A running client: wait/shim if needed, shut down `-silent` leftovers,
-        // adopt a windowed client. Never start a second steam.exe here.
+        // A windowed client whose live helper is already shimmed is the warm
+        // case. Adopt it untouched. Never start a second steam.exe here.
         if isSteamClientRunning(in: bottle) {
-            if SteamCEFShim.hasAnyHelper(in: bottle) {
-                _ = try await SteamCEFShim.installUntilSteamsVariantIsShimmed(
-                    into: bottle, debug: plan.options.debug
-                )
-                try await restartSteamIfItsWindowCannotPaint(plan: plan, bottle: bottle)
+            if let launch = SteamCEFShim.lastWebHelperLaunch(in: bottle),
+               launch.shimmed,
+               SteamCEFShim.isInstalled(in: bottle),
+               !isSilentSteamClientRunning(in: bottle) {
                 return
             }
             if steamUILooksReady(in: bottle) {
-                print("Steam is preparing the login window (first run)…")
-                let appeared = try await SteamCEFShim.waitUntilHelperExists(
-                    in: bottle, seconds: 180, debug: plan.options.debug
+                if !SteamCEFShim.isInstalled(in: bottle) {
+                    print("Steam is preparing the login window (first run)…")
+                }
+                _ = try await SteamCEFShim.waitForVariantsToSettle(
+                    in: bottle, debug: plan.options.debug
                 )
-                guard appeared else { throw SteamError.cefDidNotAppear }
-                _ = try await SteamCEFShim.installUntilSteamsVariantIsShimmed(
-                    into: bottle, debug: plan.options.debug
-                )
-                try await restartSteamIfItsWindowCannotPaint(plan: plan, bottle: bottle)
-                return
+                // The shim cannot be written while this client runs, and a
+                // helper it already launched will not repaint if it is. Stop it;
+                // the visible launch that follows is the one that loads the shim.
+                print("Stopping Steam so the shim can be applied and the window can paint…")
+                await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
+                try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
+            } else {
+                print("Steam stub cannot load steamui.dll yet; asking it to exit so the first download can run…")
+                try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
             }
-            print("Steam stub cannot load steamui.dll yet; asking it to exit so the first download can run…")
-            try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
         }
 
-        if SteamCEFShim.hasAnyHelper(in: bottle) {
-            _ = try await SteamCEFShim.installUntilSteamsVariantIsShimmed(
-                into: bottle, debug: plan.options.debug
-            )
+        if !SteamCEFShim.hasAnyHelper(in: bottle) {
+            guard SteamCEFShim.bundledShimURL != nil else {
+                throw SteamCEFShimError.shimBinaryMissing
+            }
+            try await bootstrapSteamUntilCEFSettles(plan: plan, bottle: bottle)
+        }
+
+        // Steam is stopped, so this is the only safe moment to write the shim,
+        // and the launch that follows carries `-noverifyfiles`. The guard is not
+        // paranoia: `isSteamClientRunning` is known to under-report (§3), and
+        // the cost of being wrong here is an unbreakable verify/re-extract loop,
+        // not a cosmetic glitch. A black window is the better failure.
+        guard !anySteamClientRunning() else {
+            print("A Steam client is still running; leaving bin/cef alone rather than risk Steam re-verifying over the shim.")
             return
         }
+        _ = try SteamCEFShim.install(into: bottle, debug: plan.options.debug)
+    }
 
-        guard SteamCEFShim.bundledShimURL != nil else {
-            throw SteamCEFShimError.shimBinaryMissing
-        }
-
+    /// Run Steam `-silent` purely to make it unpack `bin/cef`, then stop it.
+    ///
+    /// Nothing is shimmed in here, deliberately: this is the launch that has
+    /// `-noverifyfiles` stripped, so it is the one client that will verify its
+    /// files and fight the shim.
+    private static func bootstrapSteamUntilCEFSettles(
+        plan: SteamLaunchPlan,
+        bottle: Bottle
+    ) async throws {
         print("Steam is preparing the login window (first run)…")
         var bootstrap = plan.options
         bootstrap.detachAfterStart = true
@@ -547,9 +547,9 @@ public enum SteamLauncher {
         guard appeared else {
             throw SteamError.cefDidNotAppear
         }
-        _ = try await SteamCEFShim.installUntilSteamsVariantIsShimmed(
-                into: bottle, debug: plan.options.debug
-            )
+        _ = try await SteamCEFShim.waitForVariantsToSettle(
+            in: bottle, debug: plan.options.debug
+        )
         await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
         try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
     }
@@ -1028,7 +1028,7 @@ public enum SteamLauncher {
     }
 
     /// Any Wine PE `steam.exe` on the machine (not bottle-scoped).
-    private static func anySteamClientRunning() -> Bool {
+    static func anySteamClientRunning() -> Bool {
         pidAndCommandRows().contains { lineIsSteamClientExe($0.command) }
     }
 

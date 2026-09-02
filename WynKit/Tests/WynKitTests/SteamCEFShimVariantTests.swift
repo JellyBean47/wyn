@@ -20,6 +20,18 @@ import Testing
 /// The 47 seconds between the two variants is the whole bug: the old success
 /// rule ("every variant that has a helper is shimmed") was satisfied at
 /// 23:50:23, when the variant Steam would actually load did not exist yet.
+///
+/// Reproduced on a fresh bottle 3 Sep 2026 with the same 47-second gap
+/// (cef.win7x64 00:12:14, cef.win64 00:13:01), so it is the shape of a first
+/// run rather than a fluke — and that run turned up the other half:
+///
+///     BVerifyInstalledFiles: bin\cef\cef.win64\steamwebhelper.exe
+///       is 151908 bytes, expected 7488152
+///
+/// ten times in a hundred seconds. Steam verifies its own files on any launch
+/// without `-noverifyfiles`, re-extracts the package over the shim and
+/// restarts. So `layoutState` deliberately asks only whether Steam has finished
+/// unpacking — the shim is written afterwards, with the client stopped.
 @Suite("Steam CEF variant selection")
 struct SteamCEFShimVariantTests {
 
@@ -78,20 +90,18 @@ struct SteamCEFShimVariantTests {
         #expect(SteamCEFShim.lastWebHelperLaunch(inLog: "") == nil)
     }
 
-    // MARK: - Readiness, replayed against the recorded timeline
+    // MARK: - Layout settling, replayed against the recorded timeline
 
     private func inputs(
         helpers: Set<String>,
-        shimmed: Set<String>,
         steamVariant: String? = nil,
         variantAgeSeconds: TimeInterval = 600,
         bootstrapLogAgeSeconds: TimeInterval? = 600,
         settle: TimeInterval = 15
-    ) -> SteamCEFShim.ReadinessInputs {
+    ) -> SteamCEFShim.LayoutInputs {
         let now = Date()
-        return SteamCEFShim.ReadinessInputs(
+        return SteamCEFShim.LayoutInputs(
             helperVariants: helpers,
-            shimmedVariants: shimmed,
             steamVariant: steamVariant,
             now: now,
             lastVariantChange: now.addingTimeInterval(-variantAgeSeconds),
@@ -100,147 +110,124 @@ struct SteamCEFShimVariantTests {
         )
     }
 
-    private func isReady(_ state: SteamCEFShim.Readiness) -> Bool {
-        if case .ready = state { return true }
+    private func hasSettled(_ state: SteamCEFShim.LayoutState) -> Bool {
+        if case .settled = state { return true }
         return false
     }
 
     /// **23:50:23.** The exact state the old code called success. `cef.win7x64`
-    /// exists and is shimmed; `cef.win64` will not exist for another 47 seconds.
-    /// Returning ready here is what shipped the black window.
-    @Test func winSevenX64AloneIsNotReady() {
-        let state = SteamCEFShim.readiness(
+    /// exists; `cef.win64` will not exist for another 47 seconds. Calling this
+    /// done — and shimming on the strength of it — is what shipped the black
+    /// window.
+    @Test func winSevenX64AloneHasNotSettled() {
+        let state = SteamCEFShim.layoutState(
             inputs(
                 helpers: ["cef.win7x64"],
-                shimmed: ["cef.win7x64"],
                 steamVariant: nil,
                 variantAgeSeconds: 0,        // it landed this second
                 bootstrapLogAgeSeconds: 0    // Steam is still unpacking
             )
         )
-        #expect(!isReady(state))
+        #expect(!hasSettled(state))
     }
 
-    /// **23:51:25.** Steam has named its variant and it is Valve's helper.
+    /// Steam has named a variant that is not on disk yet — keep waiting for it,
+    /// whatever else is present.
     @Test func steamsOwnVariantDecidesAndBlocks() {
-        let state = SteamCEFShim.readiness(
-            inputs(
-                helpers: ["cef.win7x64", "cef.win64"],
-                shimmed: ["cef.win7x64"],
-                steamVariant: "cef.win64"
-            )
+        let state = SteamCEFShim.layoutState(
+            inputs(helpers: ["cef.win7x64"], steamVariant: "cef.win64")
         )
-        #expect(!isReady(state))
+        #expect(!hasSettled(state))
         if case .keepWaiting(let reason) = state {
             #expect(reason.contains("cef.win64"))
         }
     }
 
-    /// **23:52:23.** Steam's variant is shimmed — and that is the whole test.
-    @Test func readyWhenSteamsVariantIsShimmed() {
-        let state = SteamCEFShim.readiness(
-            inputs(
-                helpers: ["cef.win7x64", "cef.win64"],
-                shimmed: ["cef.win7x64", "cef.win64"],
-                steamVariant: "cef.win64"
-            )
+    /// **23:51:10.** Steam's variant is on disk. Settled — and note it is
+    /// settled while still carrying Valve's helper: shimming is a separate step
+    /// that happens after the client is stopped.
+    @Test func settledWhenSteamsVariantIsOnDisk() {
+        let state = SteamCEFShim.layoutState(
+            inputs(helpers: ["cef.win7x64", "cef.win64"], steamVariant: "cef.win64")
         )
-        #expect(state == .ready(variant: "cef.win64"))
+        #expect(state == .settled(variant: "cef.win64"))
     }
 
-    /// A variant Steam never loads must not hold the launch hostage. `cef.win7`
-    /// sitting unshimmed on a Windows 10 bottle is not a reason to wait.
+    /// A variant Steam never loads must not hold the launch hostage.
     @Test func variantsSteamDoesNotLoadDoNotBlock() {
-        let state = SteamCEFShim.readiness(
-            inputs(
-                helpers: ["cef.win7", "cef.win64"],
-                shimmed: ["cef.win64"],
-                steamVariant: "cef.win64"
-            )
+        let state = SteamCEFShim.layoutState(
+            inputs(helpers: ["cef.win7", "cef.win64"], steamVariant: "cef.win64")
         )
-        #expect(state == .ready(variant: "cef.win64"))
+        #expect(state == .settled(variant: "cef.win64"))
     }
 
-    /// The warm path: `webhelper.txt` already names a shimmed variant, so the
-    /// settle window is never charged even though a variant "just changed".
-    /// Every launch after the first must not pay for the first one's bug.
-    @Test func warmBottleIsReadyWithoutWaiting() {
-        let state = SteamCEFShim.readiness(
+    /// The warm path: `webhelper.txt` already names a present variant, so the
+    /// settle window is never charged even though a variant just changed. Every
+    /// launch after the first must not pay for the first one's bug.
+    @Test func warmBottleSettlesWithoutWaiting() {
+        let state = SteamCEFShim.layoutState(
             inputs(
                 helpers: ["cef.win64"],
-                shimmed: ["cef.win64"],
                 steamVariant: "cef.win64",
                 variantAgeSeconds: 0,
                 bootstrapLogAgeSeconds: 0
             )
         )
-        #expect(state == .ready(variant: "cef.win64"))
+        #expect(state == .settled(variant: "cef.win64"))
     }
 
-    /// No launch recorded and Steam has gone quiet: everything on disk is
-    /// shimmed and nothing has moved for a settle window. Nothing more is
-    /// coming, so stop waiting.
-    @Test func quietSteamWithEverythingShimmedIsReady() {
-        let state = SteamCEFShim.readiness(
+    /// No launch recorded and Steam has gone quiet: nothing more is coming.
+    @Test func quietSteamWithVariantsOnDiskHasSettled() {
+        let state = SteamCEFShim.layoutState(
             inputs(
                 helpers: ["cef.win64"],
-                shimmed: ["cef.win64"],
                 steamVariant: nil,
                 variantAgeSeconds: 60,
                 bootstrapLogAgeSeconds: 60
             )
         )
-        #expect(state == .ready(variant: nil))
+        #expect(state == .settled(variant: nil))
     }
 
-    /// Same, but Steam is still writing `bootstrap_log.txt` — it is mid-update
-    /// and another variant may still land. This is the guard that would have
-    /// held the 23:50:23 pass open on its own.
-    @Test func steamStillWritingBootstrapLogIsNotReady() {
-        let state = SteamCEFShim.readiness(
+    /// Same, but Steam is still writing `bootstrap_log.txt` — mid-update, and
+    /// another variant may still land. This guard alone would have held the
+    /// 23:50:23 pass open.
+    @Test func steamStillWritingBootstrapLogHasNotSettled() {
+        let state = SteamCEFShim.layoutState(
             inputs(
                 helpers: ["cef.win64"],
-                shimmed: ["cef.win64"],
                 steamVariant: nil,
                 variantAgeSeconds: 60,
                 bootstrapLogAgeSeconds: 2
             )
         )
-        #expect(!isReady(state))
+        #expect(!hasSettled(state))
     }
 
     /// A variant that appeared moments ago means Steam is still unpacking, even
-    /// if the bootstrap log is missing entirely.
-    @Test func freshlyAppearedVariantIsNotReady() {
-        let state = SteamCEFShim.readiness(
+    /// with no bootstrap log at all.
+    @Test func freshlyAppearedVariantHasNotSettled() {
+        let state = SteamCEFShim.layoutState(
             inputs(
                 helpers: ["cef.win64"],
-                shimmed: ["cef.win64"],
                 steamVariant: nil,
                 variantAgeSeconds: 1,
                 bootstrapLogAgeSeconds: nil
             )
         )
-        #expect(!isReady(state))
+        #expect(!hasSettled(state))
     }
 
-    @Test func noHelperOnDiskIsNotReady() {
-        let state = SteamCEFShim.readiness(inputs(helpers: [], shimmed: []))
-        #expect(!isReady(state))
-    }
-
-    @Test func unshimmedHelperIsNotReadyEvenWithSteamSilent() {
-        let state = SteamCEFShim.readiness(
-            inputs(helpers: ["cef.win64"], shimmed: [], steamVariant: nil)
-        )
-        #expect(!isReady(state))
+    @Test func noHelperOnDiskHasNotSettled() {
+        let state = SteamCEFShim.layoutState(inputs(helpers: []))
+        #expect(!hasSettled(state))
     }
 
     // MARK: - Against a bottle on disk
 
     /// Build the 23:50:23 layout for real and prove the two rules disagree:
     /// the **old** success rule (`isInstalled`) is true, the new one is not.
-    /// Without this the readiness tests above could be vacuously green.
+    /// Without this the layout tests above could be vacuously green.
     @Test func oldRuleSaysDoneAtTheMomentTheBugShipped() throws {
         let fixture = try CEFBottleFixture()
         defer { fixture.cleanUp() }
@@ -250,16 +237,15 @@ struct SteamCEFShimVariantTests {
         #expect(SteamCEFShim.helperBearingVariants(in: fixture.bottle) == ["cef.win7x64"])
         #expect(SteamCEFShim.shimmedVariants(in: fixture.bottle) == ["cef.win7x64"])
 
-        let state = SteamCEFShim.readiness(
+        let state = SteamCEFShim.layoutState(
             inputs(
                 helpers: SteamCEFShim.helperBearingVariants(in: fixture.bottle),
-                shimmed: SteamCEFShim.shimmedVariants(in: fixture.bottle),
                 steamVariant: nil,
                 variantAgeSeconds: 0,
                 bootstrapLogAgeSeconds: 0
             )
         )
-        #expect(!isReady(state))                                // new rule: not yet
+        #expect(!hasSettled(state))                             // new rule: not yet
     }
 
     /// 23:51:10: Valve's helper lands in `cef.win64`. It must read as a
