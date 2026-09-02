@@ -281,7 +281,7 @@ if [[ -d "$PREFIX/opt/whiskywine" ]]; then
   fi
   echo "Installed wine root: $PREFIX/wine-root"
   echo "Next:"
-  echo "  wyn runtime install --gptk-aware --directory $PREFIX/wine-root"
+  echo "  wyn runtime install --gptk-aware --directory \"$PREFIX/wine-root\""
   echo "  wyn gptk install  # GPTK 3.0 from ~/Downloads"
 else
   echo "Installed destroot: $PREFIX"

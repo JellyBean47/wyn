@@ -908,7 +908,9 @@ public enum StorefrontLauncher {
         let logURL = URL(fileURLWithPath: "/tmp/eos-proxy.log")
         FileManager.default.createFile(atPath: logURL.path, contents: nil)
         let logHandle = try? FileHandle(forWritingTo: logURL)
-        try? logHandle?.seekToEnd()
+        // The offset is deliberately discarded — we only want the seek. Binding
+        // it silences the "result of 'try?' is unused" warning.
+        _ = try? logHandle?.seekToEnd()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
         process.arguments = [

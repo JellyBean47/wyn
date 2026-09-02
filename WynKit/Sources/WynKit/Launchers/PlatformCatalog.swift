@@ -360,7 +360,10 @@ public enum PlatformCatalog {
         guard !clientLines.isEmpty else { return false }
         if !bottleHasDXMTNative(in: bottle) { return true }
         // 13:45/14:05 Chromium guesses. Round 3 `--in-process-gpu` blanked Qt.
-        if clientLines.contains { battleNetLineHasGuessedCefFlags(String($0)) } {
+        // contains(where:) rather than a trailing closure: inside an `if`, the
+        // braces are ambiguous with the statement body and the compiler warns.
+        // The line below already spells it this way.
+        if clientLines.contains(where: { battleNetLineHasGuessedCefFlags(String($0)) }) {
             return true
         }
         let mains = clientLines.filter { !String($0).contains("--type=") }
