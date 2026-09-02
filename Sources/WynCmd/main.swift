@@ -72,19 +72,14 @@ extension WynCLI {
         var graphics: TranslationLayer = .dxmt
 
         mutating func run() throws {
-            let bottleURL = BottleData.defaultBottleDir.appending(path: UUID().uuidString)
-            try FileManager.default.createDirectory(at: bottleURL, withIntermediateDirectories: true)
-
-            let bottle = Bottle(bottleUrl: bottleURL, inFlight: true)
-            bottle.settings.name = name
-            bottle.settings.windowsVersion = windows
-            bottle.settings.translationLayer = graphics
-            bottle.settings.dxvk = graphics == .dxvk
-
-            var data = BottleData()
-            data.paths.append(bottleURL)
-
-            print("Created bottle \"\(name)\" at \(bottleURL.prettyPath())")
+            // Shared with the app's New Bottle tile so the two cannot drift.
+            let bottle = try BottleFactory.create(
+                name: name,
+                windows: windows,
+                graphics: graphics
+            )
+            print("Created bottle \"\(bottle.settings.name)\" at \(bottle.url.prettyPath())")
+            print("The Wine prefix is set up the first time something runs in it.")
         }
     }
 

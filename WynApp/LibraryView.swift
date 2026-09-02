@@ -22,6 +22,7 @@ struct LibraryView: View {
                     VStack(alignment: .leading, spacing: 20) {
                         platformSection
                         gamesSection
+                        bottlesSection
                     }
                     .padding(20)
                 }
@@ -191,6 +192,55 @@ struct LibraryView: View {
                         })
                     }
                 }
+            }
+        }
+    }
+
+    private var bottlesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Bottles")
+                .font(.title3.weight(.semibold))
+            Text("A bottle is a separate Windows environment. Wyn sets each one up the first time something runs in it.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
+                ForEach(vm.bottles) { item in
+                    Button {
+                        vm.openCDrive(for: item)
+                    } label: {
+                        GameTile(
+                            title: item.name,
+                            subtitle: item.subtitle,
+                            systemImage: "shippingbox.fill",
+                            isSelected: false
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .help(item.isInitialised
+                          ? "Open the C: drive for \(item.name)"
+                          : "\(item.name) is set up the first time something runs in it")
+                    .accessibilityLabel("Bottle \(item.name)")
+                }
+
+                Button {
+                    vm.showNewBottle = true
+                } label: {
+                    GameTile(
+                        title: "New Bottle",
+                        subtitle: "Create a Windows environment",
+                        systemImage: "plus",
+                        isSelected: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("New bottle")
+            }
+        }
+        .sheet(isPresented: $vm.showNewBottle) {
+            NewBottleSheet { name, windows, graphics in
+                vm.createBottle(name: name, windows: windows, graphics: graphics)
+            } onCancel: {
+                vm.showNewBottle = false
             }
         }
     }
