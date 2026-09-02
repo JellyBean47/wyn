@@ -55,6 +55,20 @@ swift build -c release
 ./.build/release/wyn install --skip-steam-download
 ```
 
+## Uninstalling
+
+```bash
+./scripts/uninstall.sh
+```
+
+Removes the app, the `wyn` command, the Wine runtime, caches, logs, preferences
+and bottles. It lists every path with its size and asks you to type `wyn` before
+touching anything; `--dry-run` shows the same list and removes nothing.
+
+Homebrew packages (`mingw-w64`, `ccache`), `~/Downloads` and your checkout are
+never touched. `--keep-bottles` preserves your Windows environments and the
+games in them; `--clean-build` also clears this checkout's build artifacts.
+
 ## Something not working?
 
 ```bash

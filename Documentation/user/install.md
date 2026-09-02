@@ -60,6 +60,32 @@ Consistent with `WYN_ALLOW_BREW_HEROIC`, Wyn never runs `brew` unless asked.
 It will not install Homebrew itself either — if `brew` is absent, it points at
 <https://brew.sh> and stops.
 
+## Uninstalling
+
+```bash
+./scripts/uninstall.sh              # everything, asks first
+./scripts/uninstall.sh --dry-run    # show what would go, remove nothing
+./scripts/uninstall.sh --keep-bottles
+```
+
+Removes `/Applications/Wyn.app`, `~/.local/bin/wyn` (and the `fly` alias), the
+Wine runtime under `Application Support`, `~/Library/Caches/wyn`, logs, the
+`wyn` / `fly` / `com.wyn.gaming` preference domains, and the bottles under
+`Containers`.
+
+Preferences need `killall cfprefsd` as well as deleting the plist — the daemon
+holds them in memory and writes them straight back, which is how a "clean"
+reinstall ends up reading the previous install's `FlyRuntimeSource`. The script
+does this for you.
+
+Never touched: Homebrew packages, `~/Downloads` (including the GPTK image), and
+the source checkout. `--clean-build` opts into clearing `.build`, `Tools/bin`
+and `.scratch` — note `.scratch` holds the compiled winecx tree, so removing it
+means recompiling Wine from source.
+
+Plain bash and no dependency on the Wyn CLI, since the CLI is one of the things
+being removed.
+
 ## Diagnosing a broken setup
 
 ```bash
