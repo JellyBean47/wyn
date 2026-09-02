@@ -97,10 +97,17 @@ add_target "/Applications/Wyn.app"        "the app"
 add_target "$HOME/.local/bin/wyn"         "the wyn command"
 add_target "$HOME/.local/bin/fly"         "the fly alias"
 add_target "$SUPPORT"                     "Wine runtime and libraries"
+# Both spellings exist on disk. The app writes under its bundle id, the CLI
+# under its own name, and only the CLI ones were ever removed — leaving 18 MB
+# of logs and a stale HTTP cache behind on every "complete" uninstall.
 add_target "$HOME/Library/Logs/wyn"       "logs"
+add_target "$HOME/Library/Logs/com.fly.gaming"        "logs (app bundle id)"
+add_target "$HOME/Library/HTTPStorages/wyn"           "HTTP cache"
+add_target "$HOME/Library/HTTPStorages/com.wyn.gaming" "HTTP cache (bundle id)"
 
 if [[ "$KEEP_CACHE" -eq 0 ]]; then
   add_target "$HOME/Library/Caches/wyn"   "downloaded runtime cache"
+  add_target "$HOME/Library/Caches/com.wyn.gaming" "app cache (bundle id)"
 fi
 
 if [[ "$KEEP_BOTTLES" -eq 0 ]]; then
@@ -129,6 +136,45 @@ if [[ "$DROP_CCACHE" -eq 1 && -d "$CCACHE_DIR_PATH" ]]; then
   CCACHE_HUMAN="$(du -sh "$CCACHE_DIR_PATH" 2>/dev/null | cut -f1)"
 fi
 
+# `swift test` writes one com.fly.gaming.tests.<UUID>.plist per run into
+# ~/Library/Preferences and never cleans up. `defaults delete` only handles the
+# three named domains, so these accumulate — 104 of them on the machine this was
+# written on. They are Wyn's litter; remove them with everything else.
+TEST_PREF_PLISTS=()
+while IFS= read -r plist; do
+  [[ -n "$plist" ]] && TEST_PREF_PLISTS+=("$plist")
+done < <(find "$HOME/Library/Preferences" -maxdepth 1 -name 'com.fly.gaming.tests.*.plist' 2>/dev/null)
+
+# Removing the Wine tree out from under a live wineserver leaves orphaned
+# processes executing a runtime that no longer exists on disk, and the next
+# install inherits them. Find them before touching anything.
+RUNNING_GAME_CMDS=()
+RUNNING_WINE_PIDS=()
+
+while IFS= read -r wspid; do
+  [[ -n "$wspid" ]] && RUNNING_WINE_PIDS+=("$wspid")
+done < <(pgrep -x wineserver 2>/dev/null)
+
+while read -r pspid pscmd; do
+  [[ -n "${pscmd:-}" ]] || continue
+  case "$pscmd" in
+    *.exe*|*.EXE*) ;;
+    *) continue ;;
+  esac
+  # Order matters, and not in the obvious way. Anything under steamapps is a
+  # game and must be tested FIRST: Satisfactory's binary is FactoryGameSteam.exe,
+  # which matches a naive *steam.exe* pattern and would have been classified as
+  # the Steam client and killed — force-closing a running game, which Wyn must
+  # never do. steamwebhelper next, because its command line carries
+  # -steampath=…\steam.exe. Only then the client itself, matched on its real
+  # path rather than a bare filename.
+  case "$pscmd" in
+    *steamapps*)      RUNNING_GAME_CMDS+=("$pscmd"); RUNNING_WINE_PIDS+=("$pspid") ;;
+    *steamwebhelper*) RUNNING_WINE_PIDS+=("$pspid") ;;
+    *\\[Ss]team\\[Ss]team.exe*) RUNNING_WINE_PIDS+=("$pspid") ;;
+  esac
+done < <(ps -ax -o pid=,command= 2>/dev/null)
+
 # Preference domains. Deleting the plist alone is not enough: cfprefsd caches
 # them in memory and writes them straight back, which is how a "clean" install
 # ends up reading a previous one's FlyRuntimeSource.
@@ -143,7 +189,8 @@ done
 # already uninstalled — which is exactly the state you are in when you decide to
 # simulate a clean machine. Only bail when there is genuinely nothing left.
 if [[ ${#TARGETS[@]} -eq 0 && ${#PREF_DOMAINS[@]} -eq 0 \
-      && ${#GIT_CLEAN_PATHS[@]} -eq 0 && "$DROP_CCACHE" -eq 0 ]]; then
+      && ${#GIT_CLEAN_PATHS[@]} -eq 0 && "$DROP_CCACHE" -eq 0 \
+      && ${#TEST_PREF_PLISTS[@]} -eq 0 && ${#RUNNING_WINE_PIDS[@]} -eq 0 ]]; then
   echo "Nothing to remove — Wyn is not installed on this Mac."
   exit 0
 fi
@@ -167,6 +214,16 @@ done
 
 if [[ ${#PREF_DOMAINS[@]} -gt 0 ]]; then
   printf '  %8s  preferences: %s\n' "-" "${PREF_DOMAINS[*]}"
+fi
+
+if [[ ${#TEST_PREF_PLISTS[@]} -gt 0 ]]; then
+  printf '  %8s  %d leftover com.fly.gaming.tests.*.plist (one per swift test run)\n' \
+    "-" "${#TEST_PREF_PLISTS[@]}"
+fi
+
+if [[ ${#RUNNING_WINE_PIDS[@]} -gt 0 ]]; then
+  printf '  %8s  %d Wine/Steam process(es) still running — stopped first\n' \
+    "-" "${#RUNNING_WINE_PIDS[@]}"
 fi
 
 printf '\n  %sTotal: about %s GB%s\n' "$C_HEAD" \
@@ -210,6 +267,20 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   exit 0
 fi
 
+# A running game is the one thing worth stopping for: deleting the runtime
+# under it loses unsaved progress, and Wyn never force-closes a game. Refuse
+# even with --yes, because nobody passes --yes meaning "and kill my game".
+if [[ ${#RUNNING_GAME_CMDS[@]} -gt 0 ]]; then
+  echo >&2
+  echo "error: a game is still running in a Wyn bottle." >&2
+  for gamecmd in ${RUNNING_GAME_CMDS[@]+"${RUNNING_GAME_CMDS[@]}"}; do
+    printf '  %s\n' "${gamecmd:0:100}" >&2
+  done
+  echo >&2
+  echo "Quit it from its own window, then run this again." >&2
+  exit 1
+fi
+
 if [[ "$ASSUME_YES" -eq 0 ]]; then
   # No terminal means nobody can answer. Refuse rather than purge unattended.
   if [[ ! -t 0 ]]; then
@@ -227,6 +298,27 @@ if [[ "$ASSUME_YES" -eq 0 ]]; then
 fi
 
 echo
+
+# Stop first, remove second. The other order deletes the runtime out from under
+# a live wineserver, which then keeps running against a tree that no longer
+# exists — and the next install inherits that orphan. No game is running here:
+# the check above refuses outright if one is.
+if [[ ${#RUNNING_WINE_PIDS[@]} -gt 0 ]]; then
+  kill ${RUNNING_WINE_PIDS[@]+"${RUNNING_WINE_PIDS[@]}"} 2>/dev/null || true
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    alive=0
+    for wpid in ${RUNNING_WINE_PIDS[@]+"${RUNNING_WINE_PIDS[@]}"}; do
+      kill -0 "$wpid" 2>/dev/null && alive=1
+    done
+    (( alive == 0 )) && break
+    sleep 1
+  done
+  for wpid in ${RUNNING_WINE_PIDS[@]+"${RUNNING_WINE_PIDS[@]}"}; do
+    kill -0 "$wpid" 2>/dev/null && kill -9 "$wpid" 2>/dev/null || true
+  done
+  echo "  stopped  ${#RUNNING_WINE_PIDS[@]} Wine/Steam process(es)"
+fi
+
 failed=0
 for i in ${TARGETS[@]+"${!TARGETS[@]}"}; do
   path="${TARGETS[$i]}"
@@ -242,9 +334,17 @@ for domain in ${PREF_DOMAINS[@]+"${PREF_DOMAINS[@]}"}; do
   defaults delete "$domain" >/dev/null 2>&1 && echo "  removed  preferences: $domain"
 done
 
+if [[ ${#TEST_PREF_PLISTS[@]} -gt 0 ]]; then
+  removed_tests=0
+  for plist in ${TEST_PREF_PLISTS[@]+"${TEST_PREF_PLISTS[@]}"}; do
+    rm -f "$plist" 2>/dev/null && removed_tests=$((removed_tests + 1))
+  done
+  echo "  removed  $removed_tests leftover com.fly.gaming.tests.*.plist"
+fi
+
 # Without this the daemon rewrites the plists it still holds in memory, and the
 # next install inherits settings from the one just removed.
-if [[ ${#PREF_DOMAINS[@]} -gt 0 ]]; then
+if [[ ${#PREF_DOMAINS[@]} -gt 0 || ${#TEST_PREF_PLISTS[@]} -gt 0 ]]; then
   killall cfprefsd >/dev/null 2>&1 || true
   echo "  restarted cfprefsd (so the preferences stay gone)"
 fi
