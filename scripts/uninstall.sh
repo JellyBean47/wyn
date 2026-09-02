@@ -171,6 +171,18 @@ done < <(find "$HOME/Library/Preferences" -maxdepth 1 -name 'com.fly.gaming.test
 RUNNING_GAME_CMDS=()
 RUNNING_WINE_PIDS=()
 
+# Wyn.app itself. The Wine scan below only considers Windows PEs, so the macOS
+# app was invisible to it: the uninstaller stopped Steam and wineserver, then
+# deleted /Applications/Wyn.app out from under a running app, which carried on
+# executing from a bundle that no longer existed — with its window open and a
+# stale Dock icon, which reads as "the uninstall did not remove the app".
+# Match on the bundle path, not /Applications: a bundle built by a bare
+# xcodebuild lives in DerivedData and is just as launchable (see PR #35).
+RUNNING_APP_PIDS=()
+while IFS= read -r apppid; do
+  [[ -n "$apppid" ]] && RUNNING_APP_PIDS+=("$apppid")
+done < <(pgrep -f '/Wyn\.app/Contents/MacOS/Wyn' 2>/dev/null)
+
 while IFS= read -r wspid; do
   [[ -n "$wspid" ]] && RUNNING_WINE_PIDS+=("$wspid")
 done < <(pgrep -x wineserver 2>/dev/null)
@@ -249,7 +261,7 @@ done
 if [[ ${#TARGETS[@]} -eq 0 && ${#PREF_DOMAINS[@]} -eq 0 \
       && ${#GIT_CLEAN_PATHS[@]} -eq 0 && "$DROP_CCACHE" -eq 0 \
       && ${#TEST_PREF_PLISTS[@]} -eq 0 && ${#RUNNING_WINE_PIDS[@]} -eq 0 \
-      && "$REMOVE_CHECKOUT" -eq 0 ]]; then
+      && ${#RUNNING_APP_PIDS[@]} -eq 0 && "$REMOVE_CHECKOUT" -eq 0 ]]; then
   echo "Nothing to remove — Wyn is not installed on this Mac."
   exit 0
 fi
@@ -283,6 +295,10 @@ fi
 if [[ ${#RUNNING_WINE_PIDS[@]} -gt 0 ]]; then
   printf '  %8s  %d Wine/Steam process(es) still running — stopped first\n' \
     "-" "${#RUNNING_WINE_PIDS[@]}"
+fi
+
+if [[ ${#RUNNING_APP_PIDS[@]} -gt 0 ]]; then
+  printf '  %8s  Wyn.app is running — quit first\n' "-"
 fi
 
 printf '\n  %sTotal: about %s GB%s\n' "$C_HEAD" \
@@ -382,6 +398,31 @@ echo
 # a live wineserver, which then keeps running against a tree that no longer
 # exists — and the next install inherits that orphan. No game is running here:
 # the check above refuses outright if one is.
+# Quit the app before its bundle is deleted, for the same reason the Wine
+# processes are stopped before the runtime goes. Deliberately NOT the
+# refuse-and-exit treatment a running game gets: a running launcher is not
+# unsaved progress, so quit it rather than making the user do it.
+if [[ ${#RUNNING_APP_PIDS[@]} -gt 0 ]]; then
+  # Ask nicely first so the app can close its own windows and save state.
+  osascript -e 'quit app "Wyn"' >/dev/null 2>&1 || true
+  for _ in 1 2 3 4 5 6 7 8; do
+    alive=0
+    for apid in ${RUNNING_APP_PIDS[@]+"${RUNNING_APP_PIDS[@]}"}; do
+      kill -0 "$apid" 2>/dev/null && alive=1
+    done
+    (( alive == 0 )) && break
+    sleep 1
+  done
+  for apid in ${RUNNING_APP_PIDS[@]+"${RUNNING_APP_PIDS[@]}"}; do
+    kill -0 "$apid" 2>/dev/null && kill "$apid" 2>/dev/null || true
+  done
+  sleep 1
+  for apid in ${RUNNING_APP_PIDS[@]+"${RUNNING_APP_PIDS[@]}"}; do
+    kill -0 "$apid" 2>/dev/null && kill -9 "$apid" 2>/dev/null || true
+  done
+  echo "  quit     Wyn.app"
+fi
+
 if [[ ${#RUNNING_WINE_PIDS[@]} -gt 0 ]]; then
   kill ${RUNNING_WINE_PIDS[@]+"${RUNNING_WINE_PIDS[@]}"} 2>/dev/null || true
   for _ in 1 2 3 4 5 6 7 8 9 10; do
