@@ -91,21 +91,87 @@ extension WynCLI {
         @Flag(name: .long, help: "Remove from registry only, keep files on disk.")
         var keepFiles: Bool = false
 
+        @Flag(name: [.customLong("yes"), .customShort("y")],
+              help: "Delete without asking. Required when stdin is not a terminal.")
+        var assumeYes: Bool = false
+
         mutating func run() throws {
             var data = BottleData()
             let bottles = data.loadBottles()
 
-            guard let bottle = bottles.first(where: { $0.settings.name == name }) else {
+            // Case-insensitive, to match bottle creation: `wyn create` refuses a
+            // name that differs only in case, so `wyn delete` must find it.
+            guard let bottle = bottles.first(where: {
+                $0.settings.name.lowercased() == name.lowercased()
+            }) else {
                 throw ValidationError("No bottle named \"\(name)\".")
             }
+            let actualName = bottle.settings.name
 
-            data.paths.removeAll { $0 == bottle.url }
+            // Deleting a prefix out from under a live wineserver corrupts the
+            // session rather than ending it.
+            if SteamLauncher.isBottleWineserverRunning(in: bottle) {
+                throw ValidationError("""
+                "\(actualName)" is running. Quit what is using it first \
+                (Steam → Exit, or: wyn steam quit), then delete.
+                """)
+            }
 
+            if !keepFiles {
+                let size = Delete.humanSize(of: bottle.url)
+                print("Deleting \"\(actualName)\" removes \(bottle.url.prettyPath())")
+                if let size {
+                    // Games live inside the bottle. 28 GB of installs is an easy
+                    // thing to destroy with a one-word command and no warning.
+                    print("This is \(size) on disk, including anything installed in it.")
+                }
+
+                if !assumeYes {
+                    guard isatty(FileHandle.standardInput.fileDescriptor) == 1 else {
+                        throw ValidationError("""
+                        Refusing to delete without confirmation. Re-run with --yes, \
+                        or --keep-files to unregister the bottle and keep the files.
+                        """)
+                    }
+                    print("Type the bottle name to confirm: ", terminator: "")
+                    let typed = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    guard typed.lowercased() == actualName.lowercased() else {
+                        print("Not deleted.")
+                        return
+                    }
+                }
+            }
+
+            // Files first, registry second. The old order deregistered before
+            // deleting, so a failed removeItem left the directory orphaned:
+            // gone from `wyn list`, still occupying the disk, with nothing left
+            // pointing at it. StoreInstaller.reset already does it this way.
             if !keepFiles {
                 try FileManager.default.removeItem(at: bottle.url)
             }
+            data.paths.removeAll { $0 == bottle.url }
 
-            print(keepFiles ? "Removed \"\(name)\" from registry." : "Deleted \"\(name)\".")
+            print(keepFiles
+                  ? "Removed \"\(actualName)\" from the registry. Files kept at \(bottle.url.prettyPath())"
+                  : "Deleted \"\(actualName)\".")
+        }
+
+        /// `du -sh` for the bottle, or nil when it cannot be measured.
+        /// Best effort: never block a delete because sizing failed.
+        private static func humanSize(of url: URL) -> String? {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/du")
+            process.arguments = ["-sh", url.path(percentEncoded: false)]
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = Pipe()
+            guard (try? process.run()) != nil else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            return String(decoding: data, as: UTF8.self)
+                .split(separator: "\t").first
+                .map { $0.trimmingCharacters(in: .whitespaces) }
         }
     }
 
