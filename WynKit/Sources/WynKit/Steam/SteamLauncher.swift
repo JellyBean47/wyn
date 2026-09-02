@@ -300,7 +300,7 @@ public enum SteamLauncher {
         )
         if plan.useGameHost {
             try await ensureGameHostCEFReady(plan: plan, bottle: bottle)
-            _ = try await SteamCEFShim.installUntilVariantsSettle(
+            _ = try await SteamCEFShim.installUntilSteamsVariantIsShimmed(
                 into: bottle, debug: plan.options.debug
             )
             if !plan.options.debug {
@@ -446,10 +446,37 @@ public enum SteamLauncher {
         )
     }
 
+    /// The disk is right and the process is wrong.
+    ///
+    /// Shimming a variant does nothing to a `steamwebhelper` that is *already*
+    /// running out of it — only a restart repaints the login window. Two states
+    /// need one: a `-silent` bootstrap client, which can never show a window at
+    /// all, and a client whose live helper was launched before the shim reached
+    /// its variant. The second is the black login window users work around by
+    /// hand — stop Steam, launch it again. Do it for them.
+    private static func restartSteamIfItsWindowCannotPaint(
+        plan: SteamLaunchPlan,
+        bottle: Bottle
+    ) async throws {
+        let staleHelper = SteamCEFShim.lastWebHelperLaunch(in: bottle).map { launch in
+            !launch.shimmed && SteamCEFShim.shimmedVariants(in: bottle).contains(launch.variant)
+        } ?? false
+
+        if staleHelper {
+            print("Steam's login window is running an unshimmed CEF helper; restarting Steam so it paints…")
+        } else if isSilentSteamClientRunning(in: bottle) {
+            print("Steam is running in the background (-silent); asking it to exit so the window can show…")
+        } else {
+            return
+        }
+        await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
+        try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
+    }
+
     /// First install often has no `bin/cef/cef.win*` yet — it appears after Steam's
     /// win32→win64 self-update. Start Steam with the same CEF args as a normal
     /// launch **plus `-silent`**, wait until the client is actually up (not merely
-    /// until the helper file appears), shim every `cef.win*` variant, then
+    /// until the helper file appears), shim the variant Steam itself loads, then
     /// `-shutdown` (retried) so the visible login window is a shimmed process.
     ///
     /// `-silent` is the fix that prevents an unshimmed black first HWND on the
@@ -459,14 +486,10 @@ public enum SteamLauncher {
         // adopt a windowed client. Never start a second steam.exe here.
         if isSteamClientRunning(in: bottle) {
             if SteamCEFShim.hasAnyHelper(in: bottle) {
-                _ = try await SteamCEFShim.installUntilVariantsSettle(
-                into: bottle, debug: plan.options.debug
-            )
-                if isSilentSteamClientRunning(in: bottle) {
-                    print("Steam is running in the background (-silent); asking it to exit so the window can show…")
-                    await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
-                    try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
-                }
+                _ = try await SteamCEFShim.installUntilSteamsVariantIsShimmed(
+                    into: bottle, debug: plan.options.debug
+                )
+                try await restartSteamIfItsWindowCannotPaint(plan: plan, bottle: bottle)
                 return
             }
             if steamUILooksReady(in: bottle) {
@@ -475,14 +498,10 @@ public enum SteamLauncher {
                     in: bottle, seconds: 180, debug: plan.options.debug
                 )
                 guard appeared else { throw SteamError.cefDidNotAppear }
-                _ = try await SteamCEFShim.installUntilVariantsSettle(
-                into: bottle, debug: plan.options.debug
-            )
-                if isSilentSteamClientRunning(in: bottle) {
-                    print("Steam is running in the background (-silent); asking it to exit so the window can show…")
-                    await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
-                    try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
-                }
+                _ = try await SteamCEFShim.installUntilSteamsVariantIsShimmed(
+                    into: bottle, debug: plan.options.debug
+                )
+                try await restartSteamIfItsWindowCannotPaint(plan: plan, bottle: bottle)
                 return
             }
             print("Steam stub cannot load steamui.dll yet; asking it to exit so the first download can run…")
@@ -490,7 +509,7 @@ public enum SteamLauncher {
         }
 
         if SteamCEFShim.hasAnyHelper(in: bottle) {
-            _ = try await SteamCEFShim.installUntilVariantsSettle(
+            _ = try await SteamCEFShim.installUntilSteamsVariantIsShimmed(
                 into: bottle, debug: plan.options.debug
             )
             return
@@ -528,7 +547,7 @@ public enum SteamLauncher {
         guard appeared else {
             throw SteamError.cefDidNotAppear
         }
-        _ = try await SteamCEFShim.installUntilVariantsSettle(
+        _ = try await SteamCEFShim.installUntilSteamsVariantIsShimmed(
                 into: bottle, debug: plan.options.debug
             )
         await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
