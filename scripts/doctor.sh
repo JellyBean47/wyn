@@ -65,7 +65,7 @@ WANTS_D3DMETAL=0
 [[ -e "$WINE_LIB/external/libd3dshared.dylib" ]] && WANTS_D3DMETAL=1
 [[ -e "$WINE_LIB/external/D3DMetal.framework" ]] && WANTS_D3DMETAL=1
 [[ -L "$WINE_LIB/wine/x86_64-unix/d3d11.so" ]] && \
-  readlink "$WINE_LIB/wine/x86_64-unix/d3d11.so" 2>/dev/null | grep -q libd3dshared && WANTS_D3DMETAL=1
+  [[ "$(readlink "$WINE_LIB/wine/x86_64-unix/d3d11.so" 2>/dev/null)" == *libd3dshared* ]] && WANTS_D3DMETAL=1
 
 section "1. Build prerequisites"
 
@@ -192,7 +192,11 @@ fi
 NTDLL="$WINE_LIB/wine/x86_64-unix/ntdll.so"
 IS_GAMEHOST=0
 if [[ -f "$NTDLL" ]]; then
-  if strings "$NTDLL" 2>/dev/null | grep -q CX_APPLEGPTK_LIBD3DSHARED_PATH; then
+  # grep the binary directly. Piping `strings` into `grep -q` looks equivalent but
+  # is not: grep -q exits on the first match, strings dies of SIGPIPE, and under
+  # `set -o pipefail` the pipeline returns 141 -- so a real game-host reports as
+  # frankea and section 4 FAILs on a working install.
+  if grep -qa CX_APPLEGPTK_LIBD3DSHARED_PATH "$NTDLL" 2>/dev/null; then
     IS_GAMEHOST=1
     ok "Wine is the FOSS winecx game-host (D3DMetal can load)"
   else
@@ -259,7 +263,7 @@ else
       dangling_mods="$dangling_mods $mod.so"
     elif [[ ! -e "$target" ]]; then
       missing_mods="$missing_mods $mod.so"
-    elif readlink "$target" 2>/dev/null | grep -q libd3dshared; then
+    elif [[ "$(readlink "$target" 2>/dev/null)" == *libd3dshared* ]]; then
       wired_d3dmetal=$((wired_d3dmetal + 1))
     else
       wired_native=$((wired_native + 1))
@@ -297,8 +301,8 @@ else
   if [[ -n "$steam_exe" ]]; then
     ok "Steam installed in a bottle"
     bottle_root="${steam_exe%%/drive_c/*}"
-    if find "$bottle_root" -maxdepth 8 -type d -name 'cef.win*' 2>/dev/null | grep -q .; then
-      if find "$bottle_root" -maxdepth 9 -name '.fly-cef-shim' 2>/dev/null | grep -q .; then
+    if [[ -n "$(find "$bottle_root" -maxdepth 8 -type d -name 'cef.win*' 2>/dev/null)" ]]; then
+      if [[ -n "$(find "$bottle_root" -maxdepth 9 -name '.fly-cef-shim' 2>/dev/null)" ]]; then
         ok "Steam CEF shim applied (login window paints)"
       else
         warn "Steam CEF is not shimmed — the login window is likely to be black" "wyn steam launch"
