@@ -281,7 +281,14 @@ public enum SteamCEFShim {
     /// is the black window.
     public static func lastWebHelperLaunch(inLog text: String) -> WebHelperLaunch? {
         let cefSeparator = #"\bin\cef\"#
-        for line in text.split(separator: "\n", omittingEmptySubsequences: true).reversed() {
+        // Steam writes these logs CRLF, and in Swift "\r\n" is a *single*
+        // Character — so `split(separator: "\n")` matches nothing and hands
+        // back the whole file as one line. That silently turned "the last
+        // launch" into "the first launch in the file", and `shimmed` into
+        // "--in-process-gpu appears anywhere in the log", which is true
+        // forever once any good launch has happened. Split on newline-ness,
+        // never on a newline literal.
+        for line in text.split(whereSeparator: \.isNewline).reversed() {
             guard line.contains("webhelper launched pid") else { continue }
             let lower = line.lowercased()
             guard let cefRange = lower.range(of: cefSeparator.lowercased()) else { continue }

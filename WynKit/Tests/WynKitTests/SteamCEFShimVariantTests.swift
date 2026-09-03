@@ -71,6 +71,42 @@ struct SteamCEFShimVariantTests {
         #expect(SteamCEFShim.lastWebHelperLaunch(inLog: reversed)?.shimmed == false)
     }
 
+    /// **Steam writes these logs CRLF**, and in Swift `"\r\n"` is a *single*
+    /// Character — so `split(separator: "\n")` matches nothing and returns the
+    /// whole file as one line.
+    ///
+    /// That shipped. On every real log the parser returned the *first* launch
+    /// in the file and reported `shimmed` as "--in-process-gpu appears
+    /// somewhere in this log", which is true forever once one good launch has
+    /// happened — so a client sitting on a black window read as healthy and
+    /// was adopted. Caught 3 Sep against a real `webhelper.txt`; the LF tests
+    /// above all passed throughout, which is the whole lesson.
+    @Test func crlfLogsAreSplitIntoLines() {
+        let log = [Self.unshimmedLine, Self.shimmedLine].joined(separator: "\r\n")
+        let launch = SteamCEFShim.lastWebHelperLaunch(inLog: log)
+        #expect(launch?.executable == "steamwebhelper_real.exe")
+        #expect(launch?.shimmed == true)
+
+        // The direction that actually bit: a good launch, then a bad one.
+        // Whole-file matching calls this shimmed. It is not.
+        let regressed = [Self.shimmedLine, Self.unshimmedLine].joined(separator: "\r\n")
+        let live = SteamCEFShim.lastWebHelperLaunch(inLog: regressed)
+        #expect(live?.executable == "steamwebhelper.exe")
+        #expect(live?.shimmed == false)
+    }
+
+    /// Bare CR, in case a log ever arrives classic-Mac style.
+    @Test func carriageReturnOnlyLogsAreSplitIntoLines() {
+        let log = [Self.shimmedLine, Self.unshimmedLine].joined(separator: "\r")
+        #expect(SteamCEFShim.lastWebHelperLaunch(inLog: log)?.shimmed == false)
+    }
+
+    /// A trailing CRLF must not be read as an empty trailing record.
+    @Test func trailingNewlineIsHarmless() {
+        let log = Self.shimmedLine + "\r\n"
+        #expect(SteamCEFShim.lastWebHelperLaunch(inLog: log)?.shimmed == true)
+    }
+
     @Test func win7x64IsReadAsItsOwnVariant() {
         let line = #"[2026-09-02 23:50:40] Startup - webhelper launched pid: 42 commandline: "C:\Program Files (x86)\Steam\bin\cef\cef.win7x64\steamwebhelper.exe" -lang=en_US"#
         #expect(SteamCEFShim.lastWebHelperLaunch(inLog: line)?.variant == "cef.win7x64")
