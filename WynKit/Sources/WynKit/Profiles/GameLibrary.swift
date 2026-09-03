@@ -45,15 +45,26 @@ public enum GameLibrary {
             || steamBottle() == nil
     }
 
-    /// One profile per unique game. Canonical slugs live in `GameCatalog`;
-    /// variant files (`satisfactory-esync`, …) share a slug and stay hidden.
+    /// The catalog exists to keep one tile per game across the profiles Wyn
+    /// *ships* — `satisfactory-esync` and friends share a slug and stay hidden.
+    /// It is not an allowlist for the world.
+    ///
+    /// It was being used as one, and that made adding a game impossible: a
+    /// profile the person added — every profile the MCP server writes — has no
+    /// catalog slug, so it was filtered out and the game stayed "no profile"
+    /// forever no matter how correct the file was. Found end-to-end on
+    /// Solarpunk, which saved cleanly and then simply never appeared.
+    ///
+    /// So the canonical filter applies to bundled profiles only. Anything the
+    /// person added is theirs and always counts.
     public static func catalogProfiles() -> [GameProfile] {
         let all = ProfileStore.loadAll().filter { !hiddenProfileIDs.contains($0.id) }
+        let userAdded = ProfileStore.userProfileIDs()
         let canonical = Set(GameCatalog.load().games.map(\.slug))
         if canonical.isEmpty {
-            return all.filter { !$0.id.hasPrefix("satisfactory-") }
+            return all.filter { !$0.id.hasPrefix("satisfactory-") || userAdded.contains($0.id) }
         }
-        return all.filter { canonical.contains($0.id) }
+        return all.filter { canonical.contains($0.id) || userAdded.contains($0.id) }
     }
 
     /// Steam-installed apps in this bottle. Uses a bundled profile when `steamAppId` matches.

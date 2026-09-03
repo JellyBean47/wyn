@@ -29,6 +29,15 @@ public enum ProfileStore {
         return profiles.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
+    /// Ids of profiles the person added themselves, as opposed to the ones Wyn
+    /// ships. Anything written by `save_profile` — the MCP path — lands here.
+    public static func userProfileIDs() -> Set<String> {
+        guard FileManager.default.fileExists(atPath: userProfilesDirectory.path(percentEncoded: false)),
+              let profiles = try? loadFrom(directory: userProfilesDirectory)
+        else { return [] }
+        return Set(profiles.map(\.id))
+    }
+
     public static func profile(id: String, additionalDirectories: [URL] = []) -> GameProfile? {
         loadAll(additionalDirectories: additionalDirectories).first { $0.id == id }
     }

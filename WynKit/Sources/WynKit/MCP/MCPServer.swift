@@ -51,6 +51,10 @@ public struct MCPServer: Sendable {
             return encode(toolsListResult(id: id))
         case "tools/call":
             return encode(toolsCallResult(id: id, params: params))
+        case "prompts/list":
+            return encode(promptsListResult(id: id))
+        case "prompts/get":
+            return encode(promptsGetResult(id: id, params: params))
         default:
             return encode(errorResponse(
                 id: id, code: -32601, message: "Method not found: \(method)"
@@ -67,8 +71,62 @@ public struct MCPServer: Sendable {
             "id": id!,
             "result": [
                 "protocolVersion": requested ?? Self.preferredProtocolVersion,
-                "capabilities": ["tools": ["listChanged": false] as [String: Any]],
-                "serverInfo": ["name": "wyn", "version": Self.version]
+                "capabilities": [
+                    "tools": ["listChanged": false] as [String: Any],
+                    "prompts": ["listChanged": false] as [String: Any]
+                ] as [String: Any],
+                "serverInfo": ["name": "wyn", "version": Self.version],
+                // Clients hand this to the model as server-level context, which
+                // makes it the nearest thing to a system prompt Wyn gets. The
+                // gates in ProfileValidator and save_profile are what actually
+                // hold; this only makes refusals rarer and drafts better.
+                "instructions": MCPGuidance.instructions
+            ] as [String: Any]
+        ]
+    }
+
+    private func promptsListResult(id: Any?) -> [String: Any] {
+        [
+            "jsonrpc": "2.0",
+            "id": id!,
+            "result": [
+                "prompts": MCPGuidance.all.map { prompt in
+                    [
+                        "name": prompt.name,
+                        "description": prompt.description,
+                        "arguments": prompt.arguments.map { argument in
+                            [
+                                "name": argument.0,
+                                "description": argument.1,
+                                "required": argument.2
+                            ] as [String: Any]
+                        }
+                    ] as [String: Any]
+                }
+            ] as [String: Any]
+        ]
+    }
+
+    private func promptsGetResult(id: Any?, params: [String: Any]) -> [String: Any] {
+        let name = params["name"] as? String ?? ""
+        guard let prompt = MCPGuidance.all.first(where: { $0.name == name }) else {
+            return errorResponse(id: id, code: -32602, message: "No such prompt: \(name)")
+        }
+        let arguments = params["arguments"] as? [String: Any] ?? [:]
+        // Every prompt here takes at most one argument, and it is the subject.
+        let subject = prompt.arguments.first.flatMap { arguments[$0.0] as? String }
+
+        return [
+            "jsonrpc": "2.0",
+            "id": id!,
+            "result": [
+                "description": prompt.description,
+                "messages": [
+                    [
+                        "role": "user",
+                        "content": ["type": "text", "text": prompt.body(subject)] as [String: Any]
+                    ] as [String: Any]
+                ]
             ] as [String: Any]
         ]
     }

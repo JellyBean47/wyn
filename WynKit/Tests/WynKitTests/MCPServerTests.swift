@@ -131,6 +131,102 @@ struct MCPServerTests {
         #expect(toolText(response)?.isError == true)
     }
 
+    // MARK: - Guidance
+
+    /// The soft half of keeping a model on path. `instructions` is what MCP
+    /// clients hand the model as server-level context, so if it is missing the
+    /// model gets no framing at all beyond per-tool text.
+    @Test func initializeCarriesServerInstructions() {
+        let response = send(#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#)
+        let instructions = result(response)?["instructions"] as? String ?? ""
+        #expect(instructions.count > 500, "instructions must actually say something")
+
+        // The things a model most needs to know before drafting.
+        for expected in [
+            "inspect_game_files", "MetalFX", "vulkan", "guessed", "exePatterns"
+        ] {
+            #expect(instructions.lowercased().contains(expected.lowercased()),
+                    "instructions should mention \(expected)")
+        }
+    }
+
+    /// Adding Solarpunk took four launches because each one started from an
+    /// optimistic profile and bisected down after the crash. The fix was a
+    /// conservative baseline, and the two settings that actually mattered were
+    /// AVX and windowed mode. If that stops being said here, the next game
+    /// costs four launches again.
+    @Test func guidanceCarriesTheSafeBaseline() {
+        let instructions = MCPGuidance.instructions.lowercased()
+        #expect(instructions.contains("avxenabled false"))
+        #expect(instructions.contains("-windowed"))
+
+        let addGame = MCPGuidance.all.first { $0.name == "add_game" }
+        let body = (addGame?.body(nil) ?? "").lowercased()
+        for expected in ["avxenabled      false", "-windowed", "msync", "vcrun2019"] {
+            #expect(body.contains(expected), "add_game should pin \(expected)")
+        }
+    }
+
+    /// Tuning is the other half, and its whole value is the ordering: one
+    /// change per launch, cheapest-to-revert first.
+    @Test func tuningIsOneChangeAtATime() throws {
+        let tune = try #require(MCPGuidance.all.first { $0.name == "tune_profile" })
+        let body = tune.body("solarpunk")
+        #expect(body.contains("solarpunk"))
+        #expect(body.lowercased().contains("one change per launch"))
+        #expect(body.contains("read_launch_evidence"))
+
+        // The order is the point: windowed, then resolution, then AVX.
+        let windowed = try #require(body.range(of: "drop -windowed"))
+        let res = try #require(body.range(of: "raise -ResX"))
+        let avx = try #require(body.range(of: "avxEnabled true"))
+        #expect(windowed.lowerBound < res.lowerBound)
+        #expect(res.lowerBound < avx.lowerBound)
+    }
+
+    /// It must be honest about the one thing a model cannot do.
+    @Test func instructionsSayTheModelCannotVerify() {
+        let instructions = MCPGuidance.instructions.lowercased()
+        #expect(instructions.contains("cannot mark"))
+        #expect(instructions.contains("verified"))
+    }
+
+    @Test func promptsAreAdvertisedAndFetchable() {
+        let response = send(#"{"jsonrpc":"2.0","id":2,"method":"initialize","params":{}}"#)
+        let capabilities = result(response)?["capabilities"] as? [String: Any]
+        #expect(capabilities?["prompts"] != nil, "prompts capability must be declared")
+
+        let listed = result(send(#"{"jsonrpc":"2.0","id":3,"method":"prompts/list"}"#))?["prompts"]
+            as? [[String: Any]]
+        let names = Set((listed ?? []).compactMap { $0["name"] as? String })
+        #expect(names == ["add_game", "review_profile", "tune_profile"])
+    }
+
+    @Test func aPromptComesBackAsAUserMessage() {
+        let response = send(#"""
+        {"jsonrpc":"2.0","id":4,"method":"prompts/get","params":{"name":"add_game","arguments":{"game":"Solarpunk"}}}
+        """#)
+        let messages = result(response)?["messages"] as? [[String: Any]]
+        let first = messages?.first
+        #expect(first?["role"] as? String == "user")
+        let text = (first?["content"] as? [String: Any])?["text"] as? String ?? ""
+        #expect(text.contains("Solarpunk"))
+        #expect(text.contains("inspect_game_files"))
+    }
+
+    /// The argument is optional, so the prompt has to work without it.
+    @Test func addGameWorksWithNoGameNamed() {
+        let response = send(#"{"jsonrpc":"2.0","id":5,"method":"prompts/get","params":{"name":"add_game"}}"#)
+        let messages = result(response)?["messages"] as? [[String: Any]]
+        let text = ((messages?.first?["content"]) as? [String: Any])?["text"] as? String ?? ""
+        #expect(text.contains("Ask which game"))
+    }
+
+    @Test func anUnknownPromptIsRejected() {
+        let response = send(#"{"jsonrpc":"2.0","id":6,"method":"prompts/get","params":{"name":"nope"}}"#)
+        #expect((response?["error"] as? [String: Any])?["code"] as? Int == -32602)
+    }
+
     // MARK: - The write gate
 
     /// The rules that cost days apply to whatever the model drafts. This is the
@@ -183,6 +279,62 @@ struct MCPServerTests {
         let data = try Data(contentsOf: written)
         let saved = try JSONDecoder().decode(GameProfile.self, from: data)
         #expect(saved.status == .guessed)
+    }
+
+    /// The likeliest failure a prompt cannot prevent: an invented executable
+    /// name. Plausible on the page, unverifiable from text, and fatal — a
+    /// profile whose patterns match nothing can never launch the game.
+    ///
+    /// Only checkable when the game is installed, so this test asserts the
+    /// refusal when it can and the honest "could not check" note when it
+    /// cannot. Either way it must never silently accept a made-up name as
+    /// though it had been confirmed.
+    @Test func aMadeUpExecutableIsCaughtWhenTheGameIsInstalled() throws {
+        let installed = GameLibrary.steamBottle().map {
+            SteamLauncher.installDirectory(forAppId: 526870, in: $0) != nil
+        } ?? false
+
+        let id = "mcp-test-exe-\(UUID().uuidString.prefix(8))"
+        let written = ProfileStore.userProfilesDirectory.appending(path: "\(id).json")
+        defer { try? FileManager.default.removeItem(at: written) }
+
+        let response = send("""
+        {"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"save_profile","arguments":{"profile":{
+          "id":"\(id)","name":"Satisfactory","steamAppId":526870,
+          "exePatterns":["totally-invented-name.exe"],"environment":{},"notes":"n"
+        }}}}
+        """)
+        let outcome = toolText(response)
+
+        if installed {
+            #expect(outcome?.isError == true, "an invented exe name must be refused")
+            #expect(outcome?.text.contains("could never launch") == true)
+            // The refusal has to be actionable: hand back the real names.
+            #expect(outcome?.text.contains(".exe") == true)
+            #expect(!FileManager.default.fileExists(atPath: written.path(percentEncoded: false)),
+                    "a profile that cannot match must not reach disk")
+        } else {
+            #expect(outcome?.isError == false)
+            #expect(outcome?.text.contains("could not be checked") == true,
+                    "when the check is impossible, say so rather than implying it passed")
+        }
+    }
+
+    /// No app id means nothing to check against, and saying so is better than
+    /// pretending the names were confirmed.
+    @Test func aProfileWithNoAppIdSaysTheCheckWasSkipped() throws {
+        let id = "mcp-test-noappid-\(UUID().uuidString.prefix(8))"
+        let written = ProfileStore.userProfilesDirectory.appending(path: "\(id).json")
+        defer { try? FileManager.default.removeItem(at: written) }
+
+        let response = send("""
+        {"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"save_profile","arguments":{"profile":{
+          "id":"\(id)","name":"No App Id","exePatterns":["whatever.exe"],"environment":{},"notes":"n"
+        }}}}
+        """)
+        let outcome = toolText(response)
+        #expect(outcome?.isError == false)
+        #expect(outcome?.text.contains("could not be checked") == true)
     }
 
     /// And a valid profile does get written.

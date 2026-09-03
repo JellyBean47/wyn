@@ -920,6 +920,14 @@
       "steamAppId": 1462040,
       "profiles": ["ff7-remake.json"],
       "batch": 10
+    },
+    {
+      "slug": "solarpunk",
+      "name": "Solarpunk",
+      "publisher": "Cyberwave",
+      "steamAppId": 1805110,
+      "profiles": ["solarpunk.json"],
+      "batch": 11
     }
   ]
 }

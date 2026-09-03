@@ -1,0 +1,34 @@
+{
+  "id": "solarpunk",
+  "name": "Solarpunk",
+  "publisher": "Cyberwave",
+  "steamAppId": 1805110,
+  "exePatterns": [
+    "solarpunksteam-win64-shipping.exe",
+    "solarpunk.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": false,
+    "metalHud": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "0",
+    "D3DM_ENABLE_METALFX": "0",
+    "D3DM_ENABLE_ASYNC_COMMIT": "0",
+    "D3DM_SHOW_HUD_STATS": "0"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "-NO_EOS_OVERLAY -windowed -ResX=1280 -ResY=720",
+  "unrealProject": "Solarpunk",
+  "status": "verified",
+  "notes": "WORKS. Measured 4 Sep 2026 00:24-00:27: loads /Game/Maps/MainLevel, renders 998+ frames, plays, and exits cleanly with 'LogExit: Exiting.' UE5, D3DMetal, adapter reports 'AMD Compatibility Mode'. TWO SETTINGS ARE LOAD-BEARING, both found by measurement. (1) avxEnabled FALSE. With it true the game dies instantly with EXCEPTION_ILLEGAL_INSTRUCTION - twice. avxEnabled sets ROSETTA_ADVERTISE_AVX=1; the game then emits an AVX instruction Rosetta will not run. Satisfactory keeps AVX on and is fine, so this is per-title. (2) -windowed. Without it, d3dmetal reached frame 1 and died with EXCEPTION_ACCESS_VIOLATION writing 0x980. Note r.setres:1280x720 was already set in the crashing run, so the resolution is not what fixed it - the windowed viewport is. Fullscreen swapchain creation is the fragile path here: DXVK failed the same operation outright with D3D11Util.cpp:249 CreateSwapChainResult E_FAIL. RULED OUT, do not re-add: -dx11 is a no-op (the game already defaults to D3D11 - a run with an empty command line logged 'Using Default RHI: D3D11'). DXVK is worse than d3dmetal here (no swapchain at all). DXR is irrelevant, ray tracing is off by project setting r.RayTracing=0. RED HERRINGS: 'LogRenderer: Forcing update for all mesh draw commands: SkyLight change' was the last line before the crash and is NOT the cause - it also appears at frame 908 and during clean shutdown. The 'invalid ShaderMap' / 'uncooked shader map' errors are noise; the engine runs well past them. Steam's 'Visual C++ 2015-2022 Redistributable' dialog is a FALSE NEGATIVE from the small Solarpunk.exe prereq shim: the redist is installed (VC\\\\Runtimes\\\\x64 Installed=1, Version v14.51.36247.00). LAUNCH PATH: d3dmetal runs the game EXE directly, which bypasses that shim. dxvk/dxmt go via steam.exe -applaunch, where STEAM picks the exe and picks the shim - use `wyn play solarpunk --direct` on those layers."
+}
