@@ -598,6 +598,29 @@ public enum SteamLauncher {
         return !isSteamClientRunning(in: bottle)
     }
 
+    /// Profile ids whose game EXE is running right now.
+    ///
+    /// Same detection as `runningGameNames`, keyed by id instead of display
+    /// name because two profiles can share a name (satisfactory and
+    /// satisfactory-dxmt) and a launch record has to know which one ran.
+    public static func runningProfileIDs(among profiles: [GameProfile]) -> Set<String> {
+        var idForExe: [String: String] = [:]
+        for profile in profiles {
+            for pattern in profile.exePatterns {
+                idForExe[pattern.lowercased()] = profile.id
+            }
+        }
+        guard !idForExe.isEmpty else { return [] }
+
+        var running: Set<String> = []
+        for command in leftoverSessionCommands(matching: Set(idForExe.keys)) {
+            guard let base = windowsExeBasename(fromCommand: command),
+                  let id = idForExe[base] else { continue }
+            running.insert(id)
+        }
+        return running
+    }
+
     /// Display names of the given profiles whose game EXE is running right now.
     ///
     /// Detection only — nothing is signalled or killed. Steam, steamwebhelper
