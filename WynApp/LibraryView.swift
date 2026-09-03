@@ -92,16 +92,19 @@ struct LibraryView: View {
             // the export here — rather than only in a menu they will never
             // open — is what turns "it didn't work" into a report we can act
             // on. The failure text rides along inside the bundle.
-            .alert("Wyn", isPresented: errorPresented) {
+            // Titled with the step, not "Wyn". A dialog that says only what
+            // went wrong leaves the person guessing what was being attempted —
+            // and the app knew all along, it was in the busy overlay a moment
+            // earlier.
+            .alert(vm.failure?.title ?? "Wyn", isPresented: errorPresented) {
                 Button("Export Diagnostics…") {
-                    let failure = vm.errorText
-                    vm.errorText = nil
-                    vm.exportDiagnostics(note: failure)
+                    let failed = vm.failure
+                    vm.failure = nil
+                    vm.exportDiagnostics(note: failed?.noteLine)
                 }
-                Button("OK", role: .cancel) { vm.errorText = nil }
+                Button("OK", role: .cancel) { vm.failure = nil }
             } message: {
-                Text((vm.errorText ?? "") + "\n\nExport Diagnostics saves a zip to your Desktop "
-                     + "with the logs needed to diagnose this. It contains no account details.")
+                Text(alertMessage)
             }
             .sheet(isPresented: $vm.showSetup) {
                 SetupView(vm: vm)
@@ -114,9 +117,24 @@ struct LibraryView: View {
 
     private var errorPresented: Binding<Bool> {
         Binding(
-            get: { vm.errorText != nil && !vm.showSetup },
-            set: { if !$0 { vm.errorText = nil } }
+            get: { vm.failure != nil && !vm.showSetup },
+            set: { if !$0 { vm.failure = nil } }
         )
+    }
+
+    /// Reason, then what to try, then how to report it — in that order, because
+    /// that is the order a person needs them in.
+    private var alertMessage: String {
+        guard let failure = vm.failure else { return "" }
+        var parts = [failure.reason]
+        if let hint = failure.hint, !hint.isEmpty {
+            parts.append("Try: \(hint)")
+        }
+        parts.append(
+            "Export Diagnostics saves a zip to your Desktop with the logs "
+            + "needed to diagnose this. It contains no account details."
+        )
+        return parts.joined(separator: "\n\n")
     }
 
     private var statusStrip: some View {
