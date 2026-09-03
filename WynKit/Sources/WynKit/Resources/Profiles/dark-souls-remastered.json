@@ -19,5 +19,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "FromSoftware DX11 → D3DMetal with msync, same class as Dark Souls III / Sekiro. Steam launches DarkSoulsRemastered.exe (570940). This is the 2018 remaster, not Prepare to Die. Do not use Libraries.rgl or Libraries.vk."
+  "notes": "FromSoftware DX11 → D3DMetal with msync, same class as Dark Souls III / Sekiro. Steam launches DarkSoulsRemastered.exe (570940). This is the 2018 remaster, not Prepare to Die. Do not use Libraries.rgl or Libraries.vk.",
+  "status": "guessed"
 }

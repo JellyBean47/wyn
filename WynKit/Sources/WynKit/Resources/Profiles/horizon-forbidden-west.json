@@ -13,19 +13,20 @@
     "dxvkAsync": false,
     "enhancedSync": "msync",
     "avxEnabled": true,
-    "metalHud": true,
+    "metalHud": false,
     "dxrEnabled": true
   },
   "environment": {
     "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
-    "MTL_HUD_ENABLED": "1",
-    "D3DM_ENABLE_METALFX": "1",
-    "D3DM_SHOW_HUD_STATS": "1"
+    "MTL_HUD_ENABLED": "0",
+    "D3DM_ENABLE_METALFX": "0",
+    "D3DM_SHOW_HUD_STATS": "0"
   },
   "winetricks": [
     "vcrun2019",
     "vcrun2022"
   ],
   "launchArgs": "",
-  "notes": "Decima DX12 Nixxes port → D3DMetal (Horizon Zero Dawn / Control class). This is Complete Edition (2420110), including Burning Shores. Prefs in Documents\\Horizon Forbidden West Complete Edition. Ray tracing is DXR via D3DMetal on M3/M4; DLSS cannot run on Apple Silicon. Pin CX_GRAPHICS_BACKEND=d3dmetal. Do not use Libraries.rgl or Libraries.vk."
+  "notes": "Decima DX12 Nixxes port → D3DMetal (Horizon Zero Dawn / Control class). This is Complete Edition (2420110), including Burning Shores. Prefs in Documents\\Horizon Forbidden West Complete Edition. Ray tracing is DXR via D3DMetal on M3/M4; DLSS cannot run on Apple Silicon. Pin CX_GRAPHICS_BACKEND=d3dmetal. Do not use Libraries.rgl or Libraries.vk.",
+  "status": "guessed"
 }

@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Unity DX11 → DXVK (same class as Hades, distinct Steam app 1145350 vs 1145360). Native macOS Steam build may exist — this profile is the Windows Wine path."
+  "notes": "Unity DX11 → DXVK (same class as Hades, distinct Steam app 1145350 vs 1145360). Native macOS Steam build may exist — this profile is the Windows Wine path.",
+  "status": "guessed"
 }

@@ -19,5 +19,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "FromSoftware DX11 → D3DMetal with msync, same class as Elden Ring / Sekiro. Steam install is Game/DarkSoulsIII.exe. Do not use Libraries.rgl or Libraries.vk."
+  "notes": "FromSoftware DX11 → D3DMetal with msync, same class as Elden Ring / Sekiro. Steam install is Game/DarkSoulsIII.exe. Do not use Libraries.rgl or Libraries.vk.",
+  "status": "guessed"
 }

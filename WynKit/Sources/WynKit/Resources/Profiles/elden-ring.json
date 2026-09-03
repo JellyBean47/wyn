@@ -3,7 +3,10 @@
   "name": "Elden Ring",
   "publisher": "FromSoftware",
   "steamAppId": 1245620,
-  "exePatterns": ["eldenring.exe", "start_protected_game.exe"],
+  "exePatterns": [
+    "eldenring.exe",
+    "start_protected_game.exe"
+  ],
   "bottle": {
     "windowsVersion": "win10",
     "translationLayer": "d3dmetal",
@@ -14,6 +17,9 @@
   "environment": {
     "WINEDLLOVERRIDES": "winmm=n,b"
   },
-  "winetricks": ["vcrun2019"],
-  "notes": "Disable DXVK; use D3DMetal with msync. AVX helps performance on Apple Silicon."
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Disable DXVK; use D3DMetal with msync. AVX helps performance on Apple Silicon.",
+  "status": "guessed"
 }

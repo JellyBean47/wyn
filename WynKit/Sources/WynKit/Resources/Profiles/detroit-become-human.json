@@ -23,5 +23,6 @@
     "vcrun2022"
   ],
   "launchArgs": "",
-  "notes": "Quantic Dream Vulkan → DXVK/MoltenVK (DOOM Eternal class). Launch DetroitBecomeHuman.exe with SteamAppId=1222140. GPTK/D3DMetal does not translate Vulkan. First launch compiles shaders into ShaderCache. Do not use Libraries.rgl."
+  "notes": "Quantic Dream Vulkan → DXVK/MoltenVK (DOOM Eternal class). Launch DetroitBecomeHuman.exe with SteamAppId=1222140. GPTK/D3DMetal does not translate Vulkan. First launch compiles shaders into ShaderCache. Do not use Libraries.rgl.",
+  "status": "guessed"
 }

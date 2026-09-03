@@ -18,5 +18,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Gamebryo DX9 → DXVK (same family as New Vegas). This is the original GOTY Steam SKU (22330), not Oblivion Remastered (2623190). Steam launches OblivionLauncher.exe; prefer Oblivion.exe. Prefs live in Documents\\My Games\\Oblivion."
+  "notes": "Gamebryo DX9 → DXVK (same family as New Vegas). This is the original GOTY Steam SKU (22330), not Oblivion Remastered (2623190). Steam launches OblivionLauncher.exe; prefer Oblivion.exe. Prefs live in Documents\\My Games\\Oblivion.",
+  "status": "guessed"
 }

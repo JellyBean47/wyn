@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Java/libGDX. Native macOS Steam build exists — this profile is the Windows Wine path. Steam's default target is jre/bin/javaw.exe — do not match javaw.exe; launch SlayTheSpire.exe."
+  "notes": "Java/libGDX. Native macOS Steam build exists — this profile is the Windows Wine path. Steam's default target is jre/bin/javaw.exe — do not match javaw.exe; launch SlayTheSpire.exe.",
+  "status": "guessed"
 }

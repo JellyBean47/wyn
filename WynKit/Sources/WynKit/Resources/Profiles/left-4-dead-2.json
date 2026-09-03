@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Source DX9 → DXVK (Valheim / Lethal Company class; D3DMetal does not translate D3D9). Launch left4dead2.exe with SteamAppId=550. Do not match srcds.exe. VAC co-op goes through Steamworks in the same bottle."
+  "notes": "Source DX9 → DXVK (Valheim / Lethal Company class; D3DMetal does not translate D3D9). Launch left4dead2.exe with SteamAppId=550. Do not match srcds.exe. VAC co-op goes through Steamworks in the same bottle.",
+  "status": "guessed"
 }

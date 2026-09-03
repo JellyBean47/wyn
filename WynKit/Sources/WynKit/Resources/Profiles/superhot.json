@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Unity DX11 → DXVK (Hades / Lethal Company class). This is SUPERHOT (322500), not SUPERHOT: MIND CONTROL DELETE or VR."
+  "notes": "Unity DX11 → DXVK (Hades / Lethal Company class). This is SUPERHOT (322500), not SUPERHOT: MIND CONTROL DELETE or VR.",
+  "status": "guessed"
 }

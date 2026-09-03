@@ -20,5 +20,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "FromSoftware DX11 → D3DMetal with msync, same class as Elden Ring. Prefer sekiro.exe over start_protected_game.exe when both exist. AVX on Apple Silicon."
+  "notes": "FromSoftware DX11 → D3DMetal with msync, same class as Elden Ring. Prefer sekiro.exe over start_protected_game.exe when both exist. AVX on Apple Silicon.",
+  "status": "guessed"
 }

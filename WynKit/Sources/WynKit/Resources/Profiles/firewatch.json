@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Unity DX11 → DXVK (Outer Wilds / Hades class). Launch Firewatch.exe with SteamAppId=383870. Native macOS Steam build exists — this profile is the Windows Wine path."
+  "notes": "Unity DX11 → DXVK (Outer Wilds / Hades class). Launch Firewatch.exe with SteamAppId=383870. Native macOS Steam build exists — this profile is the Windows Wine path.",
+  "status": "guessed"
 }

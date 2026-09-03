@@ -18,5 +18,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "MonoGame/XNA → DXVK (same lightweight class as Lethal Company). Native macOS Steam build exists — this profile is the Windows Wine path. Prefer Stardew Valley.exe over the StardewValley.exe alias."
+  "notes": "MonoGame/XNA → DXVK (same lightweight class as Lethal Company). Native macOS Steam build exists — this profile is the Windows Wine path. Prefer Stardew Valley.exe over the StardewValley.exe alias.",
+  "status": "guessed"
 }

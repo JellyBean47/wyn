@@ -15,18 +15,19 @@
     "dxvkAsync": false,
     "enhancedSync": "msync",
     "avxEnabled": true,
-    "metalHud": true,
+    "metalHud": false,
     "dxrEnabled": true
   },
   "environment": {
     "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
-    "MTL_HUD_ENABLED": "1",
-    "D3DM_ENABLE_METALFX": "1",
-    "D3DM_SHOW_HUD_STATS": "1"
+    "MTL_HUD_ENABLED": "0",
+    "D3DM_ENABLE_METALFX": "0",
+    "D3DM_SHOW_HUD_STATS": "0"
   },
   "winetricks": [
     "vcrun2022"
   ],
   "launchArgs": "--launcher-skip -skipStartScreen",
-  "notes": "DX12-first stack probe (owns Steam app 1091500 on SSD). Prefer GPTK+D3DMetal 3.0 when Logged On; else frankea auth + DXVK-macOS. Native Mac exists — this profile is for Wyn Wine path."
+  "notes": "DX12-first stack probe (owns Steam app 1091500 on SSD). Prefer GPTK+D3DMetal 3.0 when Logged On; else frankea auth + DXVK-macOS. Native Mac exists — this profile is for Wyn Wine path.",
+  "status": "guessed"
 }

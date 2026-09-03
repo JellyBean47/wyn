@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Unity DX11 → DXVK (Valheim / Lethal Company class). Launch TheForest.exe; do not match TheForestVR.exe. This is The Forest (242760), not Sons of the Forest."
+  "notes": "Unity DX11 → DXVK (Valheim / Lethal Company class). Launch TheForest.exe; do not match TheForestVR.exe. This is The Forest (242760), not Sons of the Forest.",
+  "status": "guessed"
 }

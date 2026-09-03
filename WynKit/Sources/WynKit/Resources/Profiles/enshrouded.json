@@ -23,5 +23,6 @@
     "vcrun2022"
   ],
   "launchArgs": "",
-  "notes": "Holistic Engine Vulkan → DXVK/MoltenVK (DOOM Eternal / Windows NMS class). Launch enshrouded.exe with SteamAppId=1203620. GPTK/D3DMetal does not translate Vulkan; -dx11/-dx12 are ignored. Do not match enshrouded_server.exe. Do not use Libraries.rgl."
+  "notes": "Holistic Engine Vulkan → DXVK/MoltenVK (DOOM Eternal / Windows NMS class). Launch enshrouded.exe with SteamAppId=1203620. GPTK/D3DMetal does not translate Vulkan; -dx11/-dx12 are ignored. Do not match enshrouded_server.exe. Do not use Libraries.rgl.",
+  "status": "guessed"
 }

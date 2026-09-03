@@ -23,5 +23,6 @@
     "vcrun2022"
   ],
   "launchArgs": "",
-  "notes": "DEFER: play the native macOS Steam build (Metal). Windows NMS via Wine is lab-only — Vulkan stack notes in HANDOFF.md §2.4–2.5."
+  "notes": "DEFER: play the native macOS Steam build (Metal). Windows NMS via Wine is lab-only — Vulkan stack notes in HANDOFF.md §2.4–2.5.",
+  "status": "guessed"
 }

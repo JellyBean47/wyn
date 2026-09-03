@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Unity DX11 title; DXVK path is the same class as Lethal Company (often more stable than D3DMetal for this engine). Do not match valheim_server.exe."
+  "notes": "Unity DX11 title; DXVK path is the same class as Lethal Company (often more stable than D3DMetal for this engine). Do not match valheim_server.exe.",
+  "status": "guessed"
 }
