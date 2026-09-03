@@ -72,8 +72,11 @@ public enum MCPGuidance {
       d3dmetal (ACCESS_VIOLATION at frame 1) and dxvk (swapchain E_FAIL) on the \
       same game that works windowed.
     - enhancedSync "msync", windowsVersion "win10" (118 and 119 of 119).
-    - winetricks ["vcrun2019", "vcrun2022"]. Documents the dependency; note Wyn \
-      does not currently install it.
+    - winetricks ["vcrun2019", "vcrun2022"]. This declares a dependency; Wyn \
+      checks it against the bottle's registry and reports what is there, but \
+      never installs it — Steam's own prerequisite installer does that. Only \
+      list verbs Wyn can check (vcrun2015/2017/2019/2022, dotnet40-48); \
+      anything else is reported as unchecked rather than satisfied.
     - On Unreal, set unrealProject — it is what points diagnostics at \
       Saved/Logs/<Project>.log, which is where the evidence lives.
 
