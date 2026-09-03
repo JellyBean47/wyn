@@ -63,7 +63,34 @@ echo "==> installing Wyn.app → /Applications"
 rm -rf /Applications/Wyn.app
 ditto "$BUILT_APP" /Applications/Wyn.app
 
+# Keep the `wyn` on PATH in step with the build.
+#
+# install.sh used to be the only thing that placed it, and install.sh runs once.
+# Every rebuild after that left the copy on PATH older than the code — and
+# anything pointing at that path went on running the old binary with no sign
+# that it was doing so. An MCP client is the worst case: it fails with
+# "unknown subcommand" or, more confusingly, works but with yesterday's tools.
+# Whatever produces the binary is what should install it.
+BIN_DIR="$HOME/.local/bin"
+echo "==> installing wyn → $BIN_DIR"
+mkdir -p "$BIN_DIR"
+# Remove first: overwriting a binary that is currently running fails with
+# "Text file busy", and an MCP server started by a client is exactly that.
+# Unlinking leaves the running process alone and the next start picks this up.
+rm -f "$BIN_DIR/wyn"
+cp "$ROOT/.build/release/wyn" "$BIN_DIR/wyn"
+chmod +x "$BIN_DIR/wyn"
+ln -sfn "$BIN_DIR/wyn" "$BIN_DIR/fly"
+
+case ":$PATH:" in
+  *":$BIN_DIR:"*) ;;
+  *)
+    echo "    note: $BIN_DIR is not on your PATH, so 'wyn' will not be found." >&2
+    echo "          add to ~/.zshrc:  export PATH=\"\$HOME/.local/bin:\$PATH\"" >&2
+    ;;
+esac
+
 echo
-echo "CLI:  $ROOT/.build/release/wyn"
+echo "CLI:  $BIN_DIR/wyn  (also $ROOT/.build/release/wyn)"
 echo "App:  /Applications/Wyn.app"
 echo "Next: ./scripts/setup.sh"

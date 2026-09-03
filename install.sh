@@ -161,12 +161,10 @@ fi
 ./scripts/setup.sh
 ./scripts/install-wine-mono.sh
 
+# scripts/build.sh, called above, installs the CLI to ~/.local/bin and keeps it
+# in step on every rebuild. Doing it here as well is how the copy on PATH came
+# to be older than the code: install once, rebuild forever, nothing refreshed.
 BIN_DIR="${HOME}/.local/bin"
-mkdir -p "$BIN_DIR"
-cp ".build/release/wyn" "$BIN_DIR/wyn"
-chmod +x "$BIN_DIR/wyn"
-ln -sfn "$BIN_DIR/wyn" "$BIN_DIR/fly"
-
 WYN="$BIN_DIR/wyn"
 
 if [[ "$WITH_D3DMETAL" -eq 1 ]]; then
