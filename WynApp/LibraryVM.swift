@@ -31,6 +31,7 @@ final class LibraryVM: ObservableObject {
     @Published var isBusy = false
     @Published var busyMessage = ""
     @Published var errorText: String?
+    @Published var lastDiagnosticsPath: String?
     @Published var showSetup = false
     @Published var setupMessage = ""
 
@@ -324,6 +325,41 @@ final class LibraryVM: ObservableObject {
         let folder = Wine.logsFolder
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: folder.path(percentEncoded: false))
+    }
+
+    /// Put everything needed to diagnose a failure into one zip on the Desktop
+    /// and reveal it in Finder.
+    ///
+    /// The bug that made this necessary — the black Steam login window — was
+    /// diagnosed from a bottle's directory birth times, a grep of Steam's
+    /// webhelper.txt and a count in bootstrap_log.txt. Three files nobody can
+    /// be expected to find, inside a bottle, on a machine we cannot reach. The
+    /// zip is the difference between "it was black" and a report we can act on.
+    ///
+    /// `note` carries whatever the person was doing when it broke, when we have
+    /// it — an error message is the most useful sentence in the whole bundle.
+    func exportDiagnostics(note: String? = nil) {
+        let target = bottle
+        let reporterNote = note ?? errorText
+        isBusy = true
+        busyMessage = "Collecting diagnostics…"
+        Task { [weak self] in
+            let outcome = Result {
+                try DiagnosticsBundle.create(bottle: target, note: reporterNote)
+            }
+            await MainActor.run {
+                guard let self else { return }
+                self.isBusy = false
+                self.busyMessage = ""
+                switch outcome {
+                case .success(let bundle):
+                    NSWorkspace.shared.activateFileViewerSelecting([bundle.url])
+                    self.lastDiagnosticsPath = bundle.url.lastPathComponent
+                case .failure(let error):
+                    self.errorText = "Could not write the diagnostics bundle.\n\n\(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     func openCDrive() {

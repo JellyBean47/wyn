@@ -87,10 +87,21 @@ struct LibraryView: View {
                     .ignoresSafeArea()
                 }
             }
+            // The moment something breaks is the only moment the evidence is
+            // still on disk and the person is still willing to help. Offering
+            // the export here — rather than only in a menu they will never
+            // open — is what turns "it didn't work" into a report we can act
+            // on. The failure text rides along inside the bundle.
             .alert("Wyn", isPresented: errorPresented) {
+                Button("Export Diagnostics…") {
+                    let failure = vm.errorText
+                    vm.errorText = nil
+                    vm.exportDiagnostics(note: failure)
+                }
                 Button("OK", role: .cancel) { vm.errorText = nil }
             } message: {
-                Text(vm.errorText ?? "")
+                Text((vm.errorText ?? "") + "\n\nExport Diagnostics saves a zip to your Desktop "
+                     + "with the logs needed to diagnose this. It contains no account details.")
             }
             .sheet(isPresented: $vm.showSetup) {
                 SetupView(vm: vm)

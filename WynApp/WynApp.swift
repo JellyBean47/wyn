@@ -37,6 +37,10 @@ struct WynApp: App {
                 Button("Open C: Drive") {
                     vm.openCDrive()
                 }
+                Button("Export Diagnostics…") {
+                    vm.exportDiagnostics()
+                }
+                .keyboardShortcut("D", modifiers: [.command, .shift])
                 Button("Kill Bottle") {
                     vm.killBottle()
                 }

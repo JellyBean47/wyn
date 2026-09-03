@@ -608,13 +608,39 @@ extension WynCLI {
         @Option(name: .long, help: "Optional profile id to include in the report.")
         var profile: String?
 
+        @Flag(name: .long, help: "Write a zip to the Desktop instead of printing — send this when reporting a bug.")
+        var bundle: Bool = false
+
+        @Option(name: .long, help: "One line describing what went wrong, included in the bundle.")
+        var note: String?
+
         mutating func run() throws {
-            guard WynWineInstaller.isWynWineInstalled() else {
-                print("WynWine is NOT installed. Run: wyn install")
+            var data = BottleData()
+
+            // The bundle has to work on exactly the machines that are broken,
+            // so it must not require a healthy install to be produced. A
+            // missing WynWine is itself the most useful thing it can report.
+            if bundle {
+                let registered = data.loadBottles()
+                let target = registered.first { $0.settings.name == bottle } ?? registered.first
+                let result = try DiagnosticsBundle.create(bottle: target, note: note)
+                print("Diagnostics bundle written:")
+                print("  \(result.url.path(percentEncoded: false))")
+                print("  \(result.fileCount) file(s), \(result.readableSize)")
+                print("")
+                print("Send that zip. It has no account details in it — Steam's")
+                print("config/ is never read, and SteamIDs, e-mail addresses,")
+                print("your home path and user name are scrubbed. Open it and")
+                print("look if you like; README.txt says exactly what is inside.")
                 return
             }
 
-            var data = BottleData()
+            guard WynWineInstaller.isWynWineInstalled() else {
+                print("WynWine is NOT installed. Run: wyn install")
+                print("(To report this, run: wyn doctor --bundle)")
+                return
+            }
+
             let bottles = data.loadBottles()
 
             print("Registered bottles: \(bottles.count)")
