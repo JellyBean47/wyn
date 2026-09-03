@@ -2153,4 +2153,39 @@ public enum SteamError: LocalizedError {
             """
         }
     }
+
+    /// What to do about it, in one sentence, without assuming a terminal.
+    ///
+    /// `errorDescription` above is written for the CLI and names `wyn`
+    /// subcommands, which is right there and useless in the app — somebody who
+    /// opened Wyn.app has no prompt in front of them. The app shows this line
+    /// under the reason as "Try: …", so it names buttons and menus instead.
+    public var recoverySuggestion: String? {
+        switch self {
+        case .downloadFailed:
+            return "Check your internet connection, then try again."
+        case .steamNotInstalled, .steamSetupFailed:
+            return "Run Setup — it installs the Steam client into the bottle."
+        case .steamWineMissing:
+            return "The Wine runtime is missing or incomplete. Run Setup to reinstall it."
+        case .steamNotLoggedOn:
+            return "Open Steam, sign in with Remember me, then try again."
+        case .steamDidNotExit, .steamAlreadyRunningElsewhere:
+            return "Use Steam → Exit from Steam's own window, then try again."
+        case .cefDidNotAppear:
+            return """
+            Steam never unpacked its login interface — usually a network \
+            problem during the first client download. Check your connection \
+            and try again.
+            """
+        case .gameNotInstalled:
+            return "Install the game in Steam first, then press Play."
+        case .missingSteamAppId:
+            return "This profile needs a Steam app id before it can launch."
+        case .d3dMetalRequiresDirectLaunch:
+            return "Open Steam and sign in first, then leave it running and press Play."
+        case .previousSessionStillRunning:
+            return "Quit the game from its own window, then try again."
+        }
+    }
 }

@@ -23,11 +23,31 @@ struct SetupView: View {
                 Text(vm.setupMessage)
                     .font(.callout)
             }
-            if let error = vm.errorText {
-                Text(error)
-                    .font(.callout)
-                    .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
+            // Setup is where a first-time person is most likely to get stuck,
+            // and the alert is suppressed while this sheet is up — so this is
+            // the only place the failure is shown. It gets the step, the
+            // reason, what to try, and a way to send it.
+            if let failure = vm.failure {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(failure.title)
+                        .font(.callout)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.red)
+                    Text(failure.reason)
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                    if let hint = failure.hint {
+                        Text("Try: \(hint)")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    Button("Export Diagnostics…") {
+                        vm.exportDiagnostics(note: failure.noteLine)
+                    }
+                    .buttonStyle(.link)
+                    .disabled(vm.isBusy)
+                }
+                .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer()

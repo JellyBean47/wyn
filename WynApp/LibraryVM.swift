@@ -30,7 +30,10 @@ final class LibraryVM: ObservableObject {
     @Published var platformRow: [PlatformRowItem] = []
     @Published var isBusy = false
     @Published var busyMessage = ""
-    @Published var errorText: String?
+    /// What broke, at which step, and what to try. Replaces a bare error
+    /// string: the step is the half a person needs and the half the old
+    /// `errorText` always threw away.
+    @Published var failure: Failure?
     @Published var lastDiagnosticsPath: String?
     @Published var showSetup = false
     @Published var setupMessage = ""
@@ -157,17 +160,21 @@ final class LibraryVM: ObservableObject {
             showNewBottle = false
             refreshBottles()
         } catch {
-            errorText = error.localizedDescription
+            failure = Failure(step: "Creating the bottle", error: error)
         }
     }
 
     func openCDrive(for item: BottleRowItem) {
         let drive = item.url.appending(path: "drive_c")
         guard FileManager.default.fileExists(atPath: drive.path(percentEncoded: false)) else {
-            errorText = """
-            \(item.name) has no C: drive yet. Wyn sets the Wine prefix up the \
-            first time something runs in the bottle.
-            """
+            failure = Failure(
+                step: "Opening the C: drive",
+                reason: """
+                \(item.name) has no C: drive yet. Wyn sets the Wine prefix up \
+                the first time something runs in the bottle.
+                """,
+                hint: "Launch something in \(item.name) first, then try again."
+            )
             return
         }
         NSWorkspace.shared.open(drive)
@@ -189,13 +196,17 @@ final class LibraryVM: ObservableObject {
 
         let playing = runningGameNames
         if !playing.isEmpty {
-            errorText = """
-            \(playing.joined(separator: ", ")) is still running. \
-            Quit it from its own window first, then Quit here.
+            failure = Failure(
+                step: "Quitting Steam",
+                reason: """
+                \(playing.joined(separator: ", ")) is still running.
 
-            Wyn will not force-close a game: you would lose unsaved progress, \
-            and on D3DMetal a killed session can make the next launch crash.
-            """
+                Wyn will not force-close a game: you would lose unsaved \
+                progress, and on D3DMetal a killed session can make the next \
+                launch crash.
+                """,
+                hint: "Quit the game from its own window, then press Quit here."
+            )
             return
         }
 
@@ -203,9 +214,11 @@ final class LibraryVM: ObservableObject {
             let stopped = try await SteamLauncher.quitSteam(in: bottle)
             if !stopped {
                 await MainActor.run {
-                    self.errorText = """
-                    Steam did not exit. Try Steam → Exit from its own window.
-                    """
+                    self.failure = Failure(
+                        step: "Quitting Steam",
+                        reason: "Steam did not exit when Wyn asked it to.",
+                        hint: "Use Steam → Exit from Steam's own window."
+                    )
                 }
             }
             await MainActor.run { self.pollStatus() }
@@ -248,7 +261,11 @@ final class LibraryVM: ObservableObject {
 
     func launchSteam() {
         guard let bottle else {
-            errorText = "No Steam bottle. Run setup first."
+            failure = Failure(
+                step: "Opening Steam",
+                reason: "There is no Steam bottle yet.",
+                hint: "Run Setup — it creates the bottle and installs Steam."
+            )
             showSetup = true
             return
         }
@@ -261,12 +278,20 @@ final class LibraryVM: ObservableObject {
 
     func playSelected() {
         guard let bottle else {
-            errorText = "No Steam bottle. Run setup first."
+            failure = Failure(
+                step: "Starting the game",
+                reason: "There is no Steam bottle yet.",
+                hint: "Run Setup — it creates the bottle and installs Steam."
+            )
             showSetup = true
             return
         }
         guard let item = selectedGame else {
-            errorText = "Select a game, then press Play."
+            failure = Failure(
+                step: "Starting the game",
+                reason: "No game is selected.",
+                hint: "Pick a game in the library, then press Play."
+            )
             return
         }
         startLaunch("Launching \(item.profile.name)…") {
@@ -317,7 +342,7 @@ final class LibraryVM: ObservableObject {
             try Wine.killBottle(bottle: bottle)
             pollStatus()
         } catch {
-            errorText = error.localizedDescription
+            failure = Failure(step: "Stopping the bottle", error: error)
         }
     }
 
@@ -340,7 +365,7 @@ final class LibraryVM: ObservableObject {
     /// it — an error message is the most useful sentence in the whole bundle.
     func exportDiagnostics(note: String? = nil) {
         let target = bottle
-        let reporterNote = note ?? errorText
+        let reporterNote = note ?? failure?.noteLine
         isBusy = true
         busyMessage = "Collecting diagnostics…"
         Task { [weak self] in
@@ -356,7 +381,7 @@ final class LibraryVM: ObservableObject {
                     NSWorkspace.shared.activateFileViewerSelecting([bundle.url])
                     self.lastDiagnosticsPath = bundle.url.lastPathComponent
                 case .failure(let error):
-                    self.errorText = "Could not write the diagnostics bundle.\n\n\(error.localizedDescription)"
+                    self.failure = Failure(step: "Exporting diagnostics", error: error)
                 }
             }
         }
@@ -371,7 +396,7 @@ final class LibraryVM: ObservableObject {
         Task {
             isBusy = true
             setupMessage = "Installing Wine runtime and Steam bottle…"
-            errorText = nil
+            failure = nil
             do {
                 let result = try await WynInstaller.setup(installSteamClient: true)
                 // GPTK/D3DMetal is optional and never auto-wired from Desktop/whisky-wine.
@@ -389,7 +414,9 @@ final class LibraryVM: ObservableObject {
                     launchSteam()
                 }
             } catch {
-                errorText = error.localizedDescription
+                // The setup message says which of the two phases we reached,
+                // so carry it into the step rather than saying "Setup".
+                failure = Failure(step: setupMessage, error: error)
                 setupMessage = "Setup failed."
                 showSetup = true
                 isBusy = false
@@ -413,7 +440,7 @@ final class LibraryVM: ObservableObject {
     ) async {
         isBusy = true
         busyMessage = message
-        errorText = nil
+        failure = nil
         let sink: @Sendable (String) -> Void = { text in
             Task { @MainActor in
                 LibraryVM.progressHost?.handleProgress(text)
@@ -426,25 +453,16 @@ final class LibraryVM: ObservableObject {
                 try await work()
             } catch is CancellationError {
                 // Overlay dismiss / Cancel — do not surface as an error.
-            } catch let error as SteamError {
-                if generation == self.launchGeneration {
-                    errorText = error.localizedDescription
-                }
-            } catch let error as PlatformLaunchError {
-                if generation == self.launchGeneration {
-                    errorText = error.localizedDescription
-                }
-            } catch let error as StoreInstallError {
-                if generation == self.launchGeneration {
-                    errorText = error.localizedDescription
-                }
-            } catch let error as Wine.D3DMetalError {
-                if generation == self.launchGeneration {
-                    errorText = error.localizedDescription
-                }
             } catch {
+                // `message` is what the busy overlay was showing when this
+                // threw — "Opening Steam…", "Launching Satisfactory…". It is
+                // the step, it was always right here, and the five
+                // type-specific catch blocks this replaces each discarded it
+                // and reported the same bare `localizedDescription`. They were
+                // identical in behaviour, so there is nothing to lose by
+                // collapsing them and a step name to gain.
                 if generation == self.launchGeneration {
-                    errorText = error.localizedDescription
+                    failure = Failure(step: message, error: error)
                 }
             }
         }
