@@ -150,6 +150,40 @@ struct MCPServerTests {
         }
     }
 
+    /// Adding Solarpunk took four launches because each one started from an
+    /// optimistic profile and bisected down after the crash. The fix was a
+    /// conservative baseline, and the two settings that actually mattered were
+    /// AVX and windowed mode. If that stops being said here, the next game
+    /// costs four launches again.
+    @Test func guidanceCarriesTheSafeBaseline() {
+        let instructions = MCPGuidance.instructions.lowercased()
+        #expect(instructions.contains("avxenabled false"))
+        #expect(instructions.contains("-windowed"))
+
+        let addGame = MCPGuidance.all.first { $0.name == "add_game" }
+        let body = (addGame?.body(nil) ?? "").lowercased()
+        for expected in ["avxenabled      false", "-windowed", "msync", "vcrun2019"] {
+            #expect(body.contains(expected), "add_game should pin \(expected)")
+        }
+    }
+
+    /// Tuning is the other half, and its whole value is the ordering: one
+    /// change per launch, cheapest-to-revert first.
+    @Test func tuningIsOneChangeAtATime() throws {
+        let tune = try #require(MCPGuidance.all.first { $0.name == "tune_profile" })
+        let body = tune.body("solarpunk")
+        #expect(body.contains("solarpunk"))
+        #expect(body.lowercased().contains("one change per launch"))
+        #expect(body.contains("read_launch_evidence"))
+
+        // The order is the point: windowed, then resolution, then AVX.
+        let windowed = try #require(body.range(of: "drop -windowed"))
+        let res = try #require(body.range(of: "raise -ResX"))
+        let avx = try #require(body.range(of: "avxEnabled true"))
+        #expect(windowed.lowerBound < res.lowerBound)
+        #expect(res.lowerBound < avx.lowerBound)
+    }
+
     /// It must be honest about the one thing a model cannot do.
     @Test func instructionsSayTheModelCannotVerify() {
         let instructions = MCPGuidance.instructions.lowercased()
@@ -165,7 +199,7 @@ struct MCPServerTests {
         let listed = result(send(#"{"jsonrpc":"2.0","id":3,"method":"prompts/list"}"#))?["prompts"]
             as? [[String: Any]]
         let names = Set((listed ?? []).compactMap { $0["name"] as? String })
-        #expect(names == ["add_game", "review_profile"])
+        #expect(names == ["add_game", "review_profile", "tune_profile"])
     }
 
     @Test func aPromptComesBackAsAUserMessage() {

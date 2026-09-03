@@ -51,9 +51,38 @@ public enum MCPGuidance {
 
     - Vulkan-native game (ships vulkan-1.dll, no d3d12.dll) → the MoltenVK path: \
       translationLayer "dxvk" with dxvk false. D3DMetal cannot translate Vulkan.
-    - D3D11 game → "dxvk" with dxvk true, or "d3dmetal".
     - D3D12 game → "d3dmetal". DXVK does not do D3D12.
-    - Unsure → say so and leave it out rather than inventing one.
+    - D3D11 game, or nothing conclusive → "d3dmetal". It is the default, not the \
+      fallback: 81 of 119 shipped profiles use it, and on the one D3D11 game \
+      bisected properly D3DMetal rendered 998 frames where DXVK could not create \
+      a swapchain at all.
+
+    THE FIRST LAUNCH IS A DIAGNOSTIC
+
+    Do not draft the profile you think the game deserves. Draft the one least \
+    likely to crash, so the first launch answers "does this reach a loaded map \
+    at all". Improving from a working baseline is cheap; guessing your way to \
+    one takes three or four launches. Specifically, in a first profile:
+
+    - avxEnabled FALSE. It sets ROSETTA_ADVERTISE_AVX=1; some binaries then emit \
+      an instruction Rosetta will not run and die instantly with \
+      EXCEPTION_ILLEGAL_INSTRUCTION. Per-title, and total when it happens.
+    - launchArgs "-windowed -ResX=1280 -ResY=720". Fullscreen swapchain creation \
+      is the most fragile operation in this stack — measured failing under both \
+      d3dmetal (ACCESS_VIOLATION at frame 1) and dxvk (swapchain E_FAIL) on the \
+      same game that works windowed.
+    - enhancedSync "msync", windowsVersion "win10" (118 and 119 of 119).
+    - winetricks ["vcrun2019", "vcrun2022"]. Documents the dependency; note Wyn \
+      does not currently install it.
+    - On Unreal, set unrealProject — it is what points diagnostics at \
+      Saved/Logs/<Project>.log, which is where the evidence lives.
+
+    Tell the person the plan: get one working launch, then relax one knob at a \
+    time in this order — drop -windowed, raise resolution, try avxEnabled true. \
+    One change per launch, or you will not know which one did it.
+
+    Documentation/adding-a-game.md has the long version, including how to read a \
+    crash without blaming the wrong line.
 
     RULES THAT WILL REFUSE YOUR PROFILE
 
@@ -114,15 +143,38 @@ public enum MCPGuidance {
                    be checked.
                 2. inspect_game_files on that app id. Note the engine, which \
                    executable actually looks like the game (the biggest binary is \
-                   often a crash reporter), and which graphics libraries ship \
-                   with it.
-                3. Draft the profile from what step 2 showed. Say which parts \
-                   came off disk and which are inference — that difference is \
-                   the whole point.
+                   often a crash reporter, and a suspiciously small <Game>.exe \
+                   next to a large <Game>-Win64-Shipping.exe is a prereq shim), \
+                   and which graphics libraries ship with it.
+                3. Draft the profile from what step 2 showed, starting from the \
+                   safe baseline below rather than from what the game "should" \
+                   want. Say which parts came off disk and which are inference — \
+                   that difference is the whole point.
                 4. validate_profile, and fix anything it returns.
                 5. save_profile.
-                6. Tell me to launch it from Wyn, and that it stays a guess until \
-                   it has actually run.
+                6. Tell me to launch it from Wyn, that it stays a guess until it \
+                   has run, and what to try next if it works.
+
+                THE BASELINE. Change only what step 2 gives you a reason to \
+                change — the exe patterns, the layer if the game is Vulkan-native \
+                or D3D12, unrealProject on Unreal, -NO_EOS_OVERLAY if it ships \
+                EOS. Leave the rest exactly as it is:
+
+                  windowsVersion  "win10"
+                  translationLayer "d3dmetal"   (dxvk false, dxvkAsync false)
+                  enhancedSync    "msync"
+                  avxEnabled      false
+                  metalHud        false
+                  WINEDLLOVERRIDES "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b"
+                  MTL_HUD_ENABLED / D3DM_ENABLE_METALFX /
+                    D3DM_ENABLE_ASYNC_COMMIT / D3DM_SHOW_HUD_STATS  all "0"
+                  winetricks      ["vcrun2019", "vcrun2022"]
+                  launchArgs      "-windowed -ResX=1280 -ResY=720"
+
+                This exists because the last game added took four launches — AVX \
+                on died with EXCEPTION_ILLEGAL_INSTRUCTION, fullscreen died at \
+                frame 1, switching to DXVK was worse — and every one of those \
+                failures is ruled out by the baseline above. Aim for one launch.
                 """
             },
             Prompt(
@@ -146,6 +198,42 @@ public enum MCPGuidance {
 
                 Report what is wrong and what you would change. Do not save \
                 anything unless I ask.
+                """
+            },
+            Prompt(
+                name: "tune_profile",
+                description: "Improve a profile that already launches, one setting at a time.",
+                arguments: [("id", "Profile id of a game that has already run.", true)]
+            ) { id in
+                let target = id ?? "the profile"
+                return """
+                Improve the Wyn profile "\(target)". It already launches — this \
+                is the second half of adding a game, and the rule is one change \
+                per launch.
+
+                1. read_launch_evidence for \(target). If this machine has never \
+                   run it, stop and say so: there is no baseline to improve on \
+                   and changing settings now just resumes guessing.
+                2. get_profile \(target).
+                3. Propose exactly ONE change, taking the first that still \
+                   applies from this order:
+                     a. drop -windowed from launchArgs
+                     b. raise -ResX / -ResY toward the display's resolution
+                     c. set avxEnabled true
+                   Nothing after that. MetalFX and D3DM_ENABLE_ASYNC_COMMIT stay \
+                   "0" — that is measured, not caution, and the validator refuses \
+                   them anyway.
+                4. save_profile with that one change, and tell me to launch it.
+                5. When I report back: if it regressed, revert and stop — a game \
+                   that plays windowed at 720p is worth shipping. If it held, go \
+                   round again from step 3.
+
+                What "it held" means, from the game's own log (on Unreal, \
+                Saved/Logs/<unrealProject>.log): a LoadMap line, frames in the \
+                hundreds, and LogExit: Exiting. on close. A window appearing is \
+                not evidence. And do not blame the last line before a crash \
+                without checking whether it also appears in a healthy run — that \
+                mistake has already cost one investigation.
                 """
             }
         ]

@@ -287,7 +287,12 @@ struct GameCatalogTests {
         #expect(batch8.count == 10)
         #expect(batch9.count == 10)
         #expect(batch10.count == 10)
-        #expect(catalog.games.count == 114)
+
+        // Batches 1–10 were generated ten at a time. Batch 11 onward is one
+        // entry per game actually played and measured, so it does not come in
+        // tens and has no fixed-size assertion.
+        #expect(Set(catalog.games.filter { $0.batch == 11 }.map(\.slug)) == ["solarpunk"])
+        #expect(catalog.games.count == 115)
     }
 
     @Test func newBatchProfilesLoad() {

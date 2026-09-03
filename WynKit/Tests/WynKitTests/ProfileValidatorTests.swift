@@ -55,10 +55,14 @@ struct ProfileValidatorTests {
     }
 
     /// Provenance must be stated, not inferred — and only what was actually
-    /// measured may claim to have been.
+    /// measured may claim to have been. Each name here was played to a loaded
+    /// map on this machine and the log kept; adding one without that is the
+    /// failure this test exists to catch.
     @Test func onlyMeasuredProfilesClaimVerified() {
-        let verified = ProfileStore.loadAll().filter { $0.status == .verified }
-        #expect(verified.map(\.id).sorted() == ["satisfactory"])
+        let userAdded = ProfileStore.userProfileIDs()
+        let verified = ProfileStore.loadAll()
+            .filter { $0.status == .verified && !userAdded.contains($0.id) }
+        #expect(verified.map(\.id).sorted() == ["satisfactory", "solarpunk"])
     }
 
     /// A profile with no `status` in its JSON is a guess. If this ever defaults
