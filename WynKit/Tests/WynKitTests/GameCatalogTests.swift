@@ -192,10 +192,16 @@ struct GameCatalogTests {
         #expect(!GameLibrary.catalogProfiles().contains { $0.id == "steam" })
     }
 
+    /// The catalog tracks the profiles Wyn *ships*, so that later batches do not
+    /// duplicate a title. It says nothing about profiles the person added — and
+    /// this test used to enumerate those too, so any added game failed it.
     @Test func everyBundledGameProfileIsTracked() {
         let catalog = GameCatalog.load()
         let listed = Set(catalog.games.flatMap(\.profiles))
-        let bundled = ProfileStore.loadAll().filter { $0.id != "steam" }
+        let userAdded = ProfileStore.userProfileIDs()
+        let bundled = ProfileStore.loadAll().filter {
+            $0.id != "steam" && !userAdded.contains($0.id)
+        }
 
         for profile in bundled {
             let filename = "\(profile.id).json"
@@ -214,10 +220,18 @@ struct GameCatalogTests {
         }
     }
 
+    /// Of the profiles Wyn ships, the library shows exactly the canonical slugs
+    /// — one tile per game, variants hidden.
+    ///
+    /// Written originally as `shown == slugs`, which quietly made the catalog an
+    /// allowlist: a profile the person added has no slug, so it could never be
+    /// shown, and the whole add-a-game path was inert. Subtracting the added
+    /// ones keeps the real invariant and lets people own their own library.
     @Test func catalogProfilesMatchCanonicalSlugs() {
         let catalog = GameCatalog.load()
         let shown = Set(GameLibrary.catalogProfiles().map(\.id))
-        #expect(shown == Set(catalog.games.map(\.slug)))
+        let userAdded = ProfileStore.userProfileIDs()
+        #expect(shown.subtracting(userAdded) == Set(catalog.games.map(\.slug)))
         #expect(!shown.contains { $0.hasPrefix("satisfactory-") })
     }
 
