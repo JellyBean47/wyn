@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Unity DX11 → DXVK (Valheim / Lethal Company class). Launch SonsOfTheForest.exe with SteamAppId=1326470. Do not match SonsOfTheForestDS.exe (dedicated server is a separate app)."
+  "notes": "Unity DX11 → DXVK (Valheim / Lethal Company class). Launch SonsOfTheForest.exe with SteamAppId=1326470. Do not match SonsOfTheForestDS.exe (dedicated server is a separate app).",
+  "status": "guessed"
 }

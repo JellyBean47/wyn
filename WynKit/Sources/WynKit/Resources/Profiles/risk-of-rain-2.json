@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Unity DX11 → DXVK (Hades / Valheim class). This is Risk of Rain 2 (632360), not Risk of Rain Returns. Launch Risk of Rain 2.exe with SteamAppId=632360."
+  "notes": "Unity DX11 → DXVK (Hades / Valheim class). This is Risk of Rain 2 (632360), not Risk of Rain Returns. Launch Risk of Rain 2.exe with SteamAppId=632360.",
+  "status": "guessed"
 }

@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Unity DX11 → DXVK (Celeste / Hades class). Launch oriwotw.exe with SteamAppId=1057090. This is Will of the Wisps, not Blind Forest (261570 / 387290)."
+  "notes": "Unity DX11 → DXVK (Celeste / Hades class). Launch oriwotw.exe with SteamAppId=1057090. This is Will of the Wisps, not Blind Forest (261570 / 387290).",
+  "status": "guessed"
 }

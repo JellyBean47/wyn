@@ -18,5 +18,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Unity DX11 → DXVK (Hades / Valheim class). Steam SKU is The Final Cut (632470). Prefer Disco Elysium.exe."
+  "notes": "Unity DX11 → DXVK (Hades / Valheim class). Steam SKU is The Final Cut (632470). Prefer Disco Elysium.exe.",
+  "status": "guessed"
 }

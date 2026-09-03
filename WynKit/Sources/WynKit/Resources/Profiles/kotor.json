@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Odyssey Engine DX9 → DXVK (D3D9; D3DMetal has no d3d9.so). Native macOS Steam build exists (Aspyr) — this profile is the Windows Wine path. Launch swkotor.exe with SteamAppId=32370. This is KOTOR, not KOTOR II."
+  "notes": "Odyssey Engine DX9 → DXVK (D3D9; D3DMetal has no d3d9.so). Native macOS Steam build exists (Aspyr) — this profile is the Windows Wine path. Launch swkotor.exe with SteamAppId=32370. This is KOTOR, not KOTOR II.",
+  "status": "guessed"
 }

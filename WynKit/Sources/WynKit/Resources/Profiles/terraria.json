@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "XNA/FNA → DXVK (Stardew Valley class). Native macOS Steam build exists — this profile is the Windows Wine path. Do not match TerrariaServer.exe."
+  "notes": "XNA/FNA → DXVK (Stardew Valley class). Native macOS Steam build exists — this profile is the Windows Wine path. Do not match TerrariaServer.exe.",
+  "status": "guessed"
 }

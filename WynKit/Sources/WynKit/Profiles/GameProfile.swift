@@ -5,6 +5,27 @@
 
 import Foundation
 
+/// How much a profile's settings are actually worth.
+///
+/// A written profile and a measured one look identical on the page — plausible
+/// JSON, confident notes — so the difference has to be stated rather than
+/// inferred. 100 of the profiles Wyn ships were written in one commit and none
+/// of them has ever been launched; `satisfactory` took weeks of measurement.
+/// Treating those as the same kind of thing is how MetalFX ended up enabled in
+/// 72 games.
+///
+/// `ProfileValidator` uses this: a profile may only enable a setting that was
+/// measured to break a real game once it claims `verified`, which is a claim a
+/// person has to make on purpose and back up in `notes`.
+public enum ProfileStatus: String, Codable, Sendable, CaseIterable {
+    /// Written from knowledge of the engine and the game. Never launched.
+    case guessed
+    /// Launched successfully at least once. Nothing measured beyond "it ran".
+    case launched
+    /// Settings were measured on real hardware, and `notes` says what was seen.
+    case verified
+}
+
 /// Per-game compatibility profile.
 public struct GameProfile: Codable, Identifiable, Sendable {
     public var id: String
@@ -20,6 +41,9 @@ public struct GameProfile: Codable, Identifiable, Sendable {
     /// Unreal `%LOCALAPPDATA%/<name>` project folder (may differ from Steam installdir).
     public var unrealProject: String?
     public var notes: String?
+    /// Defaults to `.guessed`: a profile is a guess until someone says otherwise,
+    /// and an absent field must never read as "tested".
+    public var status: ProfileStatus
     /// Play must start Ubisoft Connect on frankea, then Steam on the same wineserver.
     public var requiresUbisoftConnect: Bool
 
@@ -39,6 +63,7 @@ public struct GameProfile: Codable, Identifiable, Sendable {
         launchArgs: String? = nil,
         unrealProject: String? = nil,
         notes: String? = nil,
+        status: ProfileStatus = .guessed,
         requiresUbisoftConnect: Bool = false
     ) {
         self.id = id
@@ -52,6 +77,7 @@ public struct GameProfile: Codable, Identifiable, Sendable {
         self.launchArgs = launchArgs
         self.unrealProject = unrealProject
         self.notes = notes
+        self.status = status
         self.requiresUbisoftConnect = requiresUbisoftConnect
     }
 
@@ -68,6 +94,8 @@ public struct GameProfile: Codable, Identifiable, Sendable {
         launchArgs = try container.decodeIfPresent(String.self, forKey: .launchArgs)
         unrealProject = try container.decodeIfPresent(String.self, forKey: .unrealProject)
         notes = try container.decodeIfPresent(String.self, forKey: .notes)
+        // Absent means guessed. An unstated provenance must never read as tested.
+        status = try container.decodeIfPresent(ProfileStatus.self, forKey: .status) ?? .guessed
         requiresUbisoftConnect = try container.decodeIfPresent(Bool.self, forKey: .requiresUbisoftConnect) ?? false
     }
 

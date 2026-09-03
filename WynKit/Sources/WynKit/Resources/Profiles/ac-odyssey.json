@@ -13,13 +13,13 @@
     "dxvkAsync": false,
     "enhancedSync": "msync",
     "avxEnabled": true,
-    "metalHud": true
+    "metalHud": false
   },
   "environment": {
     "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
-    "MTL_HUD_ENABLED": "1",
-    "D3DM_ENABLE_METALFX": "1",
-    "D3DM_SHOW_HUD_STATS": "1"
+    "MTL_HUD_ENABLED": "0",
+    "D3DM_ENABLE_METALFX": "0",
+    "D3DM_SHOW_HUD_STATS": "0"
   },
   "winetricks": [
     "vcrun2019",
@@ -27,5 +27,6 @@
   ],
   "launchArgs": "",
   "requiresUbisoftConnect": true,
-  "notes": "AnvilNext DX11 → D3DMetal (ACOdyssey AppDefaults d3d*=b). Ubisoft Connect CEF: win10; winhttp=b,n; dwrite=builtin (NOT empty — empty breaks libcef import); d2d1/d3d10core=d; Mac Driver RetinaMode=N Decorated=Y AllowOpenGL=Y. DO NOT re-add libEGL/libglesv2=d: a 9 Aug AppDefaults set included them, and that is what caused the gl_factory_win.cc(63) NOTREACHED storm — a disabled override makes ntdll refuse Chromium's own ANGLE DLLs. Removed from the bottle registry and every launcher 12 Aug; Connect now paints and logs in. M4 16GB in-game: 1080p low–med ~70% scale."
+  "notes": "AnvilNext DX11 → D3DMetal (ACOdyssey AppDefaults d3d*=b). Ubisoft Connect CEF: win10; winhttp=b,n; dwrite=builtin (NOT empty — empty breaks libcef import); d2d1/d3d10core=d; Mac Driver RetinaMode=N Decorated=Y AllowOpenGL=Y. DO NOT re-add libEGL/libglesv2=d: a 9 Aug AppDefaults set included them, and that is what caused the gl_factory_win.cc(63) NOTREACHED storm — a disabled override makes ntdll refuse Chromium's own ANGLE DLLs. Removed from the bottle registry and every launcher 12 Aug; Connect now paints and logs in. M4 16GB in-game: 1080p low–med ~70% scale.",
+  "status": "guessed"
 }

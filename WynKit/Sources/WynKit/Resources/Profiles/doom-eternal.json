@@ -24,5 +24,6 @@
     "vcrun2022"
   ],
   "launchArgs": "",
-  "notes": "id Tech 7 Vulkan → DXVK/MoltenVK (same class as Windows NMS). Prefer DOOMEternalx64vk.exe. GPTK/D3DMetal does not translate Vulkan. Do not use Libraries.rgl."
+  "notes": "id Tech 7 Vulkan → DXVK/MoltenVK (same class as Windows NMS). Prefer DOOMEternalx64vk.exe. GPTK/D3DMetal does not translate Vulkan. Do not use Libraries.rgl.",
+  "status": "guessed"
 }

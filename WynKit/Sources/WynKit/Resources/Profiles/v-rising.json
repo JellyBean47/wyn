@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Unity 2022 DX11 → DXVK (Valheim / Lethal Company class). Launch VRising.exe with SteamAppId=1604030. Do not match VRisingServer.exe (dedicated server is a separate Steam tool). VAC is Steamworks in the same bottle; private/solo games are the intended Wine path."
+  "notes": "Unity 2022 DX11 → DXVK (Valheim / Lethal Company class). Launch VRising.exe with SteamAppId=1604030. Do not match VRisingServer.exe (dedicated server is a separate Steam tool). VAC is Steamworks in the same bottle; private/solo games are the intended Wine path.",
+  "status": "guessed"
 }

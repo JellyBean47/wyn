@@ -16,13 +16,13 @@
     "dxvkAsync": false,
     "enhancedSync": "esync",
     "avxEnabled": true,
-    "metalHud": true
+    "metalHud": false
   },
   "environment": {
     "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
-    "MTL_HUD_ENABLED": "1",
-    "D3DM_ENABLE_METALFX": "1",
-    "D3DM_SHOW_HUD_STATS": "1"
+    "MTL_HUD_ENABLED": "0",
+    "D3DM_ENABLE_METALFX": "0",
+    "D3DM_SHOW_HUD_STATS": "0"
   },
   "winetricks": [
     "vcrun2019",
@@ -30,5 +30,6 @@
   ],
   "launchArgs": "-NO_EOS_OVERLAY -dx11 -USEALLAVAILABLECORES -Nosplash -ResX=1280 -ResY=720",
   "unrealProject": "FactoryGame",
-  "notes": "Science (6 Aug): freeze Time Profiler dominated by msync_wait_objs. A/B esync-only (no WINEMSYNC)."
+  "notes": "Science (6 Aug): freeze Time Profiler dominated by msync_wait_objs. A/B esync-only (no WINEMSYNC).",
+  "status": "guessed"
 }

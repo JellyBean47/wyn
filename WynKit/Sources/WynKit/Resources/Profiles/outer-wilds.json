@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Unity DX11 → DXVK (Hades / Valheim class). Launch OuterWilds.exe with SteamAppId=753640. Do not match OuterWilds.exe.CrashHandler or the Echoes of the Eye DLC as a separate game."
+  "notes": "Unity DX11 → DXVK (Hades / Valheim class). Launch OuterWilds.exe with SteamAppId=753640. Do not match OuterWilds.exe.CrashHandler or the Echoes of the Eye DLC as a separate game.",
+  "status": "guessed"
 }

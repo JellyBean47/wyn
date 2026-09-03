@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Unity DX11 → DXVK (Valheim / Lethal Company class). Native macOS Steam build exists — this profile is the Windows Wine path. This is Subnautica (264710), not Below Zero. Prefer Subnautica.exe over Subnautica32.exe."
+  "notes": "Unity DX11 → DXVK (Valheim / Lethal Company class). Native macOS Steam build exists — this profile is the Windows Wine path. This is Subnautica (264710), not Below Zero. Prefer Subnautica.exe over Subnautica32.exe.",
+  "status": "guessed"
 }

@@ -31,5 +31,6 @@
   ],
   "launchArgs": "-NO_EOS_OVERLAY -dx11 -USEALLAVAILABLECORES -Nosplash -ResX=1280 -ResY=720",
   "unrealProject": "FactoryGame",
-  "notes": "Launch args: -NO_EOS_OVERLAY -dx11 -USEALLAVAILABLECORES -Nosplash -ResX=1280 -ResY=720 (Steam LaunchOptions; was wrongly matched to -NOTEXTURESTREAMING earlier). D3DMetal 3.0. Crash-avoidance (not taste): MetalFX=0, D3DM_ENABLE_ASYNC_COMMIT=0, HUD off. MetalFX on crawls ~0.1–2 fps then RHIThread SIGILL in D3DMCommandQueue::ExecuteCommandLists; MetalFX off alone also SIGILL'd. wyn play waits 120s after quit (D3DMetal GPU settle). Leftover CrashReportClient does not block Play once the game EXE is gone. avxEnabled stays true — next knob if this trio still SIGILLs."
+  "notes": "Launch args: -NO_EOS_OVERLAY -dx11 -USEALLAVAILABLECORES -Nosplash -ResX=1280 -ResY=720 (Steam LaunchOptions; was wrongly matched to -NOTEXTURESTREAMING earlier). D3DMetal 3.0. Crash-avoidance (not taste): MetalFX=0, D3DM_ENABLE_ASYNC_COMMIT=0, HUD off. MetalFX on crawls ~0.1–2 fps then RHIThread SIGILL in D3DMCommandQueue::ExecuteCommandLists; MetalFX off alone also SIGILL'd. wyn play waits 120s after quit (D3DMetal GPU settle). Leftover CrashReportClient does not block Play once the game EXE is gone. avxEnabled stays true — next knob if this trio still SIGILLs.",
+  "status": "verified"
 }

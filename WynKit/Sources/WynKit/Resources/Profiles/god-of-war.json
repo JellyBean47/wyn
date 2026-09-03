@@ -13,18 +13,19 @@
     "dxvkAsync": false,
     "enhancedSync": "msync",
     "avxEnabled": true,
-    "metalHud": true
+    "metalHud": false
   },
   "environment": {
     "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
-    "MTL_HUD_ENABLED": "1",
-    "D3DM_ENABLE_METALFX": "1",
-    "D3DM_SHOW_HUD_STATS": "1"
+    "MTL_HUD_ENABLED": "0",
+    "D3DM_ENABLE_METALFX": "0",
+    "D3DM_SHOW_HUD_STATS": "0"
   },
   "winetricks": [
     "vcrun2019",
     "vcrun2022"
   ],
   "launchArgs": "",
-  "notes": "Jetpack DX11 port → D3DMetal (Skyrim/FO4 class). Launch exec/GoW.exe. Ignore the Win7 DXVK wrapper the PC build ships — pin CX_GRAPHICS_BACKEND=d3dmetal. Settings live in Saved Games\\God of War. Do not use Libraries.rgl or Libraries.vk."
+  "notes": "Jetpack DX11 port → D3DMetal (Skyrim/FO4 class). Launch exec/GoW.exe. Ignore the Win7 DXVK wrapper the PC build ships — pin CX_GRAPHICS_BACKEND=d3dmetal. Settings live in Saved Games\\God of War. Do not use Libraries.rgl or Libraries.vk.",
+  "status": "guessed"
 }

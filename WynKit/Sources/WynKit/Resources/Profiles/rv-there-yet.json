@@ -3,7 +3,10 @@
   "name": "RV There Yet?",
   "publisher": "NUGGETS ENTERTAINMENT",
   "steamAppId": 3949040,
-  "exePatterns": ["ride.exe", "ride-win64-shipping.exe"],
+  "exePatterns": [
+    "ride.exe",
+    "ride-win64-shipping.exe"
+  ],
   "bottle": {
     "windowsVersion": "win10",
     "translationLayer": "dxmt",
@@ -13,8 +16,11 @@
   "environment": {
     "WINEDLLOVERRIDES": "winmm,dxgi,d3d11,d3d10core=n,b"
   },
-  "winetricks": ["vcrun2019"],
+  "winetricks": [
+    "vcrun2019"
+  ],
   "launchArgs": "-dx11",
   "unrealProject": "Ride",
-  "notes": "~3.2 GB — ideal first test. DXMT + -dx11. wyn play uses steam.exe -applaunch (not --direct). Also pins DefaultGraphicsRHI=DX11 in AppData Local/Ride Engine.ini so Steam relaunches survive without CLI -dx11."
+  "notes": "~3.2 GB — ideal first test. DXMT + -dx11. wyn play uses steam.exe -applaunch (not --direct). Also pins DefaultGraphicsRHI=DX11 in AppData Local/Ride Engine.ini so Steam relaunches survive without CLI -dx11.",
+  "status": "guessed"
 }

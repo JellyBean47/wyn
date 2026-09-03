@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Custom OpenGL engine. Native macOS Steam build exists — this profile is the Windows Wine path. Afterbirth+/Repentance are DLC on 250900, not separate games. Launch isaac-ng.exe."
+  "notes": "Custom OpenGL engine. Native macOS Steam build exists — this profile is the Windows Wine path. Afterbirth+/Repentance are DLC on 250900, not separate games. Launch isaac-ng.exe.",
+  "status": "guessed"
 }

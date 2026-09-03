@@ -17,5 +17,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Source DX9 → DXVK (Celeste class). Launch portal2.exe with SteamAppId=620. This is Portal 2, not Portal or Portal Prelude. Native macOS Steam build exists — this profile is the Windows Wine path."
+  "notes": "Source DX9 → DXVK (Celeste class). Launch portal2.exe with SteamAppId=620. This is Portal 2, not Portal or Portal Prelude. Native macOS Steam build exists — this profile is the Windows Wine path.",
+  "status": "guessed"
 }

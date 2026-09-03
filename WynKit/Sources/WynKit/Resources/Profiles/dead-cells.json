@@ -18,5 +18,6 @@
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Heaps/Haxe → DXVK (lightweight indie class). Native macOS Steam build exists — this profile is the Windows Wine path. Prefer deadcells.exe over deadcells_gl.exe (OpenGL legacy)."
+  "notes": "Heaps/Haxe → DXVK (lightweight indie class). Native macOS Steam build exists — this profile is the Windows Wine path. Prefer deadcells.exe over deadcells_gl.exe (OpenGL legacy).",
+  "status": "guessed"
 }
