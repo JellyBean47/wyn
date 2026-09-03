@@ -38,6 +38,9 @@ final class LibraryVM: ObservableObject {
     @Published var showSetup = false
     @Published var setupMessage = ""
 
+    /// Turns the running-process poll into launch records. Held here because it
+    /// is a state machine across polls, not a query.
+    private var launchObserver = LaunchObserver()
     private var launchTask: Task<Void, Never>?
     private var launchGeneration = 0
     /// Dedicated Epic/EA/Battle.net/GOG prefix in flight. Cancel may kill this bottle only — never Steam.
@@ -140,6 +143,30 @@ final class LibraryVM: ObservableObject {
         steamRunning = SteamLauncher.isSteamClientRunning(in: bottle)
         steamLoggedOn = SteamLauncher.isSteamLoggedOn(in: bottle)
         runningGameNames = SteamLauncher.runningGameNames(among: games.map(\.profile))
+        recordFinishedLaunches()
+    }
+
+    /// Write down anything that just finished a real run.
+    ///
+    /// Rides the poll that already exists rather than adding a watchdog — a
+    /// second process-watcher on a Wine host is how you get orphans. The
+    /// observer only reports a game once its process is gone *and* it stayed up
+    /// long enough to mean something, so nothing is written while playing.
+    private func recordFinishedLaunches() {
+        let profiles = games.map(\.profile)
+        let running = SteamLauncher.runningProfileIDs(among: profiles)
+        let byID = Dictionary(profiles.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+
+        for finished in launchObserver.update(running: running) {
+            guard let profile = byID[finished.profileID] else { continue }
+            LaunchRecordStore.append(
+                LaunchRecordStore.makeRecord(
+                    for: profile,
+                    startedAt: finished.startedAt,
+                    ranFor: finished.ranFor
+                )
+            )
+        }
     }
 
     /// Reload the Bottles section from BottleData.

@@ -285,8 +285,57 @@ extension WynCLI {
     struct Profiles: ParsableCommand {
         static let configuration = CommandConfiguration(
             abstract: "Manage game compatibility profiles.",
-            subcommands: [ProfilesList.self, ProfilesShow.self, ProfilesApply.self]
+            subcommands: [
+                ProfilesList.self, ProfilesShow.self, ProfilesApply.self, ProfilesEvidence.self
+            ]
         )
+    }
+
+    /// What this machine has actually run, and which profiles that vouches for.
+    ///
+    /// Wyn ships 120 profiles and exactly one was ever measured. Everything
+    /// else is inference until somebody's machine says otherwise, and this is
+    /// where that shows up.
+    struct ProfilesEvidence: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "evidence",
+            abstract: "Show launch evidence recorded on this machine."
+        )
+
+        @Flag(name: .long, help: "List every profile, including ones with no evidence.")
+        var all: Bool = false
+
+        mutating func run() throws {
+            let records = LaunchRecordStore.load()
+            let profiles = ProfileStore.loadAll()
+
+            print("Launch records: \(records.count)")
+            print("Stored at: \(LaunchRecordStore.fileURL.path(percentEncoded: false))")
+            print("")
+
+            var counts: [ProfileStatus: Int] = [:]
+            for profile in profiles.sorted(by: { $0.id < $1.id }) {
+                let status = LaunchRecordStore.effectiveStatus(for: profile, in: records)
+                counts[status, default: 0] += 1
+                guard all || status != .guessed else { continue }
+                let evidence = LaunchRecordStore.evidence(for: profile, in: records)
+                let detail = evidence.isEmpty
+                    ? ""
+                    : "  (\(evidence.count) run(s), longest "
+                        + String(format: "%.0f", (evidence.map(\.ranForSeconds).max() ?? 0) / 60)
+                        + " min)"
+                print("  \(status.rawValue.padding(toLength: 9, withPad: " ", startingAt: 0)) \(profile.id)\(detail)")
+            }
+
+            print("")
+            for status in ProfileStatus.allCases {
+                print("  \(status.rawValue): \(counts[status] ?? 0)")
+            }
+            if (counts[.launched] ?? 0) == 0, (counts[.verified] ?? 0) <= 1 {
+                print("")
+                print("Play something for a minute and it will show up here.")
+            }
+        }
     }
 
     struct ProfilesList: ParsableCommand {

@@ -70,6 +70,7 @@ extension DiagnosticsBundle {
         try write(summary(bottle: bottle, stamp: stamp), to: "summary.txt")
         try write(cefReport(bottle: bottle), to: "cef-shim.txt")
         try write(processReport(), to: "processes.txt")
+        try write(launchRecordReport(), to: "launch-records.txt")
         try write(doctorReport(bottle: bottle), to: "doctor.txt")
 
         // Wyn's own logs.
@@ -238,6 +239,51 @@ extension DiagnosticsBundle {
             if hits > 0 {
                 lines.append("  ^^ verify/re-extract loop: Steam is overwriting the shim and restarting.")
             }
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// What actually ran on this machine, and for how long.
+    ///
+    /// The most valuable page in the bundle for anyone deciding whether a
+    /// profile is real: Wyn ships 120 profiles and one of them was ever
+    /// measured, so a tester's records are the only evidence that exists for
+    /// the other 119. No account details — a profile id, a duration, and the
+    /// fingerprint of the settings it vouches for.
+    static func launchRecordReport() -> String {
+        let records = LaunchRecordStore.load()
+        guard !records.isEmpty else {
+            return """
+            No launch records yet.
+
+            Wyn writes one when a game's process has been seen running for at
+            least \(Int(LaunchObserver.minimumUptime))s and then exits, so a
+            crash-loop never counts as a launch.
+            """
+        }
+
+        var lines = ["\(records.count) launch record(s), newest last.", ""]
+        for record in records.sorted(by: { $0.startedAt < $1.startedAt }) {
+            let minutes = String(format: "%.1f", record.ranForSeconds / 60)
+            lines.append("\(shortTime(record.startedAt))  \(record.profileID)")
+            lines.append("    ran \(minutes) min   layer=\(record.layer ?? "-")   "
+                         + "settings=\(record.settingsFingerprint)   "
+                         + "wyn=\(record.wynVersion)")
+        }
+
+        lines.append("")
+        lines.append("Profiles this evidence currently supports:")
+        let profiles = ProfileStore.loadAll()
+        var promoted = false
+        for profile in profiles.sorted(by: { $0.id < $1.id }) {
+            let status = LaunchRecordStore.effectiveStatus(for: profile, in: records)
+            guard status != .guessed else { continue }
+            let count = LaunchRecordStore.evidence(for: profile, in: records).count
+            lines.append("  \(profile.id): \(status.rawValue) (\(count) matching record(s))")
+            promoted = true
+        }
+        if !promoted {
+            lines.append("  (none — records exist but none match the current settings)")
         }
         return lines.joined(separator: "\n")
     }
