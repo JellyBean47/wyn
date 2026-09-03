@@ -209,6 +209,12 @@ struct DiagnosticsBundleTests {
         #expect(names.contains("webhelper.txt"))
         #expect(combined.contains("--in-process-gpu"))
 
+        // A bug report has to carry which process starts the game and whether
+        // the runtimes a profile declares are actually in the bottle. Chasing
+        // both by hand is what turned one Solarpunk crash into an hour.
+        #expect(names.contains("windows-runtimes.txt"))
+        #expect(combined.contains("How each profile will be started"))
+
         // The credentials are not — neither the files nor their contents.
         #expect(!names.contains("config.vdf"))
         #expect(!names.contains("loginusers.vdf"))

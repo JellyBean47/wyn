@@ -71,6 +71,7 @@ extension DiagnosticsBundle {
         try write(cefReport(bottle: bottle), to: "cef-shim.txt")
         try write(processReport(), to: "processes.txt")
         try write(launchRecordReport(), to: "launch-records.txt")
+        try write(runtimeReport(bottle: bottle), to: "windows-runtimes.txt")
         try write(doctorReport(bottle: bottle), to: "doctor.txt")
 
         // Wyn's own logs.
@@ -284,6 +285,68 @@ extension DiagnosticsBundle {
         }
         if !promoted {
             lines.append("  (none — records exist but none match the current settings)")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// What each profile *declares* it needs against what the bottle actually
+    /// has, plus which process will start the game.
+    ///
+    /// Both halves exist because of the same hour lost on Solarpunk: a "Visual
+    /// C++ Redistributable" dialog that was a false negative, thrown by a shim
+    /// that only runs on the `-applaunch` path, on a bottle where the runtime
+    /// was already installed. Neither fact was visible anywhere. A beta report
+    /// should not require someone to know to go and read system.reg.
+    static func runtimeReport(bottle: Bottle?) -> String {
+        guard let bottle else {
+            return "No Steam bottle, so nothing to check runtimes against."
+        }
+
+        var lines = [
+            "Windows runtimes each profile declares, checked against this bottle's",
+            "registry. Wyn does NOT install these — Steam's prerequisite installer",
+            "does, when the game is installed. This is a read, not a repair.",
+            ""
+        ]
+
+        let profiles = ProfileStore.loadAll()
+            .filter { !$0.winetricks.isEmpty }
+            .sorted { $0.id < $1.id }
+
+        // One read of a 4 MB hive, not one per profile.
+        let registry = WindowsRuntimes.Snapshot(bottle: bottle)
+
+        var reportedMissing = false
+        for profile in profiles {
+            let requirements = registry.check(profile: profile)
+            // Only worth a line if something is wrong or unanswerable; a
+            // hundred "present" lines would bury the two that matter.
+            let notable = requirements.filter {
+                if case .present = $0.result { return false }
+                return true
+            }
+            guard !notable.isEmpty else { continue }
+            lines.append(profile.id)
+            for requirement in notable {
+                lines.append("  \(requirement.summary)")
+            }
+            reportedMissing = true
+        }
+        if !reportedMissing {
+            lines.append("Every runtime every profile declares is present in this bottle.")
+        }
+
+        lines.append("")
+        lines.append("── How each profile will be started ──")
+        lines.append("The translation layer decides this, not a setting of its own.")
+        lines.append("")
+        let bottleLayer = bottle.settings.translationLayer
+        lines.append("Bottle default: \(bottleLayer.displayName) — "
+                     + LaunchPath.forLayer(bottleLayer).shortLabel)
+        for profile in ProfileStore.loadAll().sorted(by: { $0.id < $1.id }) {
+            guard let layer = profile.bottle?.translationLayer, layer != bottleLayer else { continue }
+            lines.append("  \(profile.id): \(layer.displayName) — "
+                         + LaunchPath.forLayer(layer).shortLabel)
         }
         return lines.joined(separator: "\n")
     }

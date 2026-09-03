@@ -418,8 +418,15 @@ extension WynCLI {
             if let publisher = profile.publisher { print("Publisher:  \(publisher)") }
             if let steam = profile.steamAppId { print("Steam ID:   \(steam)") }
             print("Patterns:   \(profile.exePatterns.joined(separator: ", "))")
-            if let layer = profile.bottle?.translationLayer {
+
+            // The layer decides the launch mechanism as well as the graphics,
+            // and that half of it used to be invisible until something broke.
+            let steamBottle = GameLibrary.steamBottle()
+            let layer = profile.bottle?.translationLayer
+                ?? steamBottle?.settings.translationLayer
+            if let layer {
                 print("Graphics:   \(layer.displayName)")
+                print("Launch:     \(LaunchPath.forLayer(layer).shortLabel)")
             }
             if !profile.environment.isEmpty {
                 print("Environment:")
@@ -428,7 +435,18 @@ extension WynCLI {
                 }
             }
             if !profile.winetricks.isEmpty {
-                print("Winetricks: \(profile.winetricks.joined(separator: ", "))")
+                // Listing the verbs alone reads as "Wyn installed these". It
+                // never did. Say what is actually in the bottle.
+                print("Runtimes:")
+                if let steamBottle {
+                    for requirement in WindowsRuntimes.check(profile: profile, in: steamBottle) {
+                        print("  \(requirement.summary)")
+                    }
+                } else {
+                    for verb in profile.winetricks {
+                        print("  \(verb): not checked — no Steam bottle yet")
+                    }
+                }
             }
             if let launchArgs = profile.launchArgs, !launchArgs.isEmpty {
                 print("Launch args: \(launchArgs)")
@@ -610,6 +628,20 @@ extension WynCLI {
             print("Executable: \(exe.path(percentEncoded: false))")
             if !launchArgs.isEmpty {
                 print("Game args: \(launchArgs.joined(separator: " "))")
+            }
+
+            // A warning, never a block: this is a registry heuristic, and
+            // refusing to launch on it would be worse than the old silence.
+            // Printed before the game starts so it is above the log spew.
+            let missingRuntimes = WindowsRuntimes.missing(profile: profile, in: bottle)
+            if !missingRuntimes.isEmpty {
+                print("""
+
+                Warning: \(profile.name) declares runtimes this bottle does not have:
+                \(missingRuntimes.map { "  \($0.displayName) (\($0.verb))" }.joined(separator: "\n"))
+                Wyn does not install these — Steam's own prerequisite installer does,
+                when the game is installed. Launching anyway.
+                """)
             }
 
             // Always-on compact auth signal (no MoltenVK). `--debug` still dumps full DLL report.

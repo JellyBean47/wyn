@@ -46,8 +46,44 @@ final class LibraryVM: ObservableObject {
     /// Dedicated Epic/EA/Battle.net/GOG prefix in flight. Cancel may kill this bottle only — never Steam.
     private var inFlightStoreBottle: Bottle?
 
+    /// Profile id → the runtimes it declares that this bottle does not have.
+    /// Normally empty; recomputed by the games refresh. See
+    /// `selectedRuntimeWarning`.
+    @Published private var runtimeWarnings: [String: String] = [:]
+
     var selectedGame: GameLibraryItem? {
         games.first { $0.id == selectedID }
+    }
+
+    /// The selected game's graphics layer and — the part that used to be
+    /// invisible — which process will actually start it. Choosing a layer
+    /// silently chooses that, and on Solarpunk the hidden half cost an hour:
+    /// the `-applaunch` path let Steam pick a prerequisite shim, which threw a
+    /// Visual C++ dialog for a runtime that was already installed.
+    var selectedLaunchLabel: String? {
+        guard let profile = selectedGame?.profile, let bottle else { return nil }
+        let layer = LaunchPath.effectiveLayer(profile: profile, bottle: bottle)
+        return "\(layer.displayName) · \(LaunchPath.forLayer(layer).shortLabel)"
+    }
+
+    /// The long form, for the tooltip.
+    var selectedLaunchExplanation: String? {
+        guard let profile = selectedGame?.profile, let bottle else { return nil }
+        return LaunchPath.forProfile(profile, in: bottle).explanation
+    }
+
+    /// Nil in the normal case, which is the point — this only speaks up when a
+    /// runtime the profile declares is genuinely absent from the bottle.
+    ///
+    /// A beta tester lives in the app and will never run `wyn profiles show`,
+    /// so the check has to reach here too. It is a note, not a block: the
+    /// probe is a registry heuristic, and refusing to launch on it would be
+    /// worse than the silence it replaces.
+    ///
+    /// Filled in by the games refresh rather than computed on demand — reading
+    /// the registry from a SwiftUI body would do it on every redraw.
+    var selectedRuntimeWarning: String? {
+        selectedID.flatMap { runtimeWarnings[$0] }
     }
 
     var steamStatusLabel: String {
@@ -125,8 +161,24 @@ final class LibraryVM: ObservableObject {
         let loaded = await Task.detached(priority: .utility) {
             GameLibrary.installed(in: steam)
         }.value
+
+        // Work the runtime warnings out here, off the main thread and once per
+        // refresh. As a computed property this re-read a 4 MB registry hive on
+        // every SwiftUI body evaluation.
+        let warnings = await Task.detached(priority: .utility) {
+            let registry = WindowsRuntimes.Snapshot(bottle: steam)
+            var found: [String: String] = [:]
+            for item in loaded where !item.profile.winetricks.isEmpty {
+                let missing = registry.missing(profile: item.profile)
+                guard !missing.isEmpty else { continue }
+                found[item.id] = "Missing: " + missing.map(\.displayName).joined(separator: ", ")
+            }
+            return found
+        }.value
+
         guard generation == gamesRefreshGeneration else { return }
         games = loaded
+        runtimeWarnings = warnings
         if let selectedID, !games.contains(where: { $0.id == selectedID }) {
             self.selectedID = games.first?.id
         } else if selectedID == nil {

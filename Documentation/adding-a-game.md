@@ -229,20 +229,46 @@ shim (`Solarpunk.exe`) rather than the real binary
 (`SolarpunkSteam-Win64-Shipping.exe`), and that shim throws a "Visual C++
 2015-2022 Redistributable" dialog. **This dialog is a false negative.** The
 redistributable was installed the whole time — the registry showed
-`VC\Runtimes\x64 Installed=1, Version v14.51.36247.00`. Check the registry
-before chasing it. On `d3dmetal` the dialog never appears, because the direct
-launch bypasses the shim entirely.
+`VC\Runtimes\x64 Installed=1, Version v14.51.36247.00`. On `d3dmetal` the dialog
+never appears, because the direct launch bypasses the shim entirely.
+
+You no longer have to read the registry by hand for either half of this. The
+effective layer and the launch path it implies show in `wyn profiles show`, in
+the app's status strip beside the selected game, and in the diagnostics bundle;
+§8 covers the runtime check. Both were added because this investigation needed
+them and neither existed.
 
 ---
 
-## 8. Known gaps
+## 8. What `winetricks` in a profile means
 
-- **`winetricks` in a profile is never executed.** All 120 profiles carry the
-  key; the only code that touches it is `print()` in `WynCmd/main.swift:430`. So
-  `vcrun2019` in a profile documents a dependency, it does not satisfy one.
-- **The launch path is invisible in the UI.** Changing the translation layer
-  silently changes whether Steam or Wyn picks the executable (§7), and nothing
-  says so on screen.
+**It is a declaration, not an installation.** Wyn does not run winetricks and
+does not download Microsoft redistributables. The games that need them get them
+from Steam's own prerequisite installer when the game installs.
+
+What Wyn does do is *check*. `wyn profiles show <id>` reads the bottle's
+`system.reg` and reports what is actually there:
+
+```
+Runtimes:
+  Visual C++ 2015-2022 runtime: present (v14.51.36247.00)
+```
+
+The same check runs before `wyn play` (a warning, never a block — it is a
+registry heuristic), appears in the app's status strip when something is
+genuinely absent, and lands in the diagnostics bundle as
+`windows-runtimes.txt`. That last one matters most: a beta report should not
+require the reporter to know to go and read a registry hive.
+
+Three outcomes, deliberately, because two would force a lie: **present**,
+**missing**, and **not checked** — the last for a bottle with no registry yet,
+or a verb Wyn has no probe for. A verb nobody taught it to look for is never
+silently reported as satisfied. `everyVerbInTheShippedCorpusIsRecognised` fails
+the build if a profile starts declaring something new.
+
+Note `vcrun2019` and `vcrun2022` are the same redistributable — Microsoft has
+shipped 2015 through 2022 as one 14.x runtime since 2017, with one registry key
+— so a profile listing both gets one line, not two.
 
 ---
 

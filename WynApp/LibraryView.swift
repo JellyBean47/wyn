@@ -150,6 +150,24 @@ struct LibraryView: View {
             if let name = vm.selectedGame?.profile.name {
                 Text(name)
                     .foregroundStyle(.secondary)
+                // The graphics layer also decides who starts the game, and
+                // nothing said so until it broke something.
+                if let launch = vm.selectedLaunchLabel {
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                    Text(launch)
+                        .foregroundStyle(.secondary)
+                        .help(vm.selectedLaunchExplanation ?? "")
+                        .accessibilityLabel("Launch settings: \(launch)")
+                }
+                // Silent unless something really is absent.
+                if let warning = vm.selectedRuntimeWarning {
+                    Label(warning, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .help("This game's profile says it needs these, and this "
+                              + "bottle does not have them. Steam normally installs "
+                              + "them with the game; Wyn does not install them itself.")
+                }
             }
         }
         .font(.callout)
