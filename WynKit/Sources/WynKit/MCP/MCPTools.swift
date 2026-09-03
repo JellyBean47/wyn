@@ -30,6 +30,7 @@ public enum MCPToolError: LocalizedError {
     case noSteamBottle
     case gameNotInstalled(Int)
     case profileRejected([ProfileValidator.Finding])
+    case noMatchingExecutable(profileID: String, patterns: [String], available: [String])
 
     public var errorDescription: String? {
         switch self {
@@ -49,6 +50,19 @@ public enum MCPToolError: LocalizedError {
 
             Fix those and call save_profile again. validate_profile checks
             without writing anything.
+            """
+        case .noMatchingExecutable(let id, let patterns, let available):
+            return """
+            None of \(id)'s exePatterns match anything in the game's installed
+            files, so this profile could never launch it.
+
+            Patterns given: \(patterns.joined(separator: ", "))
+
+            Executables actually on disk:
+            \(available.map { "  \($0)" }.joined(separator: "\n"))
+
+            Use the real filenames. An invented one is the most common way an
+            otherwise sensible profile turns out to be useless.
             """
         }
     }
@@ -284,6 +298,12 @@ public enum MCPTools {
         let errors = findings.filter { $0.severity == .error }
         guard errors.isEmpty else { throw MCPToolError.profileRejected(errors) }
 
+        // Checks beat prompts. The likeliest failure by far is an invented
+        // executable name — plausible, unverifiable from text, and fatal, since
+        // a profile whose patterns match nothing can never launch the game. If
+        // the game is installed we can simply look.
+        let executableNote = try verifyExecutablePatterns(profile)
+
         try ProfileStore.save(profile: profile)
 
         var lines = [
@@ -302,9 +322,48 @@ public enum MCPTools {
             lines.append("Saved with warnings:")
             lines.append(contentsOf: warnings.map { "  \($0.rule): \($0.message)" })
         }
+        if let executableNote {
+            lines.append("")
+            lines.append(executableNote)
+        }
         lines.append("")
         lines.append("Launch it from Wyn to find out whether any of this was right.")
         return lines.joined(separator: "\n")
+    }
+
+    /// At least one `exePattern` must match a file the game actually ships.
+    ///
+    /// Only checkable when the game is installed — with nothing on disk to
+    /// compare against there is no honest check to make, and refusing would
+    /// block the legitimate case of writing a profile ahead of installing.
+    /// Returns a note when the check could not be performed.
+    static func verifyExecutablePatterns(_ profile: GameProfile) throws -> String? {
+        guard let appId = profile.steamAppId else {
+            return "No steamAppId, so the executable names could not be checked against disk."
+        }
+        guard let bottle = GameLibrary.steamBottle(),
+              let directory = SteamLauncher.installDirectory(forAppId: appId, in: bottle)
+        else {
+            return "\(profile.name) is not installed here, so the executable names "
+                + "could not be checked against disk. Verify them when it is."
+        }
+
+        let report = GameFileInspector.inspect(installDirectory: directory)
+        guard !report.executables.isEmpty else {
+            return "No executables found in the install directory — nothing to check against."
+        }
+
+        let matched = report.executables.contains { executable in
+            profile.matches(executable: URL(fileURLWithPath: executable.name))
+        }
+        guard matched else {
+            throw MCPToolError.noMatchingExecutable(
+                profileID: profile.id,
+                patterns: profile.exePatterns,
+                available: report.executables.map(\.path)
+            )
+        }
+        return nil
     }
 
     // MARK: - Encoding
