@@ -1,0 +1,82 @@
+[
+  {
+    "slug": "detroit-become-human",
+    "name": "Detroit: Become Human",
+    "publisher": "Quantic Dream",
+    "steamAppId": 1222140,
+    "profiles": ["detroit-become-human.json"],
+    "batch": 9
+  },
+  {
+    "slug": "days-gone",
+    "name": "Days Gone",
+    "publisher": "Bend Studio",
+    "steamAppId": 1259420,
+    "profiles": ["days-gone.json"],
+    "batch": 9
+  },
+  {
+    "slug": "life-is-strange",
+    "name": "Life is Strange",
+    "publisher": "DONTNOD / Square Enix",
+    "steamAppId": 319630,
+    "profiles": ["life-is-strange.json"],
+    "batch": 9
+  },
+  {
+    "slug": "deathloop",
+    "name": "DEATHLOOP",
+    "publisher": "Arkane Studios / Bethesda Softworks",
+    "steamAppId": 1252330,
+    "profiles": ["deathloop.json"],
+    "batch": 9
+  },
+  {
+    "slug": "hi-fi-rush",
+    "name": "Hi-Fi RUSH",
+    "publisher": "Tango Gameworks / KRAFTON",
+    "steamAppId": 1817230,
+    "profiles": ["hi-fi-rush.json"],
+    "batch": 9
+  },
+  {
+    "slug": "ori-and-the-will-of-the-wisps",
+    "name": "Ori and the Will of the Wisps",
+    "publisher": "Moon Studios / Xbox Game Studios",
+    "steamAppId": 1057090,
+    "profiles": ["ori-and-the-will-of-the-wisps.json"],
+    "batch": 9
+  },
+  {
+    "slug": "hollow-knight-silksong",
+    "name": "Hollow Knight: Silksong",
+    "publisher": "Team Cherry",
+    "steamAppId": 1030300,
+    "profiles": ["hollow-knight-silksong.json"],
+    "batch": 9
+  },
+  {
+    "slug": "firewatch",
+    "name": "Firewatch",
+    "publisher": "Campo Santo / Panic",
+    "steamAppId": 383870,
+    "profiles": ["firewatch.json"],
+    "batch": 9
+  },
+  {
+    "slug": "what-remains-of-edith-finch",
+    "name": "What Remains of Edith Finch",
+    "publisher": "Giant Sparrow / Annapurna Interactive",
+    "steamAppId": 501300,
+    "profiles": ["what-remains-of-edith-finch.json"],
+    "batch": 9
+  },
+  {
+    "slug": "portal-2",
+    "name": "Portal 2",
+    "publisher": "Valve",
+    "steamAppId": 620,
+    "profiles": ["portal-2.json"],
+    "batch": 9
+  }
+]

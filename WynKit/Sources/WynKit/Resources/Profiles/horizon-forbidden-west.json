@@ -1,0 +1,31 @@
+{
+  "id": "horizon-forbidden-west",
+  "name": "Horizon Forbidden West Complete Edition",
+  "publisher": "Guerrilla / Nixxes",
+  "steamAppId": 2420110,
+  "exePatterns": [
+    "horizonforbiddenwest.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true,
+    "dxrEnabled": true
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "Decima DX12 Nixxes port → D3DMetal (Horizon Zero Dawn / Control class). This is Complete Edition (2420110), including Burning Shores. Prefs in Documents\\Horizon Forbidden West Complete Edition. Ray tracing is DXR via D3DMetal on M3/M4; DLSS cannot run on Apple Silicon. Pin CX_GRAPHICS_BACKEND=d3dmetal. Do not use Libraries.rgl or Libraries.vk."
+}

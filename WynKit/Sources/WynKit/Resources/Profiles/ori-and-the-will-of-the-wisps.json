@@ -1,0 +1,21 @@
+{
+  "id": "ori-and-the-will-of-the-wisps",
+  "name": "Ori and the Will of the Wisps",
+  "publisher": "Moon Studios / Xbox Game Studios",
+  "steamAppId": 1057090,
+  "exePatterns": [
+    "oriwotw.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Unity DX11 → DXVK (Celeste / Hades class). Launch oriwotw.exe with SteamAppId=1057090. This is Will of the Wisps, not Blind Forest (261570 / 387290)."
+}

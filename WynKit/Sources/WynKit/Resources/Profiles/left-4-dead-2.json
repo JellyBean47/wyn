@@ -1,0 +1,21 @@
+{
+  "id": "left-4-dead-2",
+  "name": "Left 4 Dead 2",
+  "publisher": "Valve",
+  "steamAppId": 550,
+  "exePatterns": [
+    "left4dead2.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Source DX9 → DXVK (Valheim / Lethal Company class; D3DMetal does not translate D3D9). Launch left4dead2.exe with SteamAppId=550. Do not match srcds.exe. VAC co-op goes through Steamworks in the same bottle."
+}

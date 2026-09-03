@@ -1,0 +1,22 @@
+{
+  "id": "rimworld",
+  "name": "RimWorld",
+  "publisher": "Ludeon Studios",
+  "steamAppId": 294100,
+  "exePatterns": [
+    "rimworldwin64.exe",
+    "rimworldwin.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Unity DX11 → DXVK (Valheim / Lethal Company class). Native macOS Steam build exists — this profile is the Windows Wine path. Prefer RimWorldWin64.exe over RimWorldWin.exe."
+}

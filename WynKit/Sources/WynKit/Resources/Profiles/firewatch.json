@@ -1,0 +1,21 @@
+{
+  "id": "firewatch",
+  "name": "Firewatch",
+  "publisher": "Campo Santo / Panic",
+  "steamAppId": 383870,
+  "exePatterns": [
+    "firewatch.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Unity DX11 → DXVK (Outer Wilds / Hades class). Launch Firewatch.exe with SteamAppId=383870. Native macOS Steam build exists — this profile is the Windows Wine path."
+}

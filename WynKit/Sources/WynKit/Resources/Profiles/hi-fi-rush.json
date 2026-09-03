@@ -1,0 +1,33 @@
+{
+  "id": "hi-fi-rush",
+  "name": "Hi-Fi RUSH",
+  "publisher": "Tango Gameworks / KRAFTON",
+  "steamAppId": 1817230,
+  "exePatterns": [
+    "hi-fi-rush.exe",
+    "hi-fi rush.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "-dx12",
+  "unrealProject": "Hibiki",
+  "notes": "UE4 DX12 → D3DMetal (Jedi Survivor class). Prefer Hi-Fi-RUSH.exe in Hibiki\\Binaries\\Win64 with SteamAppId=1817230. -dx12 pins the Unreal RHI. First run hitching is PSO translation. Pin CX_GRAPHICS_BACKEND=d3dmetal. Do not use Libraries.rgl or Libraries.vk."
+}

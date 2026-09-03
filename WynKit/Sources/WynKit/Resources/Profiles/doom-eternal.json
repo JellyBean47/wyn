@@ -1,0 +1,28 @@
+{
+  "id": "doom-eternal",
+  "name": "DOOM Eternal",
+  "publisher": "id Software",
+  "steamAppId": 782330,
+  "exePatterns": [
+    "doometernalx64vk.exe",
+    "doometernal.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "vulkan-1=b",
+    "MVK_CONFIG_USE_METAL_PRIVATE_API": "1"
+  },
+  "winetricks": [
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "id Tech 7 Vulkan → DXVK/MoltenVK (same class as Windows NMS). Prefer DOOMEternalx64vk.exe. GPTK/D3DMetal does not translate Vulkan. Do not use Libraries.rgl."
+}

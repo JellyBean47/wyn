@@ -1,0 +1,31 @@
+{
+  "id": "watch-dogs-2",
+  "name": "Watch Dogs 2",
+  "publisher": "Ubisoft",
+  "steamAppId": 447040,
+  "exePatterns": [
+    "watchdogs2.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "requiresUbisoftConnect": true,
+  "notes": "Disrupt DX11 → D3DMetal (Skyrim/FO4 class). Launch WatchDogs2.exe (bin/) with SteamAppId=447040. Ubisoft Connect required. This is Watch Dogs 2, not Legion. Pin CX_GRAPHICS_BACKEND=d3dmetal. Do not use Libraries.rgl or Libraries.vk."
+}

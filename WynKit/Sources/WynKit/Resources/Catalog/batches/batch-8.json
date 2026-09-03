@@ -1,0 +1,82 @@
+[
+  {
+    "slug": "factorio",
+    "name": "Factorio",
+    "publisher": "Wube Software",
+    "steamAppId": 427520,
+    "profiles": ["factorio.json"],
+    "batch": 8
+  },
+  {
+    "slug": "rimworld",
+    "name": "RimWorld",
+    "publisher": "Ludeon Studios",
+    "steamAppId": 294100,
+    "profiles": ["rimworld.json"],
+    "batch": 8
+  },
+  {
+    "slug": "cuphead",
+    "name": "Cuphead",
+    "publisher": "Studio MDHR",
+    "steamAppId": 268910,
+    "profiles": ["cuphead.json"],
+    "batch": 8
+  },
+  {
+    "slug": "slay-the-spire",
+    "name": "Slay the Spire",
+    "publisher": "Mega Crit",
+    "steamAppId": 646570,
+    "profiles": ["slay-the-spire.json"],
+    "batch": 8
+  },
+  {
+    "slug": "dead-cells",
+    "name": "Dead Cells",
+    "publisher": "Motion Twin",
+    "steamAppId": 588650,
+    "profiles": ["dead-cells.json"],
+    "batch": 8
+  },
+  {
+    "slug": "vampire-survivors",
+    "name": "Vampire Survivors",
+    "publisher": "poncle",
+    "steamAppId": 1794680,
+    "profiles": ["vampire-survivors.json"],
+    "batch": 8
+  },
+  {
+    "slug": "the-binding-of-isaac-rebirth",
+    "name": "The Binding of Isaac: Rebirth",
+    "publisher": "Nicalis",
+    "steamAppId": 250900,
+    "profiles": ["the-binding-of-isaac-rebirth.json"],
+    "batch": 8
+  },
+  {
+    "slug": "risk-of-rain-2",
+    "name": "Risk of Rain 2",
+    "publisher": "Hopoo Games / Gearbox",
+    "steamAppId": 632360,
+    "profiles": ["risk-of-rain-2.json"],
+    "batch": 8
+  },
+  {
+    "slug": "subnautica",
+    "name": "Subnautica",
+    "publisher": "Unknown Worlds Entertainment",
+    "steamAppId": 264710,
+    "profiles": ["subnautica.json"],
+    "batch": 8
+  },
+  {
+    "slug": "the-forest",
+    "name": "The Forest",
+    "publisher": "Endnight Games",
+    "steamAppId": 242760,
+    "profiles": ["the-forest.json"],
+    "batch": 8
+  }
+]

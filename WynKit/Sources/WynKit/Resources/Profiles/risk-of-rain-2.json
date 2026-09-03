@@ -1,0 +1,21 @@
+{
+  "id": "risk-of-rain-2",
+  "name": "Risk of Rain 2",
+  "publisher": "Hopoo Games / Gearbox",
+  "steamAppId": 632360,
+  "exePatterns": [
+    "risk of rain 2.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Unity DX11 → DXVK (Hades / Valheim class). This is Risk of Rain 2 (632360), not Risk of Rain Returns. Launch Risk of Rain 2.exe with SteamAppId=632360."
+}

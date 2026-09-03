@@ -1,0 +1,32 @@
+{
+  "id": "borderlands-3",
+  "name": "Borderlands 3",
+  "publisher": "Gearbox Software",
+  "steamAppId": 397540,
+  "exePatterns": [
+    "borderlands3.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "-dx11",
+  "unrealProject": "OakGame",
+  "notes": "UE4 DX11 → D3DMetal (Jedi Fallen Order class). Launch Borderlands3.exe with SteamAppId=397540. -dx11 pins the Unreal RHI (OakGame). Epic overlay is not required for the Steam build. Do not use Libraries.rgl or Libraries.vk."
+}

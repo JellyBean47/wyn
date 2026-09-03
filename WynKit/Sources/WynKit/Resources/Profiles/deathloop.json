@@ -1,0 +1,31 @@
+{
+  "id": "deathloop",
+  "name": "DEATHLOOP",
+  "publisher": "Arkane Studios / Bethesda Softworks",
+  "steamAppId": 1252330,
+  "exePatterns": [
+    "deathloop.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true,
+    "dxrEnabled": true
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "Void Engine DX12 → D3DMetal (Control class). Launch Deathloop.exe with SteamAppId=1252330. Ray tracing is DXR via D3DMetal on M3/M4; DLSS cannot run on Apple Silicon. Easy Anti-Cheat invasion multiplayer is not expected to work under Wine — single-player is the intended path. Pin CX_GRAPHICS_BACKEND=d3dmetal. Do not use Libraries.rgl or Libraries.vk."
+}

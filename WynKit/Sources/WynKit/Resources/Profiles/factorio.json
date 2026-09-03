@@ -1,0 +1,21 @@
+{
+  "id": "factorio",
+  "name": "Factorio",
+  "publisher": "Wube Software",
+  "steamAppId": 427520,
+  "exePatterns": [
+    "factorio.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Custom engine (Windows DirectX build) → DXVK (Stardew / Terraria class). Native macOS Steam build exists — this profile is the Windows Wine path. Launch bin/x64/Factorio.exe. Space Age is DLC on 427520, not a separate game."
+}

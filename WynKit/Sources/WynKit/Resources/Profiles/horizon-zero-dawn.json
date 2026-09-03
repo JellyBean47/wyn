@@ -1,0 +1,31 @@
+{
+  "id": "horizon-zero-dawn",
+  "name": "Horizon Zero Dawn Complete Edition",
+  "publisher": "Guerrilla Games",
+  "steamAppId": 1151640,
+  "exePatterns": [
+    "horizonzerodawn.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "Decima DX12 → D3DMetal (Control class). This is Complete Edition (1151640), not Remastered. Prefs in Documents\\Horizon Zero Dawn. Pin CX_GRAPHICS_BACKEND=d3dmetal. Do not use Libraries.rgl or Libraries.vk."
+}

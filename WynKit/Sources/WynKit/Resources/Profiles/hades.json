@@ -1,0 +1,21 @@
+{
+  "id": "hades",
+  "name": "Hades",
+  "publisher": "Supergiant Games",
+  "steamAppId": 1145360,
+  "exePatterns": [
+    "hades.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Unity DX11 → DXVK (Valheim / Lethal Company class). Native macOS Steam build exists — this profile is the Windows Wine path."
+}

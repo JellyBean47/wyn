@@ -1,0 +1,32 @@
+{
+  "id": "ac-valhalla",
+  "name": "Assassin's Creed Valhalla",
+  "publisher": "Ubisoft",
+  "steamAppId": 2208920,
+  "exePatterns": [
+    "acvalhalla.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "requiresUbisoftConnect": true,
+  "notes": "Anvil DX12 → D3DMetal (Control class). Launch ACValhalla.exe with SteamAppId=2208920. Ubisoft Connect required (same CEF bottle as Odyssey). This is Valhalla, not Odyssey (812140) or Origins. Pin CX_GRAPHICS_BACKEND=d3dmetal. Do not use Libraries.rgl or Libraries.vk."
+}

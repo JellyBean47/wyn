@@ -1,0 +1,31 @@
+{
+  "id": "dying-light-2",
+  "name": "Dying Light 2 Stay Human: Reloaded Edition",
+  "publisher": "Techland",
+  "steamAppId": 534380,
+  "exePatterns": [
+    "dyinglightgame_x64_rwdi.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "C-Engine DX11/DX12 → D3DMetal (Skyrim/FO4 class). Steam's Reloaded Edition (534380) replaced the original Stay Human SKU. Launch DyingLightGame_x64_rwdi.exe from ph/work/bin/x64. Pin CX_GRAPHICS_BACKEND=d3dmetal; prefer the in-game DX11 renderer if device creation fails. Denuvo was removed; co-op uses EOS, not a kernel anti-cheat. Ray tracing is DX12-only. Do not use Libraries.rgl or Libraries.vk."
+}

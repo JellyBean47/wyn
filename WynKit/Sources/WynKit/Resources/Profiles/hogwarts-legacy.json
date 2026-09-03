@@ -1,0 +1,33 @@
+{
+  "id": "hogwarts-legacy",
+  "name": "Hogwarts Legacy",
+  "publisher": "Avalanche Software / Warner Bros.",
+  "steamAppId": 990080,
+  "exePatterns": [
+    "hogwartslegacy-win64-shipping.exe",
+    "hogwartslegacy.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "-dx12",
+  "unrealProject": "Phoenix",
+  "notes": "UE4 DX12 → D3DMetal (Ready or Not class). Steam's HogwartsLegacy.exe is a stub; launch HogwartsLegacy-Win64-Shipping.exe with SteamAppId=990080. Pin CX_GRAPHICS_BACKEND=d3dmetal. Game-dir D3D12 agility SDK — if device creation fails, rename that folder. Do not use Libraries.rgl or Libraries.vk."
+}

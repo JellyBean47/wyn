@@ -1,0 +1,34 @@
+{
+  "id": "mass-effect-legendary-edition",
+  "name": "Mass Effect Legendary Edition",
+  "publisher": "BioWare / EA",
+  "steamAppId": 1328670,
+  "exePatterns": [
+    "masseffectlauncher.exe",
+    "masseffect1.exe",
+    "masseffect2.exe",
+    "masseffect3.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "Frostbite 3 DX11 → D3DMetal (Skyrim/FO4 class). Steam's default launch target is a link2ea:// EA App URL, not an exe. Launch MassEffectLauncher.exe (or MassEffect1/2/3.exe) with SteamAppId=1328670 so Steamworks still initialises. This is the Legendary Edition trilogy, not the 2012 originals. Pin CX_GRAPHICS_BACKEND=d3dmetal. Do not use Libraries.rgl or Libraries.vk."
+}

@@ -1,0 +1,21 @@
+{
+  "id": "v-rising",
+  "name": "V Rising",
+  "publisher": "Stunlock Studios",
+  "steamAppId": 1604030,
+  "exePatterns": [
+    "vrising.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Unity 2022 DX11 → DXVK (Valheim / Lethal Company class). Launch VRising.exe with SteamAppId=1604030. Do not match VRisingServer.exe (dedicated server is a separate Steam tool). VAC is Steamworks in the same bottle; private/solo games are the intended Wine path."
+}

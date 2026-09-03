@@ -1,0 +1,21 @@
+{
+  "id": "celeste",
+  "name": "Celeste",
+  "publisher": "Extremely OK Games",
+  "steamAppId": 504230,
+  "exePatterns": [
+    "celeste.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "FNA → DXVK (Stardew Valley class). Native macOS Steam build exists — this profile is the Windows Wine path."
+}

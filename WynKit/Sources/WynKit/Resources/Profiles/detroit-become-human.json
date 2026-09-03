@@ -1,0 +1,27 @@
+{
+  "id": "detroit-become-human",
+  "name": "Detroit: Become Human",
+  "publisher": "Quantic Dream",
+  "steamAppId": 1222140,
+  "exePatterns": [
+    "detroitbecomehuman.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "vulkan-1=b",
+    "MVK_CONFIG_USE_METAL_PRIVATE_API": "1"
+  },
+  "winetricks": [
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "Quantic Dream Vulkan → DXVK/MoltenVK (DOOM Eternal class). Launch DetroitBecomeHuman.exe with SteamAppId=1222140. GPTK/D3DMetal does not translate Vulkan. First launch compiles shaders into ShaderCache. Do not use Libraries.rgl."
+}

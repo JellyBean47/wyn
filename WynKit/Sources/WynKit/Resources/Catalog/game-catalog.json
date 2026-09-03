@@ -1,0 +1,925 @@
+{
+  "schemaVersion": 1,
+  "uniqueness": "One object per distinct game (slug + store IDs). Profile variants share the same slug and do not count as a new game. Append the next batch of 10 to games[]; bump batch. Do not add a game whose slug, steamAppId, epicId, or gogId is already present.",
+  "games": [
+    {
+      "slug": "ac-odyssey",
+      "name": "Assassin's Creed Odyssey",
+      "publisher": "Ubisoft",
+      "steamAppId": 812140,
+      "profiles": ["ac-odyssey.json"],
+      "batch": 0
+    },
+    {
+      "slug": "army-men-rts",
+      "name": "Army Men RTS",
+      "publisher": "3DO / 2K",
+      "steamAppId": 694500,
+      "profiles": ["army-men-rts.json"],
+      "batch": 0
+    },
+    {
+      "slug": "baldurs-gate-3",
+      "name": "Baldur's Gate 3",
+      "publisher": "Larian Studios",
+      "steamAppId": 1086940,
+      "profiles": ["baldurs-gate-3.json"],
+      "batch": 0
+    },
+    {
+      "slug": "cities-skylines",
+      "name": "Cities: Skylines",
+      "publisher": "Colossal Order / Paradox Interactive",
+      "steamAppId": 255710,
+      "profiles": ["cities-skylines.json"],
+      "batch": 0
+    },
+    {
+      "slug": "control-ultimate",
+      "name": "Control Ultimate Edition",
+      "publisher": "Remedy Entertainment",
+      "steamAppId": 870780,
+      "profiles": ["control-ultimate.json"],
+      "batch": 0
+    },
+    {
+      "slug": "cyberpunk-2077",
+      "name": "Cyberpunk 2077",
+      "publisher": "CD Projekt Red",
+      "steamAppId": 1091500,
+      "profiles": ["cyberpunk-2077.json"],
+      "batch": 0
+    },
+    {
+      "slug": "elden-ring",
+      "name": "Elden Ring",
+      "publisher": "FromSoftware",
+      "steamAppId": 1245620,
+      "profiles": ["elden-ring.json"],
+      "batch": 0
+    },
+    {
+      "slug": "fallout-4",
+      "name": "Fallout 4",
+      "publisher": "Bethesda Softworks",
+      "steamAppId": 377160,
+      "profiles": ["fallout-4.json"],
+      "batch": 0
+    },
+    {
+      "slug": "lethal-company",
+      "name": "Lethal Company",
+      "publisher": "Zeekerss",
+      "steamAppId": 1966720,
+      "profiles": ["lethal-company.json"],
+      "batch": 0
+    },
+    {
+      "slug": "no-mans-sky",
+      "name": "No Man's Sky",
+      "publisher": "Hello Games",
+      "steamAppId": 275850,
+      "profiles": ["no-mans-sky.json"],
+      "batch": 0
+    },
+    {
+      "slug": "ready-or-not",
+      "name": "Ready or Not",
+      "publisher": "VOID Interactive",
+      "steamAppId": 1144200,
+      "profiles": ["ready-or-not.json"],
+      "batch": 0
+    },
+    {
+      "slug": "rv-there-yet",
+      "name": "RV There Yet?",
+      "publisher": "NUGGETS ENTERTAINMENT",
+      "steamAppId": 3949040,
+      "profiles": ["rv-there-yet.json"],
+      "batch": 0
+    },
+    {
+      "slug": "satisfactory",
+      "name": "Satisfactory",
+      "publisher": "Coffee Stain Publishing",
+      "steamAppId": 526870,
+      "profiles": [
+        "satisfactory.json",
+        "satisfactory-dxmt.json",
+        "satisfactory-esync.json",
+        "satisfactory-nomp.json",
+        "satisfactory-nosync.json",
+        "satisfactory-perf.json"
+      ],
+      "batch": 0
+    },
+    {
+      "slug": "skyrim-se",
+      "name": "The Elder Scrolls V: Skyrim Special Edition",
+      "publisher": "Bethesda Softworks",
+      "steamAppId": 489830,
+      "profiles": ["skyrim-se.json"],
+      "batch": 0
+    },
+    {
+      "slug": "dark-souls-3",
+      "name": "Dark Souls III",
+      "publisher": "FromSoftware / Bandai Namco",
+      "steamAppId": 374320,
+      "profiles": ["dark-souls-3.json"],
+      "batch": 1
+    },
+    {
+      "slug": "god-of-war",
+      "name": "God of War",
+      "publisher": "Santa Monica Studio",
+      "steamAppId": 1593500,
+      "profiles": ["god-of-war.json"],
+      "batch": 1
+    },
+    {
+      "slug": "hogwarts-legacy",
+      "name": "Hogwarts Legacy",
+      "publisher": "Avalanche Software / Warner Bros.",
+      "steamAppId": 990080,
+      "profiles": ["hogwarts-legacy.json"],
+      "batch": 1
+    },
+    {
+      "slug": "horizon-zero-dawn",
+      "name": "Horizon Zero Dawn Complete Edition",
+      "publisher": "Guerrilla Games",
+      "steamAppId": 1151640,
+      "profiles": ["horizon-zero-dawn.json"],
+      "batch": 1
+    },
+    {
+      "slug": "jedi-fallen-order",
+      "name": "STAR WARS Jedi: Fallen Order",
+      "publisher": "Respawn Entertainment",
+      "steamAppId": 1172380,
+      "profiles": ["jedi-fallen-order.json"],
+      "batch": 1
+    },
+    {
+      "slug": "rdr2",
+      "name": "Red Dead Redemption 2",
+      "publisher": "Rockstar Games",
+      "steamAppId": 1174180,
+      "profiles": ["rdr2.json"],
+      "batch": 1
+    },
+    {
+      "slug": "sekiro",
+      "name": "Sekiro: Shadows Die Twice",
+      "publisher": "FromSoftware",
+      "steamAppId": 814380,
+      "profiles": ["sekiro.json"],
+      "batch": 1
+    },
+    {
+      "slug": "spider-man-remastered",
+      "name": "Marvel's Spider-Man Remastered",
+      "publisher": "Insomniac Games",
+      "steamAppId": 1817070,
+      "profiles": ["spider-man-remastered.json"],
+      "batch": 1
+    },
+    {
+      "slug": "valheim",
+      "name": "Valheim",
+      "publisher": "Iron Gate",
+      "steamAppId": 892970,
+      "profiles": ["valheim.json"],
+      "batch": 1
+    },
+    {
+      "slug": "witcher-3",
+      "name": "The Witcher 3: Wild Hunt",
+      "publisher": "CD Projekt Red",
+      "steamAppId": 292030,
+      "profiles": ["witcher-3.json"],
+      "batch": 1
+    },
+    {
+      "slug": "death-stranding",
+      "name": "Death Stranding",
+      "publisher": "Kojima Productions",
+      "steamAppId": 1190460,
+      "profiles": ["death-stranding.json"],
+      "batch": 2
+    },
+    {
+      "slug": "doom-eternal",
+      "name": "DOOM Eternal",
+      "publisher": "id Software",
+      "steamAppId": 782330,
+      "profiles": ["doom-eternal.json"],
+      "batch": 2
+    },
+    {
+      "slug": "ghost-of-tsushima",
+      "name": "Ghost of Tsushima DIRECTOR'S CUT",
+      "publisher": "Sucker Punch / Nixxes",
+      "steamAppId": 2215430,
+      "profiles": ["ghost-of-tsushima.json"],
+      "batch": 2
+    },
+    {
+      "slug": "gta-v",
+      "name": "Grand Theft Auto V",
+      "publisher": "Rockstar Games",
+      "steamAppId": 271590,
+      "profiles": ["gta-v.json"],
+      "batch": 2
+    },
+    {
+      "slug": "hades",
+      "name": "Hades",
+      "publisher": "Supergiant Games",
+      "steamAppId": 1145360,
+      "profiles": ["hades.json"],
+      "batch": 2
+    },
+    {
+      "slug": "hollow-knight",
+      "name": "Hollow Knight",
+      "publisher": "Team Cherry",
+      "steamAppId": 367520,
+      "profiles": ["hollow-knight.json"],
+      "batch": 2
+    },
+    {
+      "slug": "monster-hunter-world",
+      "name": "Monster Hunter: World",
+      "publisher": "Capcom",
+      "steamAppId": 582010,
+      "profiles": ["monster-hunter-world.json"],
+      "batch": 2
+    },
+    {
+      "slug": "palworld",
+      "name": "Palworld",
+      "publisher": "Pocketpair",
+      "steamAppId": 1623730,
+      "profiles": ["palworld.json"],
+      "batch": 2
+    },
+    {
+      "slug": "resident-evil-4",
+      "name": "Resident Evil 4",
+      "publisher": "Capcom",
+      "steamAppId": 2050650,
+      "profiles": ["resident-evil-4.json"],
+      "batch": 2
+    },
+    {
+      "slug": "stardew-valley",
+      "name": "Stardew Valley",
+      "publisher": "ConcernedApe",
+      "steamAppId": 413150,
+      "profiles": ["stardew-valley.json"],
+      "batch": 2
+    },
+    {
+      "slug": "black-myth-wukong",
+      "name": "Black Myth: Wukong",
+      "publisher": "Game Science",
+      "steamAppId": 2358720,
+      "profiles": ["black-myth-wukong.json"],
+      "batch": 3
+    },
+    {
+      "slug": "borderlands-3",
+      "name": "Borderlands 3",
+      "publisher": "Gearbox Software",
+      "steamAppId": 397540,
+      "profiles": ["borderlands-3.json"],
+      "batch": 3
+    },
+    {
+      "slug": "celeste",
+      "name": "Celeste",
+      "publisher": "Extremely OK Games",
+      "steamAppId": 504230,
+      "profiles": ["celeste.json"],
+      "batch": 3
+    },
+    {
+      "slug": "deep-rock-galactic",
+      "name": "Deep Rock Galactic",
+      "publisher": "Ghost Ship Games",
+      "steamAppId": 548430,
+      "profiles": ["deep-rock-galactic.json"],
+      "batch": 3
+    },
+    {
+      "slug": "disco-elysium",
+      "name": "Disco Elysium",
+      "publisher": "ZA/UM",
+      "steamAppId": 632470,
+      "profiles": ["disco-elysium.json"],
+      "batch": 3
+    },
+    {
+      "slug": "guardians-of-the-galaxy",
+      "name": "Marvel's Guardians of the Galaxy",
+      "publisher": "Eidos-Montréal",
+      "steamAppId": 1088850,
+      "profiles": ["guardians-of-the-galaxy.json"],
+      "batch": 3
+    },
+    {
+      "slug": "lies-of-p",
+      "name": "Lies of P",
+      "publisher": "Round8 Studio / Neowiz",
+      "steamAppId": 1627720,
+      "profiles": ["lies-of-p.json"],
+      "batch": 3
+    },
+    {
+      "slug": "terraria",
+      "name": "Terraria",
+      "publisher": "Re-Logic",
+      "steamAppId": 105600,
+      "profiles": ["terraria.json"],
+      "batch": 3
+    },
+    {
+      "slug": "the-last-of-us-part-1",
+      "name": "The Last of Us Part I",
+      "publisher": "Naughty Dog / Nixxes",
+      "steamAppId": 1888930,
+      "profiles": ["the-last-of-us-part-1.json"],
+      "batch": 3
+    },
+    {
+      "slug": "uncharted-legacy",
+      "name": "Uncharted: Legacy of Thieves Collection",
+      "publisher": "Naughty Dog / Nixxes",
+      "steamAppId": 1659420,
+      "profiles": ["uncharted-legacy.json"],
+      "batch": 3
+    },
+    {
+      "slug": "a-plague-tale-requiem",
+      "name": "A Plague Tale: Requiem",
+      "publisher": "Asobo Studio",
+      "steamAppId": 1182900,
+      "profiles": ["a-plague-tale-requiem.json"],
+      "batch": 4
+    },
+    {
+      "slug": "dead-space",
+      "name": "Dead Space",
+      "publisher": "Motive Studio / EA",
+      "steamAppId": 1693980,
+      "profiles": ["dead-space.json"],
+      "batch": 4
+    },
+    {
+      "slug": "hades-2",
+      "name": "Hades II",
+      "publisher": "Supergiant Games",
+      "steamAppId": 1145350,
+      "profiles": ["hades-2.json"],
+      "batch": 4
+    },
+    {
+      "slug": "it-takes-two",
+      "name": "It Takes Two",
+      "publisher": "Hazelight Studios",
+      "steamAppId": 1426210,
+      "profiles": ["it-takes-two.json"],
+      "batch": 4
+    },
+    {
+      "slug": "mgsv-phantom-pain",
+      "name": "Metal Gear Solid V: The Phantom Pain",
+      "publisher": "Konami",
+      "steamAppId": 287700,
+      "profiles": ["mgsv-phantom-pain.json"],
+      "batch": 4
+    },
+    {
+      "slug": "outer-wilds",
+      "name": "Outer Wilds",
+      "publisher": "Mobius Digital",
+      "steamAppId": 753640,
+      "profiles": ["outer-wilds.json"],
+      "batch": 4
+    },
+    {
+      "slug": "persona-5-royal",
+      "name": "Persona 5 Royal",
+      "publisher": "Atlus",
+      "steamAppId": 1687950,
+      "profiles": ["persona-5-royal.json"],
+      "batch": 4
+    },
+    {
+      "slug": "starfield",
+      "name": "Starfield",
+      "publisher": "Bethesda Game Studios",
+      "steamAppId": 1716740,
+      "profiles": ["starfield.json"],
+      "batch": 4
+    },
+    {
+      "slug": "superhot",
+      "name": "SUPERHOT",
+      "publisher": "SUPERHOT Team",
+      "steamAppId": 322500,
+      "profiles": ["superhot.json"],
+      "batch": 4
+    },
+    {
+      "slug": "yakuza-0",
+      "name": "Yakuza 0",
+      "publisher": "Ryu Ga Gotoku Studio",
+      "steamAppId": 638970,
+      "profiles": ["yakuza-0.json"],
+      "batch": 4
+    },
+    {
+      "slug": "god-of-war-ragnarok",
+      "name": "God of War Ragnarök",
+      "publisher": "Santa Monica Studio",
+      "steamAppId": 2322010,
+      "profiles": ["god-of-war-ragnarok.json"],
+      "batch": 5
+    },
+    {
+      "slug": "horizon-forbidden-west",
+      "name": "Horizon Forbidden West Complete Edition",
+      "publisher": "Guerrilla / Nixxes",
+      "steamAppId": 2420110,
+      "profiles": ["horizon-forbidden-west.json"],
+      "batch": 5
+    },
+    {
+      "slug": "spider-man-miles-morales",
+      "name": "Marvel's Spider-Man: Miles Morales",
+      "publisher": "Insomniac Games",
+      "steamAppId": 1817190,
+      "profiles": ["spider-man-miles-morales.json"],
+      "batch": 5
+    },
+    {
+      "slug": "spider-man-2",
+      "name": "Marvel's Spider-Man 2",
+      "publisher": "Insomniac Games",
+      "steamAppId": 2651280,
+      "profiles": ["spider-man-2.json"],
+      "batch": 5
+    },
+    {
+      "slug": "returnal",
+      "name": "Returnal",
+      "publisher": "Housemarque",
+      "steamAppId": 1649240,
+      "profiles": ["returnal.json"],
+      "batch": 5
+    },
+    {
+      "slug": "ratchet-clank-rift-apart",
+      "name": "Ratchet & Clank: Rift Apart",
+      "publisher": "Insomniac Games",
+      "steamAppId": 1895880,
+      "profiles": ["ratchet-clank-rift-apart.json"],
+      "batch": 5
+    },
+    {
+      "slug": "the-last-of-us-part-2",
+      "name": "The Last of Us Part II Remastered",
+      "publisher": "Naughty Dog / Nixxes",
+      "steamAppId": 2531310,
+      "profiles": ["the-last-of-us-part-2.json"],
+      "batch": 5
+    },
+    {
+      "slug": "jedi-survivor",
+      "name": "STAR WARS Jedi: Survivor",
+      "publisher": "Respawn Entertainment",
+      "steamAppId": 1774580,
+      "profiles": ["jedi-survivor.json"],
+      "batch": 5
+    },
+    {
+      "slug": "resident-evil-village",
+      "name": "Resident Evil Village",
+      "publisher": "Capcom",
+      "steamAppId": 1196590,
+      "profiles": ["resident-evil-village.json"],
+      "batch": 5
+    },
+    {
+      "slug": "resident-evil-2",
+      "name": "Resident Evil 2",
+      "publisher": "Capcom",
+      "steamAppId": 883710,
+      "profiles": ["resident-evil-2.json"],
+      "batch": 5
+    },
+    {
+      "slug": "dark-souls-remastered",
+      "name": "Dark Souls Remastered",
+      "publisher": "FromSoftware / Bandai Namco",
+      "steamAppId": 570940,
+      "profiles": ["dark-souls-remastered.json"],
+      "batch": 6
+    },
+    {
+      "slug": "dark-souls-2-scholar",
+      "name": "Dark Souls II: Scholar of the First Sin",
+      "publisher": "FromSoftware / Bandai Namco",
+      "steamAppId": 335300,
+      "profiles": ["dark-souls-2-scholar.json"],
+      "batch": 6
+    },
+    {
+      "slug": "armored-core-6",
+      "name": "Armored Core VI: Fires of Rubicon",
+      "publisher": "FromSoftware / Bandai Namco",
+      "steamAppId": 1888160,
+      "profiles": ["armored-core-6.json"],
+      "batch": 6
+    },
+    {
+      "slug": "nioh-2",
+      "name": "Nioh 2 – The Complete Edition",
+      "publisher": "Team Ninja / Koei Tecmo",
+      "steamAppId": 1325200,
+      "profiles": ["nioh-2.json"],
+      "batch": 6
+    },
+    {
+      "slug": "devil-may-cry-5",
+      "name": "Devil May Cry 5",
+      "publisher": "Capcom",
+      "steamAppId": 601150,
+      "profiles": ["devil-may-cry-5.json"],
+      "batch": 6
+    },
+    {
+      "slug": "nier-automata",
+      "name": "NieR: Automata",
+      "publisher": "PlatinumGames / Square Enix",
+      "steamAppId": 524220,
+      "profiles": ["nier-automata.json"],
+      "batch": 6
+    },
+    {
+      "slug": "fallout-new-vegas",
+      "name": "Fallout: New Vegas",
+      "publisher": "Obsidian / Bethesda Softworks",
+      "steamAppId": 22380,
+      "profiles": ["fallout-new-vegas.json"],
+      "batch": 6
+    },
+    {
+      "slug": "oblivion",
+      "name": "The Elder Scrolls IV: Oblivion Game of the Year Edition",
+      "publisher": "Bethesda Softworks",
+      "steamAppId": 22330,
+      "profiles": ["oblivion.json"],
+      "batch": 6
+    },
+    {
+      "slug": "kotor",
+      "name": "STAR WARS: Knights of the Old Republic",
+      "publisher": "BioWare",
+      "steamAppId": 32370,
+      "profiles": ["kotor.json"],
+      "batch": 6
+    },
+    {
+      "slug": "mass-effect-legendary-edition",
+      "name": "Mass Effect Legendary Edition",
+      "publisher": "BioWare / EA",
+      "steamAppId": 1328670,
+      "profiles": ["mass-effect-legendary-edition.json"],
+      "batch": 6
+    },
+    {
+      "slug": "ac-origins",
+      "name": "Assassin's Creed Origins",
+      "publisher": "Ubisoft",
+      "steamAppId": 582160,
+      "profiles": ["ac-origins.json"],
+      "batch": 7
+    },
+    {
+      "slug": "ac-valhalla",
+      "name": "Assassin's Creed Valhalla",
+      "publisher": "Ubisoft",
+      "steamAppId": 2208920,
+      "profiles": ["ac-valhalla.json"],
+      "batch": 7
+    },
+    {
+      "slug": "far-cry-5",
+      "name": "Far Cry 5",
+      "publisher": "Ubisoft",
+      "steamAppId": 552520,
+      "profiles": ["far-cry-5.json"],
+      "batch": 7
+    },
+    {
+      "slug": "watch-dogs-2",
+      "name": "Watch Dogs 2",
+      "publisher": "Ubisoft",
+      "steamAppId": 447040,
+      "profiles": ["watch-dogs-2.json"],
+      "batch": 7
+    },
+    {
+      "slug": "hitman-woa",
+      "name": "HITMAN World of Assassination",
+      "publisher": "IO Interactive",
+      "steamAppId": 1659040,
+      "profiles": ["hitman-woa.json"],
+      "batch": 7
+    },
+    {
+      "slug": "batman-arkham-knight",
+      "name": "Batman: Arkham Knight",
+      "publisher": "Rocksteady / Warner Bros.",
+      "steamAppId": 208650,
+      "profiles": ["batman-arkham-knight.json"],
+      "batch": 7
+    },
+    {
+      "slug": "shadow-of-war",
+      "name": "Middle-earth: Shadow of War",
+      "publisher": "Monolith Productions / Warner Bros.",
+      "steamAppId": 356190,
+      "profiles": ["shadow-of-war.json"],
+      "batch": 7
+    },
+    {
+      "slug": "mad-max",
+      "name": "Mad Max",
+      "publisher": "Avalanche Studios / Warner Bros.",
+      "steamAppId": 234140,
+      "profiles": ["mad-max.json"],
+      "batch": 7
+    },
+    {
+      "slug": "sleeping-dogs-definitive",
+      "name": "Sleeping Dogs: Definitive Edition",
+      "publisher": "United Front Games / Square Enix",
+      "steamAppId": 307690,
+      "profiles": ["sleeping-dogs-definitive.json"],
+      "batch": 7
+    },
+    {
+      "slug": "mafia-definitive",
+      "name": "Mafia: Definitive Edition",
+      "publisher": "Hangar 13 / 2K",
+      "steamAppId": 1030840,
+      "profiles": ["mafia-definitive.json"],
+      "batch": 7
+    },
+    {
+      "slug": "factorio",
+      "name": "Factorio",
+      "publisher": "Wube Software",
+      "steamAppId": 427520,
+      "profiles": ["factorio.json"],
+      "batch": 8
+    },
+    {
+      "slug": "rimworld",
+      "name": "RimWorld",
+      "publisher": "Ludeon Studios",
+      "steamAppId": 294100,
+      "profiles": ["rimworld.json"],
+      "batch": 8
+    },
+    {
+      "slug": "cuphead",
+      "name": "Cuphead",
+      "publisher": "Studio MDHR",
+      "steamAppId": 268910,
+      "profiles": ["cuphead.json"],
+      "batch": 8
+    },
+    {
+      "slug": "slay-the-spire",
+      "name": "Slay the Spire",
+      "publisher": "Mega Crit",
+      "steamAppId": 646570,
+      "profiles": ["slay-the-spire.json"],
+      "batch": 8
+    },
+    {
+      "slug": "dead-cells",
+      "name": "Dead Cells",
+      "publisher": "Motion Twin",
+      "steamAppId": 588650,
+      "profiles": ["dead-cells.json"],
+      "batch": 8
+    },
+    {
+      "slug": "vampire-survivors",
+      "name": "Vampire Survivors",
+      "publisher": "poncle",
+      "steamAppId": 1794680,
+      "profiles": ["vampire-survivors.json"],
+      "batch": 8
+    },
+    {
+      "slug": "the-binding-of-isaac-rebirth",
+      "name": "The Binding of Isaac: Rebirth",
+      "publisher": "Nicalis",
+      "steamAppId": 250900,
+      "profiles": ["the-binding-of-isaac-rebirth.json"],
+      "batch": 8
+    },
+    {
+      "slug": "risk-of-rain-2",
+      "name": "Risk of Rain 2",
+      "publisher": "Hopoo Games / Gearbox",
+      "steamAppId": 632360,
+      "profiles": ["risk-of-rain-2.json"],
+      "batch": 8
+    },
+    {
+      "slug": "subnautica",
+      "name": "Subnautica",
+      "publisher": "Unknown Worlds Entertainment",
+      "steamAppId": 264710,
+      "profiles": ["subnautica.json"],
+      "batch": 8
+    },
+    {
+      "slug": "the-forest",
+      "name": "The Forest",
+      "publisher": "Endnight Games",
+      "steamAppId": 242760,
+      "profiles": ["the-forest.json"],
+      "batch": 8
+    },
+    {
+      "slug": "detroit-become-human",
+      "name": "Detroit: Become Human",
+      "publisher": "Quantic Dream",
+      "steamAppId": 1222140,
+      "profiles": ["detroit-become-human.json"],
+      "batch": 9
+    },
+    {
+      "slug": "days-gone",
+      "name": "Days Gone",
+      "publisher": "Bend Studio",
+      "steamAppId": 1259420,
+      "profiles": ["days-gone.json"],
+      "batch": 9
+    },
+    {
+      "slug": "life-is-strange",
+      "name": "Life is Strange",
+      "publisher": "DONTNOD / Square Enix",
+      "steamAppId": 319630,
+      "profiles": ["life-is-strange.json"],
+      "batch": 9
+    },
+    {
+      "slug": "deathloop",
+      "name": "DEATHLOOP",
+      "publisher": "Arkane Studios / Bethesda Softworks",
+      "steamAppId": 1252330,
+      "profiles": ["deathloop.json"],
+      "batch": 9
+    },
+    {
+      "slug": "hi-fi-rush",
+      "name": "Hi-Fi RUSH",
+      "publisher": "Tango Gameworks / KRAFTON",
+      "steamAppId": 1817230,
+      "profiles": ["hi-fi-rush.json"],
+      "batch": 9
+    },
+    {
+      "slug": "ori-and-the-will-of-the-wisps",
+      "name": "Ori and the Will of the Wisps",
+      "publisher": "Moon Studios / Xbox Game Studios",
+      "steamAppId": 1057090,
+      "profiles": ["ori-and-the-will-of-the-wisps.json"],
+      "batch": 9
+    },
+    {
+      "slug": "hollow-knight-silksong",
+      "name": "Hollow Knight: Silksong",
+      "publisher": "Team Cherry",
+      "steamAppId": 1030300,
+      "profiles": ["hollow-knight-silksong.json"],
+      "batch": 9
+    },
+    {
+      "slug": "firewatch",
+      "name": "Firewatch",
+      "publisher": "Campo Santo / Panic",
+      "steamAppId": 383870,
+      "profiles": ["firewatch.json"],
+      "batch": 9
+    },
+    {
+      "slug": "what-remains-of-edith-finch",
+      "name": "What Remains of Edith Finch",
+      "publisher": "Giant Sparrow / Annapurna Interactive",
+      "steamAppId": 501300,
+      "profiles": ["what-remains-of-edith-finch.json"],
+      "batch": 9
+    },
+    {
+      "slug": "portal-2",
+      "name": "Portal 2",
+      "publisher": "Valve",
+      "steamAppId": 620,
+      "profiles": ["portal-2.json"],
+      "batch": 9
+    },
+    {
+      "slug": "left-4-dead-2",
+      "name": "Left 4 Dead 2",
+      "publisher": "Valve",
+      "steamAppId": 550,
+      "profiles": ["left-4-dead-2.json"],
+      "batch": 10
+    },
+    {
+      "slug": "dying-light-2",
+      "name": "Dying Light 2 Stay Human: Reloaded Edition",
+      "publisher": "Techland",
+      "steamAppId": 534380,
+      "profiles": ["dying-light-2.json"],
+      "batch": 10
+    },
+    {
+      "slug": "sons-of-the-forest",
+      "name": "Sons Of The Forest",
+      "publisher": "Endnight Games / Newnight",
+      "steamAppId": 1326470,
+      "profiles": ["sons-of-the-forest.json"],
+      "batch": 10
+    },
+    {
+      "slug": "grounded",
+      "name": "Grounded",
+      "publisher": "Obsidian Entertainment / Xbox Game Studios",
+      "steamAppId": 962130,
+      "profiles": ["grounded.json"],
+      "batch": 10
+    },
+    {
+      "slug": "enshrouded",
+      "name": "Enshrouded",
+      "publisher": "Keen Games",
+      "steamAppId": 1203620,
+      "profiles": ["enshrouded.json"],
+      "batch": 10
+    },
+    {
+      "slug": "v-rising",
+      "name": "V Rising",
+      "publisher": "Stunlock Studios",
+      "steamAppId": 1604030,
+      "profiles": ["v-rising.json"],
+      "batch": 10
+    },
+    {
+      "slug": "divinity-original-sin-2",
+      "name": "Divinity: Original Sin 2 - Definitive Edition",
+      "publisher": "Larian Studios",
+      "steamAppId": 435150,
+      "profiles": ["divinity-original-sin-2.json"],
+      "batch": 10
+    },
+    {
+      "slug": "monster-hunter-rise",
+      "name": "Monster Hunter Rise",
+      "publisher": "Capcom",
+      "steamAppId": 1446780,
+      "profiles": ["monster-hunter-rise.json"],
+      "batch": 10
+    },
+    {
+      "slug": "dragons-dogma-2",
+      "name": "Dragon's Dogma 2",
+      "publisher": "Capcom",
+      "steamAppId": 2054970,
+      "profiles": ["dragons-dogma-2.json"],
+      "batch": 10
+    },
+    {
+      "slug": "ff7-remake",
+      "name": "FINAL FANTASY VII REMAKE INTERGRADE",
+      "publisher": "Square Enix",
+      "steamAppId": 1462040,
+      "profiles": ["ff7-remake.json"],
+      "batch": 10
+    }
+  ]
+}

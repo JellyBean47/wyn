@@ -1,0 +1,22 @@
+{
+  "id": "fallout-new-vegas",
+  "name": "Fallout: New Vegas",
+  "publisher": "Obsidian / Bethesda Softworks",
+  "steamAppId": 22380,
+  "exePatterns": [
+    "falloutnv.exe",
+    "falloutnvlauncher.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Gamebryo DX9 → DXVK (D3D9; D3DMetal has no d3d9.so). Steam launches FalloutNVLauncher.exe; prefer FalloutNV.exe with SteamAppId=22380. Keep vsync on — Gamebryo physics breaks at high FPS. This is New Vegas, not Fallout 4. Prefs live in Documents\\My Games\\FalloutNV."
+}

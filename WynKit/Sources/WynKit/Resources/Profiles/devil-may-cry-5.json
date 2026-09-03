@@ -1,0 +1,31 @@
+{
+  "id": "devil-may-cry-5",
+  "name": "Devil May Cry 5",
+  "publisher": "Capcom",
+  "steamAppId": 601150,
+  "exePatterns": [
+    "devilmaycry5.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "RE Engine DX11 → D3DMetal (Monster Hunter World class). Launch DevilMayCry5.exe with SteamAppId=601150. This is DMC5, not the HD Collection or Special Edition console SKU. Pin CX_GRAPHICS_BACKEND=d3dmetal. Do not use Libraries.rgl or Libraries.vk."
+}

@@ -1,0 +1,22 @@
+{
+  "id": "dead-cells",
+  "name": "Dead Cells",
+  "publisher": "Motion Twin",
+  "steamAppId": 588650,
+  "exePatterns": [
+    "deadcells.exe",
+    "deadcells_gl.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Heaps/Haxe → DXVK (lightweight indie class). Native macOS Steam build exists — this profile is the Windows Wine path. Prefer deadcells.exe over deadcells_gl.exe (OpenGL legacy)."
+}

@@ -1,0 +1,32 @@
+{
+  "id": "jedi-fallen-order",
+  "name": "STAR WARS Jedi: Fallen Order",
+  "publisher": "Respawn Entertainment",
+  "steamAppId": 1172380,
+  "exePatterns": [
+    "swgame-win64-shipping.exe",
+    "starwarsjedifallenorder.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "-dx11",
+  "unrealProject": "SwGame",
+  "notes": "UE4 DX11 → D3DMetal. Steam may start StarWarsJediFallenOrder.exe; prefer SwGame-Win64-Shipping.exe with SteamAppId=1172380. -dx11 pins the Unreal RHI (same idea as RV There Yet?). EA App overlay is not required for the Steam build. Do not use Libraries.rgl or Libraries.vk."
+}

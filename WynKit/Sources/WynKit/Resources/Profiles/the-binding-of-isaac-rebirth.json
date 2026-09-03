@@ -1,0 +1,21 @@
+{
+  "id": "the-binding-of-isaac-rebirth",
+  "name": "The Binding of Isaac: Rebirth",
+  "publisher": "Nicalis",
+  "steamAppId": 250900,
+  "exePatterns": [
+    "isaac-ng.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Custom OpenGL engine. Native macOS Steam build exists — this profile is the Windows Wine path. Afterbirth+/Repentance are DLC on 250900, not separate games. Launch isaac-ng.exe."
+}

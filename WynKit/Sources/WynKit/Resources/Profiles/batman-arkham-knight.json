@@ -1,0 +1,30 @@
+{
+  "id": "batman-arkham-knight",
+  "name": "Batman: Arkham Knight",
+  "publisher": "Rocksteady / Warner Bros.",
+  "steamAppId": 208650,
+  "exePatterns": [
+    "batmanak.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "UE3 DX11 → D3DMetal (Skyrim/FO4 class). Launch BatmanAK.exe with SteamAppId=208650. Disable NVIDIA HairWorks / GameWorks in the WB launcher; PhysX is CPU-only on Apple Silicon. Pin CX_GRAPHICS_BACKEND=d3dmetal. Do not use Libraries.rgl or Libraries.vk."
+}

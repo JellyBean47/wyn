@@ -1,0 +1,21 @@
+{
+  "id": "the-forest",
+  "name": "The Forest",
+  "publisher": "Endnight Games",
+  "steamAppId": 242760,
+  "exePatterns": [
+    "theforest.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Unity DX11 → DXVK (Valheim / Lethal Company class). Launch TheForest.exe; do not match TheForestVR.exe. This is The Forest (242760), not Sons of the Forest."
+}
