@@ -25,9 +25,46 @@ struct WynCLI: AsyncParsableCommand {
             Runtime.self,
             Steam.self,
             GPTK.self,
-            Renderer.self
+            Renderer.self,
+            MCP.self
         ]
     )
+}
+
+// MARK: - MCP
+
+extension WynCLI {
+    /// Wyn as an MCP server, so the person's own Claude can add games.
+    ///
+    /// Server, not client: no API key lives in Wyn, no model call costs the
+    /// project anything, and there is no LLM in the binary. Whoever is talking
+    /// to it brings their own.
+    struct MCP: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "mcp",
+            abstract: "Run Wyn as an MCP server over stdio (for Claude Desktop / Claude Code).",
+            discussion: """
+            Point an MCP client at this command. For Claude Desktop, in \
+            claude_desktop_config.json:
+
+              {
+                "mcpServers": {
+                  "wyn": { "command": "/usr/local/bin/wyn", "args": ["mcp"] }
+                }
+              }
+
+            For Claude Code: claude mcp add wyn -- /usr/local/bin/wyn mcp
+
+            It speaks JSON-RPC on stdin/stdout and logs to stderr, so running it \
+            in a terminal looks like it has hung. That is correct: it is waiting \
+            for a client.
+            """
+        )
+
+        mutating func run() throws {
+            MCPServer().run()
+        }
+    }
 }
 
 // MARK: - Bottles
