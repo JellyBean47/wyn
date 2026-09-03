@@ -1,0 +1,27 @@
+{
+  "id": "enshrouded",
+  "name": "Enshrouded",
+  "publisher": "Keen Games",
+  "steamAppId": 1203620,
+  "exePatterns": [
+    "enshrouded.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "vulkan-1=b",
+    "MVK_CONFIG_USE_METAL_PRIVATE_API": "1"
+  },
+  "winetricks": [
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "Holistic Engine Vulkan → DXVK/MoltenVK (DOOM Eternal / Windows NMS class). Launch enshrouded.exe with SteamAppId=1203620. GPTK/D3DMetal does not translate Vulkan; -dx11/-dx12 are ignored. Do not match enshrouded_server.exe. Do not use Libraries.rgl."
+}

@@ -1,0 +1,21 @@
+{
+  "id": "portal-2",
+  "name": "Portal 2",
+  "publisher": "Valve",
+  "steamAppId": 620,
+  "exePatterns": [
+    "portal2.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Source DX9 → DXVK (Celeste class). Launch portal2.exe with SteamAppId=620. This is Portal 2, not Portal or Portal Prelude. Native macOS Steam build exists — this profile is the Windows Wine path."
+}

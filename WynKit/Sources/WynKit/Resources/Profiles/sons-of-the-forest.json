@@ -1,0 +1,21 @@
+{
+  "id": "sons-of-the-forest",
+  "name": "Sons Of The Forest",
+  "publisher": "Endnight Games / Newnight",
+  "steamAppId": 1326470,
+  "exePatterns": [
+    "sonsoftheforest.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Unity DX11 → DXVK (Valheim / Lethal Company class). Launch SonsOfTheForest.exe with SteamAppId=1326470. Do not match SonsOfTheForestDS.exe (dedicated server is a separate app)."
+}

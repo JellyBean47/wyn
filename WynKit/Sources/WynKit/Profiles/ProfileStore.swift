@@ -49,6 +49,7 @@ public enum ProfileStore {
 
         if let urls = Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: nil) {
             for url in urls {
+                guard GameCatalog.isProfileResource(url) else { continue }
                 if let profile = decodeProfile(at: url, decoder: decoder) {
                     profiles.append(profile)
                 }
@@ -57,6 +58,7 @@ public enum ProfileStore {
 
         if let urls = Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: bundledProfilesDirectory) {
             for url in urls {
+                guard GameCatalog.isProfileResource(url) else { continue }
                 if let profile = decodeProfile(at: url, decoder: decoder) {
                     profiles.append(profile)
                 }
@@ -80,6 +82,7 @@ public enum ProfileStore {
 
         return contents.compactMap { url in
             guard url.pathExtension == "json" else { return nil }
+            guard GameCatalog.isProfileResource(url) else { return nil }
             return decodeProfile(at: url, decoder: decoder)
         }
     }

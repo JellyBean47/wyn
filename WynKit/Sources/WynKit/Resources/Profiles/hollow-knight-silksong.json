@@ -1,0 +1,22 @@
+{
+  "id": "hollow-knight-silksong",
+  "name": "Hollow Knight: Silksong",
+  "publisher": "Team Cherry",
+  "steamAppId": 1030300,
+  "exePatterns": [
+    "hollow knight silksong.exe",
+    "silksong.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Unity DX11 → DXVK (Hollow Knight / Hades class). Distinct Steam app 1030300 vs Hollow Knight 367520. Prefer Hollow Knight Silksong.exe with SteamAppId=1030300. Native macOS Steam build exists — this profile is the Windows Wine path."
+}

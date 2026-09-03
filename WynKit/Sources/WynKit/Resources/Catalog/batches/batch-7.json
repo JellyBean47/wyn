@@ -1,0 +1,82 @@
+[
+  {
+    "slug": "ac-origins",
+    "name": "Assassin's Creed Origins",
+    "publisher": "Ubisoft",
+    "steamAppId": 582160,
+    "profiles": ["ac-origins.json"],
+    "batch": 7
+  },
+  {
+    "slug": "ac-valhalla",
+    "name": "Assassin's Creed Valhalla",
+    "publisher": "Ubisoft",
+    "steamAppId": 2208920,
+    "profiles": ["ac-valhalla.json"],
+    "batch": 7
+  },
+  {
+    "slug": "far-cry-5",
+    "name": "Far Cry 5",
+    "publisher": "Ubisoft",
+    "steamAppId": 552520,
+    "profiles": ["far-cry-5.json"],
+    "batch": 7
+  },
+  {
+    "slug": "watch-dogs-2",
+    "name": "Watch Dogs 2",
+    "publisher": "Ubisoft",
+    "steamAppId": 447040,
+    "profiles": ["watch-dogs-2.json"],
+    "batch": 7
+  },
+  {
+    "slug": "hitman-woa",
+    "name": "HITMAN World of Assassination",
+    "publisher": "IO Interactive",
+    "steamAppId": 1659040,
+    "profiles": ["hitman-woa.json"],
+    "batch": 7
+  },
+  {
+    "slug": "batman-arkham-knight",
+    "name": "Batman: Arkham Knight",
+    "publisher": "Rocksteady / Warner Bros.",
+    "steamAppId": 208650,
+    "profiles": ["batman-arkham-knight.json"],
+    "batch": 7
+  },
+  {
+    "slug": "shadow-of-war",
+    "name": "Middle-earth: Shadow of War",
+    "publisher": "Monolith Productions / Warner Bros.",
+    "steamAppId": 356190,
+    "profiles": ["shadow-of-war.json"],
+    "batch": 7
+  },
+  {
+    "slug": "mad-max",
+    "name": "Mad Max",
+    "publisher": "Avalanche Studios / Warner Bros.",
+    "steamAppId": 234140,
+    "profiles": ["mad-max.json"],
+    "batch": 7
+  },
+  {
+    "slug": "sleeping-dogs-definitive",
+    "name": "Sleeping Dogs: Definitive Edition",
+    "publisher": "United Front Games / Square Enix",
+    "steamAppId": 307690,
+    "profiles": ["sleeping-dogs-definitive.json"],
+    "batch": 7
+  },
+  {
+    "slug": "mafia-definitive",
+    "name": "Mafia: Definitive Edition",
+    "publisher": "Hangar 13 / 2K",
+    "steamAppId": 1030840,
+    "profiles": ["mafia-definitive.json"],
+    "batch": 7
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "id": "dark-souls-3",
+  "name": "Dark Souls III",
+  "publisher": "FromSoftware / Bandai Namco",
+  "steamAppId": 374320,
+  "exePatterns": [
+    "darksoulsiii.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "winmm=n,b"
+  },
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "FromSoftware DX11 → D3DMetal with msync, same class as Elden Ring / Sekiro. Steam install is Game/DarkSoulsIII.exe. Do not use Libraries.rgl or Libraries.vk."
+}

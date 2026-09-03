@@ -1,0 +1,23 @@
+{
+  "id": "dark-souls-2-scholar",
+  "name": "Dark Souls II: Scholar of the First Sin",
+  "publisher": "FromSoftware / Bandai Namco",
+  "steamAppId": 335300,
+  "exePatterns": [
+    "darksoulsii.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "winmm=n,b"
+  },
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "FromSoftware DX11 → D3DMetal with msync, same class as Dark Souls III / Sekiro. Steam install is Game/DarkSoulsII.exe (335300). This is Scholar of the First Sin, not the 2014 original. Do not use Libraries.rgl or Libraries.vk."
+}

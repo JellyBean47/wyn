@@ -1,0 +1,23 @@
+{
+  "id": "dark-souls-remastered",
+  "name": "Dark Souls Remastered",
+  "publisher": "FromSoftware / Bandai Namco",
+  "steamAppId": 570940,
+  "exePatterns": [
+    "darksoulsremastered.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "winmm=n,b"
+  },
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "FromSoftware DX11 → D3DMetal with msync, same class as Dark Souls III / Sekiro. Steam launches DarkSoulsRemastered.exe (570940). This is the 2018 remaster, not Prepare to Die. Do not use Libraries.rgl or Libraries.vk."
+}

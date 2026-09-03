@@ -1,0 +1,21 @@
+{
+  "id": "vampire-survivors",
+  "name": "Vampire Survivors",
+  "publisher": "poncle",
+  "steamAppId": 1794680,
+  "exePatterns": [
+    "vampiresurvivors.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Unity DX11 → DXVK (Hades / Lethal Company class). Native macOS Steam build exists — this profile is the Windows Wine path."
+}

@@ -1,0 +1,82 @@
+[
+  {
+    "slug": "god-of-war-ragnarok",
+    "name": "God of War Ragnarök",
+    "publisher": "Santa Monica Studio",
+    "steamAppId": 2322010,
+    "profiles": ["god-of-war-ragnarok.json"],
+    "batch": 5
+  },
+  {
+    "slug": "horizon-forbidden-west",
+    "name": "Horizon Forbidden West Complete Edition",
+    "publisher": "Guerrilla / Nixxes",
+    "steamAppId": 2420110,
+    "profiles": ["horizon-forbidden-west.json"],
+    "batch": 5
+  },
+  {
+    "slug": "spider-man-miles-morales",
+    "name": "Marvel's Spider-Man: Miles Morales",
+    "publisher": "Insomniac Games",
+    "steamAppId": 1817190,
+    "profiles": ["spider-man-miles-morales.json"],
+    "batch": 5
+  },
+  {
+    "slug": "spider-man-2",
+    "name": "Marvel's Spider-Man 2",
+    "publisher": "Insomniac Games",
+    "steamAppId": 2651280,
+    "profiles": ["spider-man-2.json"],
+    "batch": 5
+  },
+  {
+    "slug": "returnal",
+    "name": "Returnal",
+    "publisher": "Housemarque",
+    "steamAppId": 1649240,
+    "profiles": ["returnal.json"],
+    "batch": 5
+  },
+  {
+    "slug": "ratchet-clank-rift-apart",
+    "name": "Ratchet & Clank: Rift Apart",
+    "publisher": "Insomniac Games",
+    "steamAppId": 1895880,
+    "profiles": ["ratchet-clank-rift-apart.json"],
+    "batch": 5
+  },
+  {
+    "slug": "the-last-of-us-part-2",
+    "name": "The Last of Us Part II Remastered",
+    "publisher": "Naughty Dog / Nixxes",
+    "steamAppId": 2531310,
+    "profiles": ["the-last-of-us-part-2.json"],
+    "batch": 5
+  },
+  {
+    "slug": "jedi-survivor",
+    "name": "STAR WARS Jedi: Survivor",
+    "publisher": "Respawn Entertainment",
+    "steamAppId": 1774580,
+    "profiles": ["jedi-survivor.json"],
+    "batch": 5
+  },
+  {
+    "slug": "resident-evil-village",
+    "name": "Resident Evil Village",
+    "publisher": "Capcom",
+    "steamAppId": 1196590,
+    "profiles": ["resident-evil-village.json"],
+    "batch": 5
+  },
+  {
+    "slug": "resident-evil-2",
+    "name": "Resident Evil 2",
+    "publisher": "Capcom",
+    "steamAppId": 883710,
+    "profiles": ["resident-evil-2.json"],
+    "batch": 5
+  }
+]

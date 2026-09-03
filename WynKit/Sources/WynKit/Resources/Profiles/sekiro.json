@@ -1,0 +1,24 @@
+{
+  "id": "sekiro",
+  "name": "Sekiro: Shadows Die Twice",
+  "publisher": "FromSoftware",
+  "steamAppId": 814380,
+  "exePatterns": [
+    "sekiro.exe",
+    "start_protected_game.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "winmm=n,b"
+  },
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "FromSoftware DX11 → D3DMetal with msync, same class as Elden Ring. Prefer sekiro.exe over start_protected_game.exe when both exist. AVX on Apple Silicon."
+}

@@ -1,0 +1,31 @@
+{
+  "id": "witcher-3",
+  "name": "The Witcher 3: Wild Hunt",
+  "publisher": "CD Projekt Red",
+  "steamAppId": 292030,
+  "exePatterns": [
+    "witcher3.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "REDengine DX12 next-gen (same family as Cyberpunk 2077). Prefer GPTK+D3DMetal; bin/x64_dx12/witcher3.exe over the DX11 x64 copy. Do not use Libraries.rgl or Libraries.vk."
+}

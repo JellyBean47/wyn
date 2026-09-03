@@ -1,0 +1,22 @@
+{
+  "id": "oblivion",
+  "name": "The Elder Scrolls IV: Oblivion Game of the Year Edition",
+  "publisher": "Bethesda Softworks",
+  "steamAppId": 22330,
+  "exePatterns": [
+    "oblivion.exe",
+    "oblivionlauncher.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Gamebryo DX9 → DXVK (same family as New Vegas). This is the original GOTY Steam SKU (22330), not Oblivion Remastered (2623190). Steam launches OblivionLauncher.exe; prefer Oblivion.exe. Prefs live in Documents\\My Games\\Oblivion."
+}

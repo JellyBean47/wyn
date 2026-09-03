@@ -1,0 +1,30 @@
+{
+  "id": "divinity-original-sin-2",
+  "name": "Divinity: Original Sin 2 - Definitive Edition",
+  "publisher": "Larian Studios",
+  "steamAppId": 435150,
+  "exePatterns": [
+    "eocapp.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "--skip-launcher",
+  "notes": "Divinity Engine 2 DX11 → D3DMetal (Baldur's Gate 3 class). Steam may start SupportTool.exe; launch DefEd/bin/EoCApp.exe with SteamAppId=435150. --skip-launcher avoids the Larian Support Tool. Native macOS Steam build exists — this profile is the Windows Wine path. Pin CX_GRAPHICS_BACKEND=d3dmetal. Do not use Libraries.rgl or Libraries.vk."
+}

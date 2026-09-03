@@ -1,0 +1,82 @@
+[
+  {
+    "slug": "left-4-dead-2",
+    "name": "Left 4 Dead 2",
+    "publisher": "Valve",
+    "steamAppId": 550,
+    "profiles": ["left-4-dead-2.json"],
+    "batch": 10
+  },
+  {
+    "slug": "dying-light-2",
+    "name": "Dying Light 2 Stay Human: Reloaded Edition",
+    "publisher": "Techland",
+    "steamAppId": 534380,
+    "profiles": ["dying-light-2.json"],
+    "batch": 10
+  },
+  {
+    "slug": "sons-of-the-forest",
+    "name": "Sons Of The Forest",
+    "publisher": "Endnight Games / Newnight",
+    "steamAppId": 1326470,
+    "profiles": ["sons-of-the-forest.json"],
+    "batch": 10
+  },
+  {
+    "slug": "grounded",
+    "name": "Grounded",
+    "publisher": "Obsidian Entertainment / Xbox Game Studios",
+    "steamAppId": 962130,
+    "profiles": ["grounded.json"],
+    "batch": 10
+  },
+  {
+    "slug": "enshrouded",
+    "name": "Enshrouded",
+    "publisher": "Keen Games",
+    "steamAppId": 1203620,
+    "profiles": ["enshrouded.json"],
+    "batch": 10
+  },
+  {
+    "slug": "v-rising",
+    "name": "V Rising",
+    "publisher": "Stunlock Studios",
+    "steamAppId": 1604030,
+    "profiles": ["v-rising.json"],
+    "batch": 10
+  },
+  {
+    "slug": "divinity-original-sin-2",
+    "name": "Divinity: Original Sin 2 - Definitive Edition",
+    "publisher": "Larian Studios",
+    "steamAppId": 435150,
+    "profiles": ["divinity-original-sin-2.json"],
+    "batch": 10
+  },
+  {
+    "slug": "monster-hunter-rise",
+    "name": "Monster Hunter Rise",
+    "publisher": "Capcom",
+    "steamAppId": 1446780,
+    "profiles": ["monster-hunter-rise.json"],
+    "batch": 10
+  },
+  {
+    "slug": "dragons-dogma-2",
+    "name": "Dragon's Dogma 2",
+    "publisher": "Capcom",
+    "steamAppId": 2054970,
+    "profiles": ["dragons-dogma-2.json"],
+    "batch": 10
+  },
+  {
+    "slug": "ff7-remake",
+    "name": "FINAL FANTASY VII REMAKE INTERGRADE",
+    "publisher": "Square Enix",
+    "steamAppId": 1462040,
+    "profiles": ["ff7-remake.json"],
+    "batch": 10
+  }
+]

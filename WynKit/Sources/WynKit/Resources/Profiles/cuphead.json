@@ -1,0 +1,21 @@
+{
+  "id": "cuphead",
+  "name": "Cuphead",
+  "publisher": "Studio MDHR",
+  "steamAppId": 268910,
+  "exePatterns": [
+    "cuphead.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Unity DX11 → DXVK (Hades / Valheim class). Native macOS Steam build exists — this profile is the Windows Wine path. The Delicious Last Course is DLC on 268910."
+}

@@ -45,13 +45,15 @@ public enum GameLibrary {
             || steamBottle() == nil
     }
 
-    /// Profiles shown in the library catalog. Skips Steam-client JSON and extra Satisfactory variants.
+    /// One profile per unique game. Canonical slugs live in `GameCatalog`;
+    /// variant files (`satisfactory-esync`, …) share a slug and stay hidden.
     public static func catalogProfiles() -> [GameProfile] {
-        ProfileStore.loadAll().filter { profile in
-            if hiddenProfileIDs.contains(profile.id) { return false }
-            if profile.id.hasPrefix("satisfactory-") { return false }
-            return true
+        let all = ProfileStore.loadAll().filter { !hiddenProfileIDs.contains($0.id) }
+        let canonical = Set(GameCatalog.load().games.map(\.slug))
+        if canonical.isEmpty {
+            return all.filter { !$0.id.hasPrefix("satisfactory-") }
         }
+        return all.filter { canonical.contains($0.id) }
     }
 
     /// Steam-installed apps in this bottle. Uses a bundled profile when `steamAppId` matches.

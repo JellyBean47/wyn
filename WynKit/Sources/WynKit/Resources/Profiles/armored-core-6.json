@@ -1,0 +1,24 @@
+{
+  "id": "armored-core-6",
+  "name": "Armored Core VI: Fires of Rubicon",
+  "publisher": "FromSoftware / Bandai Namco",
+  "steamAppId": 1888160,
+  "exePatterns": [
+    "armoredcore6.exe",
+    "start_protected_game.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "winmm=n,b"
+  },
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "FromSoftware DX12 → D3DMetal with msync, same class as Elden Ring. Steam launches Game/start_protected_game.exe; prefer armoredcore6.exe when both exist. Easy Anti-Cheat is not expected to work under Wine — this profile is for the local/offline path. AVX on Apple Silicon. Do not use Libraries.rgl or Libraries.vk."
+}

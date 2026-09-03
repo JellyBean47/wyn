@@ -1,0 +1,21 @@
+{
+  "id": "hades-2",
+  "name": "Hades II",
+  "publisher": "Supergiant Games",
+  "steamAppId": 1145350,
+  "exePatterns": [
+    "hades2.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Unity DX11 → DXVK (same class as Hades, distinct Steam app 1145350 vs 1145360). Native macOS Steam build may exist — this profile is the Windows Wine path."
+}

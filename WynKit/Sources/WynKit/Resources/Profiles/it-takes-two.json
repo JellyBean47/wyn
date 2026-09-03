@@ -1,0 +1,33 @@
+{
+  "id": "it-takes-two",
+  "name": "It Takes Two",
+  "publisher": "Hazelight Studios",
+  "steamAppId": 1426210,
+  "exePatterns": [
+    "ittakestwo.exe",
+    "nuts-win64-shipping.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "-dx11",
+  "unrealProject": "Nuts",
+  "notes": "UE4 DX11 → D3DMetal (Jedi Fallen Order class). Prefer ItTakesTwo.exe / Nuts-Win64-Shipping.exe with SteamAppId=1426210. -dx11 pins the Unreal RHI. Easy Anti-Cheat is not expected to work under Wine — local couch co-op is the intended path. Do not use Libraries.rgl or Libraries.vk."
+}

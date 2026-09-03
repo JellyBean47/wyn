@@ -1,0 +1,22 @@
+{
+  "id": "stardew-valley",
+  "name": "Stardew Valley",
+  "publisher": "ConcernedApe",
+  "steamAppId": 413150,
+  "exePatterns": [
+    "stardew valley.exe",
+    "stardewvalley.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "MonoGame/XNA → DXVK (same lightweight class as Lethal Company). Native macOS Steam build exists — this profile is the Windows Wine path. Prefer Stardew Valley.exe over the StardewValley.exe alias."
+}

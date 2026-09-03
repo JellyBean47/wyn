@@ -1,0 +1,21 @@
+{
+  "id": "valheim",
+  "name": "Valheim",
+  "publisher": "Iron Gate",
+  "steamAppId": 892970,
+  "exePatterns": [
+    "valheim.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Unity DX11 title; DXVK path is the same class as Lethal Company (often more stable than D3DMetal for this engine). Do not match valheim_server.exe."
+}

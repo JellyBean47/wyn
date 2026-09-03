@@ -1,0 +1,31 @@
+{
+  "id": "gta-v",
+  "name": "Grand Theft Auto V",
+  "publisher": "Rockstar Games",
+  "steamAppId": 271590,
+  "exePatterns": [
+    "gta5.exe",
+    "playgtav.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "RAGE DX11 → D3DMetal (Skyrim/FO4 class; RDR2 is the DX12 sibling). This is Legacy (271590), not Enhanced. Prefer GTA5.exe over PlayGTAV.exe. Rockstar Launcher may be required on first run (same bottle as Steam). Pin CX_GRAPHICS_BACKEND=d3dmetal. Do not use Libraries.rgl or Libraries.vk."
+}

@@ -1,0 +1,32 @@
+{
+  "id": "a-plague-tale-requiem",
+  "name": "A Plague Tale: Requiem",
+  "publisher": "Asobo Studio",
+  "steamAppId": 1182900,
+  "exePatterns": [
+    "aplaguetalerequiem_x64.exe",
+    "aplaguetalerequiem.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true,
+    "dxrEnabled": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "Asobo DX12 → D3DMetal (Control class). This is Requiem (1182900), not Innocence. Prefer APlagueTaleRequiem_x64.exe. Pin CX_GRAPHICS_BACKEND=d3dmetal. Do not use Libraries.rgl or Libraries.vk."
+}

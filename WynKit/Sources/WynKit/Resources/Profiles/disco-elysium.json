@@ -1,0 +1,22 @@
+{
+  "id": "disco-elysium",
+  "name": "Disco Elysium",
+  "publisher": "ZA/UM",
+  "steamAppId": 632470,
+  "exePatterns": [
+    "disco elysium.exe",
+    "disco.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "Unity DX11 → DXVK (Hades / Valheim class). Steam SKU is The Final Cut (632470). Prefer Disco Elysium.exe."
+}

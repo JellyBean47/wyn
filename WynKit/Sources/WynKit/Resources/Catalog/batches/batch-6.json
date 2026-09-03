@@ -1,0 +1,82 @@
+[
+  {
+    "slug": "dark-souls-remastered",
+    "name": "Dark Souls Remastered",
+    "publisher": "FromSoftware / Bandai Namco",
+    "steamAppId": 570940,
+    "profiles": ["dark-souls-remastered.json"],
+    "batch": 6
+  },
+  {
+    "slug": "dark-souls-2-scholar",
+    "name": "Dark Souls II: Scholar of the First Sin",
+    "publisher": "FromSoftware / Bandai Namco",
+    "steamAppId": 335300,
+    "profiles": ["dark-souls-2-scholar.json"],
+    "batch": 6
+  },
+  {
+    "slug": "armored-core-6",
+    "name": "Armored Core VI: Fires of Rubicon",
+    "publisher": "FromSoftware / Bandai Namco",
+    "steamAppId": 1888160,
+    "profiles": ["armored-core-6.json"],
+    "batch": 6
+  },
+  {
+    "slug": "nioh-2",
+    "name": "Nioh 2 – The Complete Edition",
+    "publisher": "Team Ninja / Koei Tecmo",
+    "steamAppId": 1325200,
+    "profiles": ["nioh-2.json"],
+    "batch": 6
+  },
+  {
+    "slug": "devil-may-cry-5",
+    "name": "Devil May Cry 5",
+    "publisher": "Capcom",
+    "steamAppId": 601150,
+    "profiles": ["devil-may-cry-5.json"],
+    "batch": 6
+  },
+  {
+    "slug": "nier-automata",
+    "name": "NieR: Automata",
+    "publisher": "PlatinumGames / Square Enix",
+    "steamAppId": 524220,
+    "profiles": ["nier-automata.json"],
+    "batch": 6
+  },
+  {
+    "slug": "fallout-new-vegas",
+    "name": "Fallout: New Vegas",
+    "publisher": "Obsidian / Bethesda Softworks",
+    "steamAppId": 22380,
+    "profiles": ["fallout-new-vegas.json"],
+    "batch": 6
+  },
+  {
+    "slug": "oblivion",
+    "name": "The Elder Scrolls IV: Oblivion Game of the Year Edition",
+    "publisher": "Bethesda Softworks",
+    "steamAppId": 22330,
+    "profiles": ["oblivion.json"],
+    "batch": 6
+  },
+  {
+    "slug": "kotor",
+    "name": "STAR WARS: Knights of the Old Republic",
+    "publisher": "BioWare",
+    "steamAppId": 32370,
+    "profiles": ["kotor.json"],
+    "batch": 6
+  },
+  {
+    "slug": "mass-effect-legendary-edition",
+    "name": "Mass Effect Legendary Edition",
+    "publisher": "BioWare / EA",
+    "steamAppId": 1328670,
+    "profiles": ["mass-effect-legendary-edition.json"],
+    "batch": 6
+  }
+]

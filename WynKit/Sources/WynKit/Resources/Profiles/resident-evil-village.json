@@ -1,0 +1,31 @@
+{
+  "id": "resident-evil-village",
+  "name": "Resident Evil Village",
+  "publisher": "Capcom",
+  "steamAppId": 1196590,
+  "exePatterns": [
+    "re8.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": true,
+    "dxrEnabled": true
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
+    "MTL_HUD_ENABLED": "1",
+    "D3DM_ENABLE_METALFX": "1",
+    "D3DM_SHOW_HUD_STATS": "1"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "",
+  "notes": "RE Engine DX12 → D3DMetal (RE4 remake / Control class). Launch re8.exe with SteamAppId=1196590. Ray tracing is DXR via D3DMetal on M3/M4; DLSS cannot run on Apple Silicon. First run hitching is PSO translation. Pin CX_GRAPHICS_BACKEND=d3dmetal. Do not use Libraries.rgl or Libraries.vk."
+}

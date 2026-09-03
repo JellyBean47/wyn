@@ -1,0 +1,21 @@
+{
+  "id": "life-is-strange",
+  "name": "Life is Strange",
+  "publisher": "DONTNOD / Square Enix",
+  "steamAppId": 319630,
+  "exePatterns": [
+    "lifeisstrange.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "enhancedSync": "msync",
+    "dxvk": true,
+    "dxvkAsync": true
+  },
+  "environment": {},
+  "winetricks": [
+    "vcrun2019"
+  ],
+  "notes": "UE3 DX9 → DXVK (Celeste class). Launch LifeIsStrange.exe in Binaries\\Win32 with SteamAppId=319630. Episode 1 is the Steam base; episodes 2–5 are DLC. This is the original, not Remastered (1265920). Native macOS Steam build exists (Feral) — this profile is the Windows Wine path."
+}
