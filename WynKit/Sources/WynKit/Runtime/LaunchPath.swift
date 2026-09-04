@@ -34,6 +34,19 @@ public enum LaunchPath: Sendable, Equatable {
     /// shim get in the way.
     case steamApplaunch
 
+    /// Also `-applaunch`, but for a different reason: the profile names no
+    /// executable, so there is nothing to run directly whatever the layer says.
+    ///
+    /// `GameLibrary.installed` synthesises a `steam-<appid>` profile with empty
+    /// `exePatterns` for any installed title Wyn has no profile for, and
+    /// `launchGame` short-circuits on that *before* it looks at the translation
+    /// layer. Reporting the layer's answer here would be a lie — and it is the
+    /// lie that cost an hour: a game whose profile had been removed launched
+    /// via Steam, Steam picked a 230 KB prerequisite shim over the 131 MB game
+    /// binary, and the shim's "Visual C++ Redistributable" dialog looked like a
+    /// missing runtime on a machine that had it installed.
+    case noProfile
+
     /// The one rule, in one place.
     ///
     /// D3DMetal is always direct — `launchGame`'s `direct` flag is not consulted
@@ -52,8 +65,11 @@ public enum LaunchPath: Sendable, Equatable {
         profile.bottle?.translationLayer ?? bottle.settings.translationLayer
     }
 
+    /// The answer for a real profile, which must check for an executable
+    /// *before* the layer — that is the order `launchGame` uses.
     public static func forProfile(_ profile: GameProfile, in bottle: Bottle, direct: Bool = false) -> LaunchPath {
-        forLayer(effectiveLayer(profile: profile, bottle: bottle), direct: direct)
+        guard !profile.exePatterns.isEmpty else { return .noProfile }
+        return forLayer(effectiveLayer(profile: profile, bottle: bottle), direct: direct)
     }
 
     /// Short enough for a status strip.
@@ -61,6 +77,7 @@ public enum LaunchPath: Sendable, Equatable {
         switch self {
         case .directExecutable: return "runs the game directly"
         case .steamApplaunch: return "launched by Steam"
+        case .noProfile: return "no profile — Steam picks the executable"
         }
     }
 
@@ -74,6 +91,13 @@ public enum LaunchPath: Sendable, Equatable {
             return "Wyn asks Steam to launch the game (steam.exe -applaunch). "
                 + "Steam picks the executable, which for some titles is a "
                 + "prerequisite shim rather than the game itself."
+        case .noProfile:
+            return "Wyn has no profile for this game, so it does not know which "
+                + "executable to run and asks Steam to launch it instead. Steam "
+                + "picks, and for some titles it picks a small prerequisite "
+                + "installer rather than the game — which then reports a missing "
+                + "runtime whether or not one is actually missing. Adding a "
+                + "profile puts the game back on the direct path."
         }
     }
 }

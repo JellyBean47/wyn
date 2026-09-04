@@ -208,4 +208,46 @@ struct LaunchPathTests {
         let layer = try #require(profile.bottle?.translationLayer)
         #expect(LaunchPath.forLayer(layer) == .directExecutable)
     }
+
+    /// A game with no profile is `-applaunch` whatever the layer says, because
+    /// `launchGame` short-circuits on empty `exePatterns` *before* it looks at
+    /// the layer. `GameLibrary.installed` hands the app exactly this shape —
+    /// a synthesised `steam-<appid>` profile — for every installed title Wyn
+    /// has no profile for.
+    ///
+    /// Reporting the layer's answer for one of those is the mistake that cost
+    /// an hour: a d3dmetal bottle would have claimed "runs the game directly"
+    /// while Steam was in fact picking the executable, and picking a 230 KB
+    /// prerequisite shim over the game.
+    @Test func aGameWithNoExecutableIsNeverReportedAsDirect() throws {
+        let unprofiled = GameProfile(
+            id: "steam-1805110",
+            name: "Solarpunk",
+            steamAppId: 1805110,
+            exePatterns: []
+        )
+        let bottle = Bottle(bottleUrl: URL.temporaryDirectory.appending(path: UUID().uuidString))
+        bottle.settings.translationLayer = .d3dMetal
+
+        #expect(LaunchPath.forLayer(.d3dMetal) == .directExecutable)
+        #expect(LaunchPath.forProfile(unprofiled, in: bottle) == .noProfile)
+        #expect(LaunchPath.noProfile.shortLabel.contains("no profile"))
+        #expect(LaunchPath.noProfile.explanation.contains("prerequisite"))
+    }
+
+    /// The same profile with an executable does follow the layer.
+    @Test func aProfileWithAnExecutableFollowsTheLayer() throws {
+        let profiled = GameProfile(
+            id: "solarpunk",
+            name: "Solarpunk",
+            steamAppId: 1805110,
+            exePatterns: ["solarpunk-win64-shipping.exe"]
+        )
+        let bottle = Bottle(bottleUrl: URL.temporaryDirectory.appending(path: UUID().uuidString))
+        bottle.settings.translationLayer = .d3dMetal
+        #expect(LaunchPath.forProfile(profiled, in: bottle) == .directExecutable)
+
+        bottle.settings.translationLayer = .dxmt
+        #expect(LaunchPath.forProfile(profiled, in: bottle) == .steamApplaunch)
+    }
 }
