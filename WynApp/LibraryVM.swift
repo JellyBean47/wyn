@@ -62,8 +62,12 @@ final class LibraryVM: ObservableObject {
     /// Visual C++ dialog for a runtime that was already installed.
     var selectedLaunchLabel: String? {
         guard let profile = selectedGame?.profile, let bottle else { return nil }
+        let path = LaunchPath.forProfile(profile, in: bottle)
+        // With no profile the layer is not what decides the launch, so naming
+        // it would point at the wrong thing.
+        guard path != .noProfile else { return path.shortLabel }
         let layer = LaunchPath.effectiveLayer(profile: profile, bottle: bottle)
-        return "\(layer.displayName) · \(LaunchPath.forLayer(layer).shortLabel)"
+        return "\(layer.displayName) · \(path.shortLabel)"
     }
 
     /// The long form, for the tooltip.
