@@ -13,11 +13,62 @@
 #     build artifacts, --fresh-machine makes the checkout match a fresh clone,
 #     and --remove-checkout deletes it outright for "leave no trace".
 #
-# Reports before it removes, and asks you to type the word.
+# Reports before it removes, and asks you to type the word. The report is du's
+# estimate; what the volume actually gave back is measured and printed at the
+# end, because on APFS those are not the same number.
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
+
+# Free space on the volume holding $HOME, in bytes.
+#
+# The size report below cannot be trusted on its own. It comes from du, which
+# counts logical bytes, and an APFS clone shares every block with its twin --
+# so du bills the clone at full size and removing it frees nothing. That is not
+# a corner case here: 'cp -Rc' is how a bottle gets parked, so a parked bottle
+# and the live one under Library/Containers are the same blocks. Uninstall then
+# reports "about 34 GB", removes the bottle, prints "Wyn is off this Mac", and
+# hands back no disk at all.
+#
+# Measured on this Mac with a 500 MB file: the clone cost 0 bytes to make, du
+# called it 477M, and deleting it returned 0 bytes. Deleting the original
+# returned all 500 MB.
+#
+# So du stays -- it is the only thing that can size a target before it is gone
+# -- but it is labelled an estimate, and what actually came back is measured
+# afterwards and printed. A number that is checked is worth more than a number
+# that is predicted.
+volume_free_bytes() {
+  df -k "$HOME" 2>/dev/null | tail -1 | awk '{ print $4 * 1024 }'
+}
+
+human_gb() {
+  awk -v b="${1:-0}" 'BEGIN { printf "%.1f", b / 1073741824 }'
+}
+
+# Whether the gap between what du promised and what the volume gave back is
+# worth saying out loud: more than 1 GiB, and more than a quarter of the
+# estimate. Small gaps are ordinary -- a log written mid-run, rounding -- and a
+# warning that fires every time is one nobody reads.
+#
+# Its own function so it can be tested without uninstalling anything:
+# scripts/test-uninstall-helpers.sh.
+shortfall_is_significant() {
+  local estimate_bytes="${1:-0}"
+  local reclaimed_bytes="${2:-0}"
+  local shortfall=$(( estimate_bytes - reclaimed_bytes ))
+  (( estimate_bytes > 0 ))            || return 1
+  (( shortfall > 1073741824 ))        || return 1
+  (( shortfall * 4 > estimate_bytes )) || return 1
+  return 0
+}
+
+# Sourcing with WYN_UNINSTALL_LIB=1 defines the helpers above and stops before
+# anything is inspected or removed. That is how the test script exercises them.
+if [[ -n "${WYN_UNINSTALL_LIB:-}" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
 
 KEEP_BOTTLES=0
 KEEP_CACHE=0
@@ -309,8 +360,15 @@ if [[ ${#RUNNING_APP_PIDS[@]} -gt 0 ]]; then
   printf '  %8s  Wyn.app is running — quit first\n' "-"
 fi
 
-printf '\n  %sTotal: about %s GB%s\n' "$C_HEAD" \
-  "$(awk -v kb="$TOTAL_KB" 'BEGIN { printf "%.1f", kb/1048576 }')" "$C_OFF"
+TOTAL_HUMAN="$(awk -v kb="$TOTAL_KB" 'BEGIN { printf "%.1f", kb/1048576 }')"
+printf '\n  %sTotal: about %s GB%s %s(logical size)%s\n' "$C_HEAD" \
+  "$TOTAL_HUMAN" "$C_OFF" "$C_DIM" "$C_OFF"
+printf '  %sA parked copy made with '"'"'cp -Rc'"'"' shares its blocks with the original,%s\n' \
+  "$C_DIM" "$C_OFF"
+printf '  %sso removing either one frees less than this, or nothing at all.%s\n' \
+  "$C_DIM" "$C_OFF"
+printf '  %sWhat actually came back is measured and reported at the end.%s\n' \
+  "$C_DIM" "$C_OFF"
 
 if [[ "$KEEP_BOTTLES" -eq 0 && -e "$CONTAINERS" ]]; then
   printf '\n  %sThis removes your bottles, and any game installed inside them.%s\n' "$C_WARN" "$C_OFF"
@@ -399,6 +457,10 @@ if [[ "$ASSUME_YES" -eq 0 ]]; then
     exit 0
   fi
 fi
+
+# Read before anything is stopped or removed, so the figure at the end covers
+# the whole run.
+FREE_BEFORE="$(volume_free_bytes)"
 
 echo
 
@@ -493,6 +555,37 @@ if [[ "$DROP_CCACHE" -eq 1 ]]; then
     echo "  removed  ${CCACHE_DIR_PATH/#$HOME/~}"
   else
     echo "  note     no ccache found to clear"
+  fi
+fi
+
+# What actually came back. The line above the confirmation is du's guess; this
+# is the volume's own answer, and the two disagree exactly when a target was
+# cloned. Reporting only the guess is how an uninstall can free nothing and
+# still read like it freed 34 GB.
+sleep 1
+FREE_AFTER="$(volume_free_bytes)"
+if [[ -n "${FREE_BEFORE:-}" && -n "${FREE_AFTER:-}" ]]; then
+  RECLAIMED=$((FREE_AFTER - FREE_BEFORE))
+  (( RECLAIMED < 0 )) && RECLAIMED=0
+  echo
+  printf '  %sReclaimed: %s GB%s %s(estimated %s GB)%s\n' \
+    "$C_HEAD" "$(human_gb "$RECLAIMED")" "$C_OFF" "$C_DIM" "$TOTAL_HUMAN" "$C_OFF"
+
+  ESTIMATE_BYTES=$(( TOTAL_KB * 1024 ))
+  SHORTFALL=$(( ESTIMATE_BYTES - RECLAIMED ))
+  if shortfall_is_significant "$ESTIMATE_BYTES" "$RECLAIMED"; then
+    printf '  %s%s GB of that is still on this Mac, shared with a copy of its own:%s\n' \
+      "$C_WARN" "$(human_gb "$SHORTFALL")" "$C_OFF"
+    printf '  %sremoving one side of an APFS clone frees nothing. Parked bottles%s\n' \
+      "$C_WARN" "$C_OFF"
+    printf '  %sare the usual reason. Find them with:%s\n' "$C_WARN" "$C_OFF"
+    printf "  %s  find ~ -maxdepth 3 -name 'Application Support-com.fly.gaming'%s\n" \
+      "$C_DIM" "$C_OFF"
+  fi
+
+  if [[ "$REMOVE_CHECKOUT" -eq 1 ]]; then
+    printf '  %sThe checkout is removed after this line, so it is not counted here.%s\n' \
+      "$C_DIM" "$C_OFF"
   fi
 fi
 

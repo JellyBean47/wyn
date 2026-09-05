@@ -78,6 +78,29 @@ holds them in memory and writes them straight back, which is how a "clean"
 reinstall ends up reading the previous install's `FlyRuntimeSource`. The script
 does this for you.
 
+### The size it reports, and the size you get back
+
+The total printed before you confirm comes from `du`, which counts logical
+bytes. An APFS clone shares every block with the file it was cloned from, so
+`du` bills it at full size and removing it frees nothing. `cp -Rc` makes a
+clone, and that is how a bottle gets parked — meaning a parked bottle and the
+live one under `Containers` are the same 34 GB of blocks, counted twice.
+
+So the script prints two numbers. The estimate before, and what the volume
+actually gave back after:
+
+```
+  Reclaimed: 1.4 GB (estimated 36.2 GB)
+  34.8 GB of that is still on this Mac, shared with a copy of its own:
+  removing one side of an APFS clone frees nothing. Parked bottles
+  are the usual reason. Find them with:
+    find ~ -maxdepth 3 -name 'Application Support-com.fly.gaming'
+```
+
+A parked copy is a deliberate backup, so uninstall never removes one — it only
+tells you it is there. `scripts/test-uninstall-helpers.sh` covers the
+arithmetic.
+
 Never touched: Homebrew packages, `~/Downloads` (including the GPTK image), and
 the source checkout. `--clean-build` opts into clearing `.build`, `Tools/bin`
 and `.scratch` — note `.scratch` holds the compiled winecx tree, so removing it
