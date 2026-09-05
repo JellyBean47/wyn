@@ -172,6 +172,80 @@ struct SessionPerformanceTests {
         #expect(!text.contains("WRONG LAYER"))
     }
 
+    // MARK: - A session that stopped
+
+    /// The real shape, from Solarpunk on 5 September: the map loads, one frame
+    /// renders, the render thread parks in `msync_wait_objs` waiting on
+    /// D3DMetal, and 120 seconds later the game thread gives up. Two minutes of
+    /// log, one frame, and the first version of this file called it healthy.
+    private var hungLog: String {
+        """
+        [2026.09.05-08.25.38:588][  0]LogD3D11RHI:     Description : AMD Compatibility Mode
+        [2026.09.05-08.25.38:588][  0]LogD3D11RHI:     VendorId    : 1002
+        [2026.09.05-08.25.38:588][  0]LogConfig: Set CVar [[r.setres:1280x720]]
+        [2026.09.05-08.25.43:787][  0]LogGameMode: Display: Match State Changed to InProgress
+        [2026.09.05-08.25.44:563][  1]LogRenderer: Forcing update for all mesh draw commands
+        [2026.09.05-08.27.49:359][243]LogRendererCore: Error: GameThread timed out waiting for \
+        RenderThread after 120.00 seconds:
+        """
+    }
+
+    @Test func theEngineAdmittingAThreadStoppedIsRead() {
+        let report = read(hungLog)
+        #expect(report.renderThreadTimeoutSeconds == 120)
+    }
+
+    /// The bug this test exists for. Every measurement in the file describes a
+    /// session that ran; none of them can describe one that did not, so the
+    /// checker found nothing to say and said so.
+    @Test func aHangIsNotACleanBill() {
+        let report = read(hungLog)
+        let findings = SessionPerformance.findings(report, expecting: .d3dMetal)
+        #expect(!findings.isEmpty)
+        let first = try? #require(findings.first)
+        #expect(first?.contains("THE SESSION STOPPED") == true)
+
+        let text = SessionPerformance.rendered(report, expecting: .d3dMetal)
+        #expect(!text.contains("Nothing looks wrong"))
+        #expect(text.contains("STOPPED"))
+    }
+
+    /// A stopped session outranks a wrong layer: the layer explains numbers,
+    /// and a hang means there are none to explain.
+    @Test func stoppedIsReportedBeforeTheWrongLayer() {
+        let onDXVK = hungLog
+            .replacingOccurrences(of: "AMD Compatibility Mode", with: "NVIDIA GeForce 6800")
+            .replacingOccurrences(of: "VendorId    : 1002", with: "VendorId    : 10de")
+        let findings = SessionPerformance.findings(read(onDXVK), expecting: .d3dMetal)
+        #expect(findings.count >= 2)
+        #expect(findings[0].contains("THE SESSION STOPPED"))
+        #expect(findings[1].contains("WRONG LAYER"))
+    }
+
+    /// The backstop, for a hang the engine never logged: minutes of log with
+    /// no measurable coverage and no frames.
+    @Test func minutesOfLogWithNoFramesIsItsOwnFinding() {
+        let silent = """
+        [2026.09.05-08.25.38:588][  0]LogD3D11RHI:     Description : AMD Compatibility Mode
+        [2026.09.05-08.25.38:588][  0]LogD3D11RHI:     VendorId    : 1002
+        [2026.09.05-08.29.38:588][  0]LogTemp: still nothing
+        """
+        let text = SessionPerformance.findings(read(silent), expecting: .d3dMetal)
+            .joined(separator: "\n")
+        #expect(text.contains("was not playing"))
+    }
+
+    /// And it must not fire on the healthy session, which is the whole reason
+    /// the backstop is written this narrowly.
+    @Test func aHealthySessionIsNotCalledAHang() {
+        let report = read(log(vendor: "1002", adapter: "AMD Compatibility Mode",
+                              framesPerSecond: 60, minutes: 3))
+        #expect(report.renderThreadTimeoutSeconds == nil)
+        let text = SessionPerformance.findings(report, expecting: .d3dMetal).joined(separator: "\n")
+        #expect(!text.contains("STOPPED"))
+        #expect(!text.contains("was not playing"))
+    }
+
     // MARK: - The rendered report
 
     @Test func theReportLeadsWithTheLayer() {
