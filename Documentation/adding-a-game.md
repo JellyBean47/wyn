@@ -167,6 +167,42 @@ is worth shipping; one that might play fullscreen is not.
 
 ---
 
+## 4b. Performance is part of the job
+
+A profile that launches is not a profile that is finished, and the difference is
+not cosmetic. Measured on Solarpunk — same settings, same resolution, same
+machine:
+
+| | DXVK | D3DMetal |
+|---|---|---|
+| median fps | 45.4 | **119.7** |
+| min / max | 29.9 / 69.3 | 116.7 / 120.2 |
+| layer log noise | 126,296 err/warn lines | none |
+
+`wyn profiles performance <id>` (and `read_session_performance` over MCP) reads
+this back out of the game's own log:
+
+```
+Layer that actually ran: D3DMetal (Apple GPTK)
+  adapter reported: AMD Compatibility Mode
+Frame rate: min 99.8  p25 117.0  median 119.6  p75 120.0  max 120.2  (33 min)
+Rendering: 1280x720 at 45% screen percentage → ~576x324 effective
+```
+
+**Always check the layer before you read the frame rate.** The profile does not
+decide it — the Wine tree the bottle is running does (§7b), and a number
+measured on the wrong layer is not evidence about the right one.
+
+Then judge the frame rate **against the resolution that produced it**. 45 fps is
+fine at 4K and alarming at 576×324. Slow *at a low resolution* is the signature
+of a structural problem, and the reflex it has to override is "turn the settings
+down" — that reflex cost a day here.
+
+Frames above the display's refresh rate are discarded: power and heat for
+nothing. VSync in the game's own settings is the fix. Never `-ExecCmds`.
+
+---
+
 ## 5. What counts as "it works"
 
 Not "a window appeared". From the game's own log — for UE that is
@@ -237,6 +273,37 @@ effective layer and the launch path it implies show in `wyn profiles show`, in
 the app's status strip beside the selected game, and in the diagnostics bundle;
 §8 covers the runtime check. Both were added because this investigation needed
 them and neither existed.
+
+---
+
+## 7b. The profile does not decide the translation layer
+
+Worse than §7, and the same shape. `WINEDLLOVERRIDES d3d11=b` asks for
+**builtin**, and builtin is D3DMetal only in the **game-host** Wine tree. If the
+bottle's wineserver is already up on the frankea tree — because Steam was
+started there, and Wyn adopts a live Steam rather than restarting it — the game
+gets the bottle's own native DXVK `d3d11.dll` instead. The profile is correct
+and irrelevant.
+
+This ran a two-hour session at a third of the frame rate with no symptom but a
+warm Mac.
+
+**Before launching**, `wyn runtime status`:
+
+```
+GPTK stubs:  D3DMetal selected            <- what is installed
+Live tree:   game (GPTK-aware Libraries)  <- what the next launch will get
+```
+
+**After launching**, the adapter in the game's own log, which is the only
+reliable answer:
+
+| Layer | Adapter | VendorId |
+|---|---|---|
+| D3DMetal | `AMD Compatibility Mode` | `0x1002` |
+| DXVK | `NVIDIA GeForce 6800` | `0x10de` |
+
+Remedy: `wyn steam quit`, then launch again. **Never `wineserver -k`.**
 
 ---
 

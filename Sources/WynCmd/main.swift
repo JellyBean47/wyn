@@ -323,9 +323,34 @@ extension WynCLI {
         static let configuration = CommandConfiguration(
             abstract: "Manage game compatibility profiles.",
             subcommands: [
-                ProfilesList.self, ProfilesShow.self, ProfilesApply.self, ProfilesEvidence.self
+                ProfilesList.self, ProfilesShow.self, ProfilesApply.self, ProfilesEvidence.self,
+                ProfilesPerformance.self
             ]
         )
+    }
+
+    /// What the last session actually did, from the game's own log.
+    ///
+    /// Separate from `evidence` on purpose: evidence says a game ran, this says
+    /// how it ran and — the part nothing else can answer — which translation
+    /// layer it really got.
+    struct ProfilesPerformance: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "performance",
+            abstract: "Which layer actually ran, and how fast, from the game's own log."
+        )
+
+        @Argument(help: "Profile id, e.g. \"solarpunk\".") var id: String
+
+        mutating func run() throws {
+            guard let profile = ProfileStore.profile(id: id) else {
+                throw ValidationError("Unknown profile \"\(id)\". Run: wyn profiles list")
+            }
+            guard let bottle = GameLibrary.steamBottle() else {
+                throw ValidationError("No Steam bottle. Run: wyn install")
+            }
+            print(SessionPerformance.report(profile: profile, in: bottle))
+        }
     }
 
     /// What this machine has actually run, and which profiles that vouches for.
