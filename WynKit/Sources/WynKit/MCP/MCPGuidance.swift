@@ -53,9 +53,40 @@ public enum MCPGuidance {
       translationLayer "dxvk" with dxvk false. D3DMetal cannot translate Vulkan.
     - D3D12 game → "d3dmetal". DXVK does not do D3D12.
     - D3D11 game, or nothing conclusive → "d3dmetal". It is the default, not the \
-      fallback: 81 of 119 shipped profiles use it, and on the one D3D11 game \
-      bisected properly D3DMetal rendered 998 frames where DXVK could not create \
-      a swapchain at all.
+      fallback, and the gap is large: measured on the same game, same settings, \
+      same resolution, D3DMetal held 119.7 fps median where DXVK managed 45.4. \
+      DXVK also could not create a fullscreen swapchain on that title at all.
+
+    THE PROFILE DOES NOT DECIDE THE LAYER
+
+    The Wine tree the bottle is running decides it. `WINEDLLOVERRIDES d3d11=b` \
+    asks for *builtin*, and builtin is D3DMetal only in the game-host tree; if \
+    Steam was started on the frankea tree the game gets the bottle's own native \
+    DXVK instead — silently, with a correct-looking profile.
+
+    This is not hypothetical. A d3dmetal profile ran a two-hour session on DXVK \
+    at a third of the frame rate, and the only symptom was a warm Mac.
+
+    So never conclude a layer is in use because the profile names it. After a \
+    launch, call read_session_performance: it reads the adapter out of the \
+    game's own log, which is the only reliable answer.
+
+      D3DMetal reports "AMD Compatibility Mode" (VendorId 0x1002)
+      DXVK     reports "NVIDIA GeForce 6800"    (VendorId 0x10de)
+
+    PERFORMANCE IS PART OF THE JOB
+
+    A profile that launches is not a profile that is finished. Read \
+    read_session_performance and judge the frame rate *against the resolution \
+    that produced it* — 45 fps is fine at 4K and alarming at 576x324.
+
+    Slow at a low resolution is the signature of a structural problem, not of \
+    settings being too high. Check the layer first. Do not tell someone to \
+    lower their settings to fix it; that is the diagnosis that cost a day.
+
+    Frames above the display's refresh rate are also worth naming: they are \
+    discarded, and they cost power and heat for nothing. VSync in the game's \
+    own settings is the fix. Do not reach for -ExecCmds to force a cap.
 
     THE FIRST LAUNCH IS A DIAGNOSTIC
 
@@ -72,13 +103,12 @@ public enum MCPGuidance {
       d3dmetal (ACCESS_VIOLATION at frame 1) and dxvk (swapchain E_FAIL) on the \
       same game that works windowed.
     - enhancedSync "msync", windowsVersion "win10" (118 and 119 of 119).
-    - winetricks ["vcrun2019", "vcrun2022"]. This declares a dependency; Wyn \
-      checks it against the bottle's registry and reports what is there, but \
-      never installs it — Steam's own prerequisite installer does that. Only \
-      list verbs Wyn can check (vcrun2015/2017/2019/2022, dotnet40-48); \
-      anything else is reported as unchecked rather than satisfied.
-    - On Unreal, set unrealProject — it is what points diagnostics at \
-      Saved/Logs/<Project>.log, which is where the evidence lives.
+    - winetricks ["vcrun2019", "vcrun2022"]. Declares a dependency; Wyn checks \
+      it against the bottle's registry but never installs it. Only verbs it can \
+      check (vcrun2015/2017/2019/2022, dotnet40-48).
+    - On Unreal, ALWAYS set unrealProject. It is what points diagnostics and \
+      read_session_performance at Saved/Logs/<Project>.log; without it there is \
+      no way to find out which layer ran or how fast.
 
     Tell the person the plan: get one working launch, then relax one knob at a \
     time in this order — drop -windowed, raise resolution, try avxEnabled true. \
@@ -156,7 +186,10 @@ public enum MCPGuidance {
                 4. validate_profile, and fix anything it returns.
                 5. save_profile.
                 6. Tell me to launch it from Wyn, that it stays a guess until it \
-                   has run, and what to try next if it works.
+                   has run, and that once it has you will call \
+                   read_session_performance — because a profile that launches on \
+                   the wrong layer at a third of the frame rate looks exactly \
+                   like success from here.
 
                 THE BASELINE. Change only what step 2 gives you a reason to \
                 change — the exe patterns, the layer if the game is Vulkan-native \
@@ -217,26 +250,39 @@ public enum MCPGuidance {
                 1. read_launch_evidence for \(target). If this machine has never \
                    run it, stop and say so: there is no baseline to improve on \
                    and changing settings now just resumes guessing.
-                2. get_profile \(target).
-                3. Propose exactly ONE change, taking the first that still \
+                2. read_session_performance \(target). CHECK THE LAYER FIRST. If \
+                   it is not the one the profile asks for, stop — nothing about \
+                   the frame rate means anything yet, and the fix is to quit \
+                   Steam and relaunch, not to change the profile.
+                3. get_profile \(target).
+                4. Read the frame rate against the resolution that produced it. \
+                   Slow at a low resolution is structural, not a settings \
+                   problem, and lowering settings further is the wrong move. \
+                   Fast with VSync off means frames being thrown away as heat, \
+                   and the fix is VSync in the game's own settings — never \
+                   -ExecCmds.
+                5. Propose exactly ONE change, taking the first that still \
                    applies from this order:
                      a. drop -windowed from launchArgs
                      b. raise -ResX / -ResY toward the display's resolution
                      c. set avxEnabled true
                    Nothing after that. MetalFX and D3DM_ENABLE_ASYNC_COMMIT stay \
                    "0" — that is measured, not caution, and the validator refuses \
-                   them anyway.
-                4. save_profile with that one change, and tell me to launch it.
-                5. When I report back: if it regressed, revert and stop — a game \
-                   that plays windowed at 720p is worth shipping. If it held, go \
-                   round again from step 3.
+                   them anyway. In-game quality settings are the person's to \
+                   change, not yours: say what the headroom allows and let them \
+                   decide.
+                6. save_profile with that one change, and tell me to launch it.
+                7. When I report back, read_session_performance again and compare \
+                   like for like. If it regressed, revert and stop — a game that \
+                   plays windowed at 720p is worth shipping. If it held, go round \
+                   again from step 5.
 
-                What "it held" means, from the game's own log (on Unreal, \
-                Saved/Logs/<unrealProject>.log): a LoadMap line, frames in the \
-                hundreds, and LogExit: Exiting. on close. A window appearing is \
-                not evidence. And do not blame the last line before a crash \
-                without checking whether it also appears in a healthy run — that \
-                mistake has already cost one investigation.
+                What "it held" means: same or better median frame rate at the \
+                same resolution, on the same layer, with no new hitches. A window \
+                appearing is not evidence, and neither is a frame rate measured \
+                against a different resolution. Do not blame the last line before \
+                a crash without checking whether it also appears in a healthy \
+                run — that mistake has already cost one investigation.
                 """
             }
         ]

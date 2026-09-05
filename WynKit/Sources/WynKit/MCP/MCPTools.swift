@@ -148,6 +148,26 @@ public enum MCPTools {
                 inputSchema: object()
             ),
             Tool(
+                name: "read_session_performance",
+                description: """
+                What a game's last session actually did, read from the game's \
+                own Unreal log: which translation layer really ran, frame rate, \
+                the resolution actually rendered, and whether anything caps the \
+                frame rate.
+
+                Call this after the person reports back on a launch. It answers \
+                the one question no profile can: the layer a game gets is \
+                decided by the Wine tree the bottle is running, not by the \
+                profile — a d3dmetal profile measured 45 fps on DXVK where \
+                D3DMetal gives 120, and every other tool reported success. \
+                Requires the profile to set `unrealProject`.
+                """,
+                inputSchema: object(
+                    ["id": ["type": "string", "description": "Profile id, e.g. \"solarpunk\"."]],
+                    required: ["id"]
+                )
+            ),
+            Tool(
                 name: "validate_profile",
                 description: """
                 Check a profile against Wyn's rules without writing anything. \
@@ -192,6 +212,7 @@ public enum MCPTools {
         case "list_profiles":          return listProfiles()
         case "get_profile":            return try getProfile(arguments)
         case "read_launch_evidence":   return DiagnosticsBundle.launchRecordReport()
+        case "read_session_performance": return try readSessionPerformance(arguments)
         case "validate_profile":       return try validateProfile(arguments)
         case "save_profile":           return try saveProfile(arguments)
         default: throw MCPToolError.unknownTool(name)
@@ -266,6 +287,18 @@ public enum MCPTools {
             return "No profile with id \"\(id)\". list_profiles shows what exists."
         }
         return encode(profile)
+    }
+
+    /// Reads the game's own log rather than anything Wyn wrote, which is the
+    /// point: it is the only source that knows which layer really ran.
+    static func readSessionPerformance(_ arguments: [String: Any]) throws -> String {
+        guard let id = arguments["id"] as? String else {
+            throw MCPToolError.missingArgument("id")
+        }
+        guard let profile = ProfileStore.profile(id: id) else {
+            return "No profile with id \"\(id)\". list_profiles shows what exists."
+        }
+        return SessionPerformance.report(profile: profile, in: try steamBottle())
     }
 
     static func decodeProfile(_ arguments: [String: Any]) throws -> GameProfile {

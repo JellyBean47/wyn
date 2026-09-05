@@ -87,7 +87,8 @@ struct MCPServerTests {
         let names = Set((tools ?? []).compactMap { $0["name"] as? String })
         #expect(names == [
             "list_installed_games", "inspect_game_files", "list_profiles",
-            "get_profile", "read_launch_evidence", "validate_profile", "save_profile"
+            "get_profile", "read_launch_evidence", "read_session_performance",
+            "validate_profile", "save_profile"
         ])
     }
 
@@ -182,6 +183,37 @@ struct MCPServerTests {
         let avx = try #require(body.range(of: "avxEnabled true"))
         #expect(windowed.lowerBound < res.lowerBound)
         #expect(res.lowerBound < avx.lowerBound)
+    }
+
+    /// A model could previously see that a profile launched and nothing else,
+    /// which is how a two-hour session ran on the wrong layer at a third of the
+    /// frame rate with every tool reporting success. The guidance has to say
+    /// that the profile does not decide the layer, and name the adapter check.
+    @Test func guidanceSaysTheProfileDoesNotDecideTheLayer() {
+        let instructions = MCPGuidance.instructions
+        #expect(instructions.contains("read_session_performance"))
+        #expect(instructions.contains("AMD Compatibility Mode"))
+        #expect(instructions.contains("NVIDIA GeForce 6800"))
+        #expect(instructions.lowercased().contains("wine tree"))
+    }
+
+    /// Performance is part of configuring a game, and the specific trap is
+    /// answering "slow" with "lower the settings".
+    @Test func guidanceTreatsPerformanceAsPartOfTheJob() {
+        let instructions = MCPGuidance.instructions.lowercased()
+        #expect(instructions.contains("lower their settings"))
+        #expect(instructions.contains("resolution that produced it"))
+    }
+
+    /// Order matters more than content here: a frame rate measured on the wrong
+    /// layer is not evidence about the right one, so the layer check has to come
+    /// before anything is concluded from the numbers.
+    @Test func tuningChecksTheLayerBeforeTheNumbers() throws {
+        let tune = try #require(MCPGuidance.all.first { $0.name == "tune_profile" })
+        let body = tune.body("solarpunk")
+        let layerCheck = try #require(body.range(of: "CHECK THE LAYER FIRST"))
+        let oneChange = try #require(body.range(of: "Propose exactly ONE change"))
+        #expect(layerCheck.lowerBound < oneChange.lowerBound)
     }
 
     /// It must be honest about the one thing a model cannot do.
