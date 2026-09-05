@@ -90,6 +90,15 @@ final class LibraryVM: ObservableObject {
         selectedID.flatMap { runtimeWarnings[$0] }
     }
 
+    /// Set only when the bottle is running on a Wine tree that cannot deliver
+    /// the layer the selected game's profile asks for.
+    ///
+    /// This is the one that cost two hours of play on the wrong layer with no
+    /// symptom but a warm Mac, so it gets its own line rather than being
+    /// folded into the launch label — the launch label would happily say
+    /// "D3DMetal · runs the game directly" while DXVK was doing the work.
+    @Published private(set) var layerMismatch: LayerReality.Mismatch?
+
     var steamStatusLabel: String {
         if bottle == nil { return "No Steam bottle" }
         if !steamInstalled { return "Steam not installed" }
@@ -199,6 +208,18 @@ final class LibraryVM: ObservableObject {
         steamRunning = SteamLauncher.isSteamClientRunning(in: bottle)
         steamLoggedOn = SteamLauncher.isSteamLoggedOn(in: bottle)
         runningGameNames = SteamLauncher.runningGameNames(among: games.map(\.profile))
+
+        // Only D3DMetal profiles can be downgraded by the running tree, and
+        // only then is it worth the process walk. Recomputed on the poll
+        // because it depends on which wineserver is alive, which changes
+        // underneath the app whenever Steam starts or stops.
+        if let profile = selectedGame?.profile,
+           LaunchPath.effectiveLayer(profile: profile, bottle: bottle) == .d3dMetal {
+            layerMismatch = LayerReality.mismatch(profile: profile, in: bottle)
+        } else {
+            layerMismatch = nil
+        }
+
         recordFinishedLaunches()
     }
 
