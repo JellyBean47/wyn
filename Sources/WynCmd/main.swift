@@ -588,6 +588,13 @@ extension WynCLI {
         @Flag(name: .long, help: "DXMT/DXVK only: run game EXE without steam.exe -applaunch. Ignored for D3DMetal (always direct).")
         var direct: Bool = false
 
+        // Without this there is no way to run a game in any bottle but "Steam",
+        // so a second bottle made to test another translation layer cannot be
+        // played from the CLI at all — the reason the 5 Sep DXMT attempt had to
+        // go through Steam's own Play button and silently measured D3DMetal.
+        @Option(name: .customLong("bottle"), help: "Bottle to play in (default: Steam).")
+        var bottleName: String = SteamLauncher.defaultBottleName
+
         mutating func run() async throws {
             guard let profile = ProfileStore.profile(id: profileId) else {
                 throw ValidationError("Unknown profile \"\(profileId)\". Run: wyn profiles list")
@@ -598,8 +605,11 @@ extension WynCLI {
             }
 
             var data = BottleData()
-            guard let bottle = data.loadBottles().first(where: { $0.settings.name == SteamLauncher.defaultBottleName }) else {
-                throw ValidationError("No Steam bottle. Run: wyn install")
+            guard let bottle = data.loadBottles().first(where: { $0.settings.name == bottleName }) else {
+                if bottleName == SteamLauncher.defaultBottleName {
+                    throw ValidationError("No Steam bottle. Run: wyn install")
+                }
+                throw ValidationError("No bottle named \"\(bottleName)\". Run: wyn list")
             }
 
             guard let appId = profile.steamAppId else {
@@ -622,6 +632,16 @@ extension WynCLI {
             )
             let layer = profile.bottle?.translationLayer
                 ?? bottle.settings.translationLayer
+            // Same honesty as `steam launch`: the tree decides the layer. A
+            // dxmt profile played on the game-host tree renders through
+            // D3DMetal, and the numbers that come back are not evidence about
+            // dxmt.
+            if let notice = DeclaredLayerNotice.message(
+                declared: layer,
+                tree: frankeaSteam ? .frankea : .gameHost
+            ) {
+                print(notice)
+            }
             let appleDirect = layer == .d3dMetal
             let diagProgram = Program(
                 url: (appleDirect || direct) ? exe : SteamLauncher.steamExePath(in: bottle),
@@ -983,12 +1003,23 @@ extension WynCLI {
             let fossWine = !GPTKInstaller.isWineGPTKAware()
             options.preferFrankeaSteam = (frankeaSteam || fossWine) && !gptkSteam
             options.preferGPTKSteam = !options.preferFrankeaSteam
+            let tree: DeclaredLayerNotice.Tree
             if options.preferFrankeaSteam {
                 options.wineTree = .steam
+                tree = .frankea
                 print("Launching Windows Steam on frankea Wine (DXMT/DXVK)…")
             } else {
                 options.wineTree = .game
+                tree = .gameHost
                 print("Launching Windows Steam on game-host Wine (Libraries/ — FOSS winecx + D3DMetal)…")
+            }
+            // The tree decides the layer, not the bottle. Say so when they
+            // disagree — a Steam-DXMT bottle launched here gets D3DMetal, and
+            // anything started from this client inherits it.
+            if let notice = DeclaredLayerNotice.message(
+                declared: target.settings.translationLayer, tree: tree
+            ) {
+                print(notice)
             }
             print("Log in here and check Remember me. Press Play in Steam — that should start the game.")
             print("wyn play <game> is fallback if Play hits a launcher/picker instead of the game EXE.\n")
