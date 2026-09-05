@@ -157,6 +157,15 @@ def read_game_user_settings(log_path):
     return ini, values
 
 
+def describe(rows):
+    """min / p25 / median / p75 / max over per-minute fps values."""
+    values = sorted(value for _, value in rows)
+    n = len(values)
+    return (f"min {values[0]:.1f}   p25 {values[n // 4]:.1f}   "
+            f"median {values[n // 2]:.1f}   p75 {values[(3 * n) // 4]:.1f}   "
+            f"max {values[-1]:.1f}")
+
+
 def summarise_dxvk(path):
     counts = collections.Counter()
     with open(path, errors="ignore") as handle:
@@ -171,6 +180,12 @@ def main():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("log", help="the game's own UE log")
     parser.add_argument("--dxvk", help="a DXVK log to summarise alongside it")
+    parser.add_argument("--timeline", action="store_true",
+                        help="print fps per minute — the only way to see a setting "
+                             "change mid-session")
+    parser.add_argument("--split", metavar="HH:MM",
+                        help="report separately either side of this UTC time. UE logs "
+                             "in UTC; a South African clock is two hours ahead of it")
     args = parser.parse_args()
 
     if not os.path.exists(args.log):
@@ -195,13 +210,27 @@ def main():
     print(f"  session : {span / 60:.1f} min of log timestamps")
     print(f"  frames  : {total:,} counted")
     if rows:
-        fps = sorted(value for _, value in rows)
-        n = len(fps)
-        print(f"  minutes : {n} with enough coverage to measure")
-        print(f"  fps     : min {fps[0]:.1f}   p25 {fps[n // 4]:.1f}   "
-              f"median {fps[n // 2]:.1f}   p75 {fps[(3 * n) // 4]:.1f}   max {fps[-1]:.1f}")
+        print(f"  minutes : {len(rows)} with enough coverage to measure")
+        print(f"  fps     : {describe(rows)}")
     else:
         print("  fps     : not enough log coverage to measure")
+
+    if args.split and rows:
+        before = [r for r in rows if r[0] < args.split]
+        after = [r for r in rows if r[0] >= args.split]
+        print()
+        print(f"  split at {args.split} UTC:")
+        print(f"    before ({len(before)} min): "
+              f"{describe(before) if before else 'no coverage'}")
+        print(f"    after  ({len(after)} min): "
+              f"{describe(after) if after else 'no coverage'}")
+
+    if args.timeline and rows:
+        print()
+        print("  per minute (UTC):")
+        for label, value in rows:
+            bar = "#" * int(round(value / 4))
+            print(f"    {label}  {value:6.1f}  {bar}")
 
     print()
     print("== what it was rendering ==")
