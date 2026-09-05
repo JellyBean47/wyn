@@ -630,6 +630,21 @@ extension WynCLI {
                 print("Game args: \(launchArgs.joined(separator: " "))")
             }
 
+            // The layer the profile names is not the layer the game gets if a
+            // wineserver from another tree is already up. Measured: a two-hour
+            // session ran on DXVK under a d3dmetal profile, and the only trace
+            // was one adapter line in the game's own log.
+            if let mismatch = LayerReality.mismatch(profile: profile, in: bottle) {
+                print("""
+
+                ⚠︎  WRONG TRANSLATION LAYER
+                \(mismatch.summary)
+                \(mismatch.remedy)
+                \(mismatch.howToVerify)
+                Launching anyway — this is a warning, not a block.
+                """)
+            }
+
             // A warning, never a block: this is a registry heuristic, and
             // refusing to launch on it would be worse than the old silence.
             // Printed before the game starts so it is above the log spew.
@@ -1031,6 +1046,17 @@ extension WynCLI {
             print("GPTK files:  \(GPTKInstaller.isInstalled() ? "yes (external/)" : "not installed")")
             print("Renderer:    \(RendererWiring.inspect().statusLines[0])")
             print("GPTK stubs:  \(GPTKInstaller.isWineModulesWired() ? "D3DMetal selected" : "not selected (DXMT/Wine unix)")")
+            // Which tree is live right now, not just which is installed. This
+            // is the difference between "D3DMetal is available" and "D3DMetal
+            // is what the next game will actually get".
+            if let steamBottle = GameLibrary.steamBottle() {
+                if let running = LayerReality.runningTree(in: steamBottle) {
+                    print("Live tree:   \(running.displayName)"
+                          + (running == .game ? "" : "  ← D3DMetal not available in this tree"))
+                } else {
+                    print("Live tree:   nothing running — next launch picks it")
+                }
+            }
             let steamOK = WynWineInstaller.isSteamWineInstalled()
             print("Steam Wine:  \(steamOK ? "yes (frankea fallback) — \(WynWineInstaller.steamLibraryFolder.path)" : "no frankea fallback (optional; one-Wine uses Libraries/)")")
             print("")

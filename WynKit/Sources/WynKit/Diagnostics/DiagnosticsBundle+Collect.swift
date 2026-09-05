@@ -337,6 +337,26 @@ extension DiagnosticsBundle {
         }
 
         lines.append("")
+        lines.append("── Which Wine tree the bottle is running on ──")
+        // The layer a profile names is not the layer a game gets. Measured 4
+        // Sep: a two-hour session ran on DXVK under a d3dmetal profile because
+        // Steam had been started on the frankea tree. The only evidence was one
+        // adapter line in the game's own log, which no bug report would carry.
+        if let running = LayerReality.runningTree(in: bottle) {
+            lines.append("Live wineserver: \(running.displayName)")
+            if running != .game {
+                lines.append("  NOTE: D3DMetal is only available in the game-host tree.")
+                lines.append("  Any d3dmetal profile launched into this wineserver gets")
+                lines.append("  the bottle's native DXVK instead, silently.")
+            }
+        } else {
+            lines.append("Live wineserver: none — the next launch picks the tree.")
+        }
+        lines.append("To confirm after a run, the game's own log names the adapter:")
+        lines.append("  D3DMetal = \"AMD Compatibility Mode\" (0x1002)")
+        lines.append("  DXVK     = \"NVIDIA GeForce 6800\" (0x10de)")
+
+        lines.append("")
         lines.append("── How each profile will be started ──")
         lines.append("The translation layer decides this, not a setting of its own.")
         lines.append("")

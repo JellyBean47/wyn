@@ -160,6 +160,14 @@ struct LibraryView: View {
                         .help(vm.selectedLaunchExplanation ?? "")
                         .accessibilityLabel("Launch settings: \(launch)")
                 }
+                // The one that had no symptom at all until someone noticed the
+                // Mac was warm. Louder than the rest, deliberately.
+                if let mismatch = vm.layerMismatch {
+                    Label("Wrong layer — \(mismatch.runningTree.displayName) tree",
+                          systemImage: "exclamationmark.octagon.fill")
+                        .foregroundStyle(.red)
+                        .help("\(mismatch.summary)\n\n\(mismatch.remedy)\n\n\(mismatch.howToVerify)")
+                }
                 // Silent unless something really is absent.
                 if let warning = vm.selectedRuntimeWarning {
                     Label(warning, systemImage: "exclamationmark.triangle.fill")
