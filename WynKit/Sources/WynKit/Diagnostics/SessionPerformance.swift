@@ -43,6 +43,13 @@ public enum SessionPerformance {
     public enum DetectedLayer: Sendable, Equatable {
         case d3dMetal
         case dxvk
+        /// DXMT, and it is the odd one out: it does not fake an adapter at all.
+        /// D3DMetal claims to be an AMD card and DXVK an NVIDIA one, so both
+        /// are recognised by a made-up vendor id. DXMT reports the real GPU
+        /// under Apple's own vendor id — `Apple M4`, `0x106b` — which is why
+        /// this file called the first DXMT session ever measured here an
+        /// "unrecognised adapter".
+        case dxmt
         /// An adapter string nobody has taught this file to recognise. Named
         /// rather than guessed — a wrong layer attribution is worse than none.
         case unrecognised(String)
@@ -51,6 +58,7 @@ public enum SessionPerformance {
             switch self {
             case .d3dMetal: return "D3DMetal (Apple GPTK)"
             case .dxvk: return "DXVK (DXVK-macOS → MoltenVK → Metal)"
+            case .dxmt: return "DXMT (D3D11 → Metal)"
             case .unrecognised(let adapter): return "unrecognised adapter \"\(adapter)\""
             }
         }
@@ -59,6 +67,7 @@ public enum SessionPerformance {
             switch self {
             case .d3dMetal: return .d3dMetal
             case .dxvk: return .dxvk
+            case .dxmt: return .dxmt
             case .unrecognised: return nil
             }
         }
@@ -67,6 +76,10 @@ public enum SessionPerformance {
             switch vendorId?.lowercased() {
             case "1002": return .d3dMetal
             case "10de": return .dxvk
+            // 0x106b is Apple. DXMT passes the real GPU through rather than
+            // impersonating a PC card, so this is the only one of the three
+            // where the adapter string is the truth.
+            case "106b": return .dxmt
             case .some: return .unrecognised(adapter ?? "vendor \(vendorId ?? "?")")
             case nil: return adapter.map { .unrecognised($0) }
             }
