@@ -577,18 +577,30 @@ public enum PlatformCatalog {
     /// The old `~/Desktop/wyn` fallback is gone: CONTRIBUTING says not to
     /// require it, and it only ever worked on a machine whose checkout happened
     /// to be in that exact place.
-    static func toolsBinURL() -> URL? {
+    /// Every directory searched for the native helpers, in order. Exposed so the
+    /// ordering can be tested without helpers on disk.
+    static func toolsBinSearchPaths() -> [URL] {
         let fm = FileManager.default
         var candidates: [URL] = []
 
         if let resources = Bundle.main.resourceURL {
             candidates.append(resources)
         }
+        // The installed app's Resources, by its known path. Bundle.main above
+        // covers the app; it does not cover the CLI, whose Bundle.main is
+        // ~/.local/bin. Same omission as the CEF shim had — see InstalledApp.
+        candidates.append(InstalledApp.resourcesDirectory)
         candidates.append(repoRootFromSource().appending(path: "Tools").appending(path: "bin"))
         candidates.append(
             URL(fileURLWithPath: fm.currentDirectoryPath)
                 .appending(path: "Tools").appending(path: "bin")
         )
+        return candidates
+    }
+
+    static func toolsBinURL() -> URL? {
+        let fm = FileManager.default
+        let candidates = toolsBinSearchPaths()
 
         // A directory only counts when it actually holds a helper — Resources
         // always exists, so testing the directory alone would match an app
