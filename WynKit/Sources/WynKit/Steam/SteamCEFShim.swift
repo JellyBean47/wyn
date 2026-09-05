@@ -80,12 +80,22 @@ public enum SteamCEFShim {
     ///
     /// The source-relative and cwd paths stay as developer conveniences for
     /// `swift run` out of a checkout.
-    public static var bundledShimURL: URL? {
+    /// Every place the shim is looked for, in order. Exposed so the ordering can
+    /// be tested without a shim on disk.
+    static var shimSearchPaths: [URL] {
         var candidates: [URL] = []
 
         if let bundled = Bundle.main.url(forResource: "steamwebhelper_shim", withExtension: "exe") {
             candidates.append(bundled)
         }
+
+        // The installed app carries it. This is the one that matters for the
+        // CLI, whose Bundle.main is ~/.local/bin and holds no Resources — see
+        // InstalledApp. Without this candidate every fresh bottle created from
+        // the command line gets a black Steam login window.
+        candidates.append(
+            InstalledApp.resourcesDirectory.appending(path: "steamwebhelper_shim.exe")
+        )
 
         // #filePath = .../WynKit/Sources/WynKit/Steam/SteamCEFShim.swift
         candidates.append(
@@ -102,7 +112,11 @@ public enum SteamCEFShim {
                 .appending(path: "Tools/bin/steamwebhelper_shim.exe")
         )
 
-        return candidates.first {
+        return candidates
+    }
+
+    public static var bundledShimURL: URL? {
+        shimSearchPaths.first {
             FileManager.default.fileExists(atPath: $0.path(percentEncoded: false))
         }
     }
