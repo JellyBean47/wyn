@@ -151,16 +151,19 @@ public enum MCPTools {
                 name: "read_session_performance",
                 description: """
                 What a game's last session actually did, read from the game's \
-                own Unreal log: which translation layer really ran, frame rate, \
-                the resolution actually rendered, and whether anything caps the \
-                frame rate.
+                own Unreal log: whether it ran at all, which translation layer \
+                really ran, frame rate, the resolution actually rendered, and \
+                whether anything caps the frame rate.
 
                 Call this after the person reports back on a launch. It answers \
                 the one question no profile can: the layer a game gets is \
                 decided by the Wine tree the bottle is running, not by the \
                 profile — a d3dmetal profile measured 45 fps on DXVK where \
                 D3DMetal gives 120, and every other tool reported success. \
-                Requires the profile to set `unrealProject`.
+                It also reports a session that stopped — a game that hung on \
+                its first frame has no frame rate, and "unmeasurable" must \
+                never be read as "fine". Requires the profile to set \
+                `unrealProject`.
                 """,
                 inputSchema: object(
                     ["id": ["type": "string", "description": "Profile id, e.g. \"solarpunk\"."]],

@@ -113,6 +113,21 @@ public enum SessionPerformance {
         public let vsync: Bool?
         public let frameRateLimit: Double?
 
+        /// Seconds the game thread waited for the render thread before giving
+        /// up, when the engine reported that it did.
+        ///
+        /// This is not a slow session, it is a stopped one, and the difference
+        /// was invisible here on 5 September: Solarpunk wedged on its first
+        /// frame, the game thread gave up after 120 seconds, and this file read
+        /// the log and said "Nothing looks wrong". Everything it measures —
+        /// frame rate, coverage, hitches — is about a session that ran. None of
+        /// them can describe one that did not.
+        ///
+        /// Only ever set from the engine's own timeout line, so it cannot fire
+        /// on a healthy session. Absence of the line is not evidence of health;
+        /// it is the absence of that particular admission.
+        public let renderThreadTimeoutSeconds: Double?
+
         /// Effective pixels actually rendered, which is what makes a frame rate
         /// mean something. 45 fps is fine at 4K and alarming at 576x324.
         public var effectiveResolution: String? {
@@ -169,6 +184,7 @@ public enum SessionPerformance {
         var resolution: String?
         var screenPercentage: Int?
         var hitches = 0
+        var threadTimeout: Double?
 
         var buckets: [String: (frames: Int, seconds: Double)] = [:]
         var previous: (time: Double, frame: Int)?
@@ -196,6 +212,17 @@ public enum SessionPerformance {
             // healthy session, which is how a signal becomes noise.
             if line.lowercased().contains("hitch detected") {
                 hitches += 1
+            }
+            // "GameThread timed out waiting for RenderThread after 120.00
+            // seconds:" — the engine admitting a thread stopped answering.
+            // Matched on the shape rather than on GameThread specifically, so
+            // the reverse wording is caught too. Only the longest wait is kept:
+            // one stall is the event, and a log that reports it twice is still
+            // one wedged session.
+            if line.contains("timed out waiting for"),
+               let seconds = match(line, #"timed out waiting for \w+ after ([0-9.]+) seconds"#)
+                   .flatMap(Double.init) {
+                threadTimeout = max(threadTimeout ?? 0, seconds)
             }
 
             guard let stamp = framePrefix(line) else { continue }
@@ -244,7 +271,8 @@ public enum SessionPerformance {
             screenPercentage: screenPercentage,
             hitches: hitches,
             vsync: settings.vsync,
-            frameRateLimit: settings.limit
+            frameRateLimit: settings.limit,
+            renderThreadTimeoutSeconds: threadTimeout
         )
     }
 
@@ -267,6 +295,9 @@ public enum SessionPerformance {
         }
         lines.append(String(format: "Session: %.1f min, %d frames counted",
                             report.sessionMinutes, report.framesCounted))
+        if let stalled = report.renderThreadTimeoutSeconds {
+            lines.append(String(format: "STOPPED: a thread stopped answering for %.0f s", stalled))
+        }
         lines.append("Frame rate: " + (report.fps?.summary ?? "not enough log coverage to measure"))
 
         var rendering = "Rendering: \(report.resolution ?? "resolution not in log")"
@@ -303,7 +334,42 @@ public enum SessionPerformance {
                                 expecting expected: TranslationLayer? = nil) -> [String] {
         var out: [String] = []
 
-        // 1. Wrong layer first. Everything else is misleading until this is right.
+        // 0. A session that stopped comes before a session that was slow.
+        //
+        // Solarpunk wedged on its first frame on 5 September and this function
+        // returned nothing at all: the frame rate was unmeasurable, so no
+        // finding about frame rate could fire, and "unmeasurable" was being
+        // treated as "nothing to say". A checker that reports a 120-second
+        // deadlock as a clean bill is worse than no checker, because it is
+        // believed.
+        if let stalled = report.renderThreadTimeoutSeconds {
+            out.append("""
+            THE SESSION STOPPED. The engine gave up after \
+            \(String(format: "%.0f", stalled)) seconds waiting for a thread that never answered, \
+            so nothing below is a measurement of how this game performs — it is a description of \
+            a game that hung. This is not fixed by lowering settings. Look at where it stopped: \
+            take a `sample <pid>` while it is still wedged, and if the render thread is parked in \
+            `msync_wait_objs` while D3DMetal's own thread waits in `os_sync_wait_on_address`, the \
+            two are waiting on each other and the GPU is idle.
+            """)
+        }
+
+        // 0b. The same failure, for a hang the engine never got round to
+        // admitting. Deliberately narrow — minutes of session with no
+        // measurable coverage AND essentially no frames — because a quiet
+        // healthy minute can also log little, and a false "it hung" would be
+        // exactly the kind of noise the finding above exists to avoid.
+        if report.renderThreadTimeoutSeconds == nil,
+           report.sessionMinutes >= 2, report.fps == nil, report.framesCounted <= 2 {
+            out.append("""
+            \(String(format: "%.0f", report.sessionMinutes)) minutes of log and \
+            \(report.framesCounted) frame(s) advanced. Whatever this session was, it was not \
+            playing. Treat the numbers below as absent rather than as evidence, and check whether \
+            the game was wedged rather than idle.
+            """)
+        }
+
+        // 1. Wrong layer next. Everything else is misleading until this is right.
         if let expected, let actual = report.layer?.translationLayer, actual != expected {
             out.append("""
             WRONG LAYER. The profile asks for \(expected.displayName) but the session ran on \
