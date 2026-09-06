@@ -268,6 +268,29 @@ final class LibraryVM: ObservableObject {
         }
     }
 
+    /// Set a bottle's **default** graphics layer.
+    ///
+    /// Since DXMT and D3DMetal stopped overwriting each other in `system32`,
+    /// both payloads sit in the bottle at once and the layer is chosen per
+    /// launch by `WINEDLLOVERRIDES`. So this is metadata: nothing is installed,
+    /// nothing is removed, and it takes effect on the next launch.
+    ///
+    /// It is a *default*, and deliberately not more than that. A game profile
+    /// that declares its own `translationLayer` is applied to the bottle at
+    /// launch by `ProfileApplicator.apply`, so that game keeps the layer its
+    /// profile asks for and this value is overwritten. Making the toggle win
+    /// instead would silently override profiles that pin a layer because the
+    /// title only works on one — which is why the UI says which games this
+    /// applies to rather than quietly doing nothing.
+    func setGraphics(_ layer: TranslationLayer, for item: BottleRowItem) {
+        let bottle = Bottle(bottleUrl: item.url)
+        guard bottle.settings.translationLayer != layer else { return }
+        bottle.settings.translationLayer = layer
+        // Mirrors ProfileApplicator: the two are one setting in two places.
+        bottle.settings.dxvk = layer == .dxvk
+        refreshBottles()
+    }
+
     func openCDrive(for item: BottleRowItem) {
         let drive = item.url.appending(path: "drive_c")
         guard FileManager.default.fileExists(atPath: drive.path(percentEncoded: false)) else {
