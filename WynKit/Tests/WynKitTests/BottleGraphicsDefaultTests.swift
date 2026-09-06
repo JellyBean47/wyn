@@ -66,4 +66,20 @@ struct BottleGraphicsDefaultTests {
             #expect(bottle.settings.translationLayer == layer)
         }
     }
+
+    /// Starting Steam must not change what the user picked. `prepareGameHostSteam`
+    /// used to write `.d3dMetal` into the bottle every time, so choosing DXMT in
+    /// the app and then launching Steam silently reverted the tile — the same
+    /// "interface says one thing, something else rewrites it" failure the toggle
+    /// was labelled to avoid. The Steam client's layer is forced per launch by
+    /// `translationLayerOverride`, which `Wine.runProgram` takes ahead of
+    /// anything stored, so nothing needs to be persisted for it.
+    @Test func theSteamClientsLayerIsALaunchOptionNotAStoredSetting() throws {
+        let options = Wine.LaunchOptions(translationLayerOverride: .d3dMetal)
+        #expect(options.translationLayerOverride == .d3dMetal)
+
+        // The bottle default is the user's, and starting Steam leaves it alone.
+        let bottle = makeBottle(layer: .dxmt)
+        #expect(bottle.settings.translationLayer == .dxmt)
+    }
 }

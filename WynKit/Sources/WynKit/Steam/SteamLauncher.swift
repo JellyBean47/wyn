@@ -271,15 +271,28 @@ public enum SteamLauncher {
         }
     }
 
-    /// Pin the bottle on D3DMetal and write per-exe AppDefaults. Do **not** apply `steam.json`
+    /// Write the per-exe AppDefaults that keep Steam's own processes on Wine
+    /// builtins, plus the CEF shim. Do **not** apply `steam.json`
     /// (`translationLayer: dxmt`) — that is what made Play inherit DXMT.
+    ///
+    /// This used to also write `.d3dMetal` into the bottle's settings. It
+    /// bought nothing: `makeSteamLaunchPlan` sets
+    /// `translationLayerOverride = .d3dMetal` for this launch and
+    /// `Wine.runProgram` takes that override ahead of anything stored, so the
+    /// client goes to D3DMetal either way. What the write did do was silently
+    /// overwrite the bottle's graphics default — a setting the user can see and
+    /// change in the app's Bottles section — every single time Steam started.
+    /// Pick DXMT in the app, launch Steam, and the tile quietly read D3DMETAL
+    /// again.
+    ///
+    /// A requirement of the Steam client is not a statement about what the user
+    /// wants their games to run on. The client's layer is a launch option now,
+    /// and stays one.
     private static func prepareGameHostSteam(
         in bottle: Bottle,
         gameExeNames: [String],
         debug: Bool
     ) throws {
-        bottle.settings.translationLayer = .d3dMetal
-        bottle.settings.dxvk = false
         try Wine.applyD3DMetalSteamIsolation(
             bottle: bottle,
             gameExeNames: d3dMetalGameExeNames(extra: gameExeNames),
