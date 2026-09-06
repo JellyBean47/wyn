@@ -290,13 +290,22 @@ public enum SteamLauncher {
     /// Launch the Steam client with Wyn's Steam compatibility profile applied.
     /// Default: game-host `Libraries/` (FOSS winecx + D3DMetal).
     /// Rollback: `preferFrankeaSteam` / `--frankea-steam` → `Libraries.steam`.
+    ///
+    /// `extraEnvironment` is merged over the plan's environment. `wyn play` uses
+    /// it to put the game profile's variables on the client process, because a
+    /// game Steam starts inherits the client's environment and nothing else.
+    /// Pass only what is safe for Steam's own CEF — see `steamSafeOverrides`.
     public static func launchSteam(
         in bottle: Bottle,
         options: Wine.LaunchOptions = Wine.LaunchOptions(),
-        gameExeNames: [String] = []
+        gameExeNames: [String] = [],
+        extraEnvironment: [String: String] = [:]
     ) async throws {
         let plan = try makeSteamLaunchPlan(
-            in: bottle, options: options, gameExeNames: gameExeNames
+            in: bottle,
+            options: options,
+            gameExeNames: gameExeNames,
+            extraEnvironment: extraEnvironment
         )
         if plan.useGameHost {
             // No second shim pass here: ensureGameHostCEFReady already left the
@@ -383,7 +392,8 @@ public enum SteamLauncher {
     private static func makeSteamLaunchPlan(
         in bottle: Bottle,
         options: Wine.LaunchOptions,
-        gameExeNames: [String]
+        gameExeNames: [String],
+        extraEnvironment: [String: String] = [:]
     ) throws -> SteamLaunchPlan {
         let steamURL = steamExePath(in: bottle)
         guard FileManager.default.fileExists(atPath: steamURL.path(percentEncoded: false)) else {
@@ -437,10 +447,13 @@ public enum SteamLauncher {
             }
         }
 
+        var planEnvironment = environment
+        planEnvironment.merge(extraEnvironment, uniquingKeysWith: { _, new in new })
+
         return SteamLaunchPlan(
             steamURL: steamURL,
             args: args,
-            environment: environment,
+            environment: planEnvironment,
             options: steamOptions,
             useGameHost: useGameHost
         )
@@ -1908,12 +1921,10 @@ public enum SteamLauncher {
             program: steamProgram
         )
 
-        // Critical: if Steam is already running, `-applaunch` only signals that process.
-        // Cold-restart so game args / DLL overrides apply.
-        //
+        // Cold-restart so game args, AppDefaults and client environment apply.
         // GPTK-aware Wine breaks Steam CEF — play uses frankea Steam Wine for DXMT/DXVK.
         if options.debug {
-            print("[wyn:debug] Restarting Wine bottle for frankea Steam -applaunch…")
+            print("[wyn:debug] Restarting Wine bottle before starting Steam…")
         } else {
             print("Restarting Steam (frankea Wine) so the game can launch…")
         }
@@ -1924,6 +1935,8 @@ public enum SteamLauncher {
 
         if effectiveLayer == .dxmt {
             // Game EXEs: DXMT natives. Steam: frankea builtins (set by prepareFrankea).
+            // These per-exe AppDefaults are how the game gets its layer now — the
+            // client process no longer carries d3d overrides for it to inherit.
             let gameDXMT: [String: String] = [
                 "d3d11": "n",
                 "dxgi": "n",
@@ -1936,8 +1949,6 @@ public enum SteamLauncher {
                 guard exe.lowercased().hasSuffix(".exe") else { continue }
                 try Wine.setAppDllOverrides(bottle: bottle, exeName: exe, overrides: gameDXMT)
             }
-            environment["WINEDLLOVERRIDES"] =
-                "d3d11,dxgi,d3d10core=n,b;gameoverlayrenderer64=n;steamerrorreporter64.exe,steamerrorreporter.exe=d"
         }
 
         let hostEnv = ProcessInfo.processInfo.environment
@@ -1947,22 +1958,23 @@ public enum SteamLauncher {
             }
         }
 
-        var args: [String] = []
-        if let steamProfile = ProfileStore.profile(id: "steam") {
-            args.append(contentsOf: ProfileApplicator.launchArguments(
-                profile: steamProfile, program: steamProgram
-            ))
+        // The game inherits the *client's* environment, so the profile's
+        // variables go on the client — minus any d3d/dxgi override, which on
+        // that process reaches steamwebhelper and kills CEF.
+        var clientEnvironment = environment
+        if let safe = steamSafeOverrides(environment["WINEDLLOVERRIDES"]) {
+            clientEnvironment["WINEDLLOVERRIDES"] = safe
+        } else {
+            clientEnvironment.removeValue(forKey: "WINEDLLOVERRIDES")
         }
-        args.append(contentsOf: ["-applaunch", "\(appId)"])
-        args.append(contentsOf: resolvedGameArgs)
 
         var playOptions = options
         playOptions.wineTree = .steam
 
         if options.debug {
             print("[wyn:debug] play → frankea Steam Wine (\(WynWineInstaller.steamLibraryFolder.path))")
-            print("[wyn:debug] steam args: \(args.joined(separator: " "))")
-            print("[wyn:debug] WINEDLLOVERRIDES=\(environment["WINEDLLOVERRIDES"] ?? "(none)")")
+            print("[wyn:debug] client WINEDLLOVERRIDES=\(clientEnvironment["WINEDLLOVERRIDES"] ?? "(none)")")
+            print("[wyn:debug] game layer via AppDefaults: \(effectiveLayer.rawValue)")
             SteamUIDiagnostics.printSnapshot(bottle: bottle, label: "pre-launch")
         }
 
@@ -1971,16 +1983,79 @@ public enum SteamLauncher {
             : nil
         defer { sampler?.cancel() }
 
+        // Phase 1 — start the client, the way `wyn steam launch` starts one.
+        var clientOptions = playOptions
+        clientOptions.preferFrankeaSteam = true
+        clientOptions.preferGPTKSteam = false
+        clientOptions.detachAfterStart = true
+        progress("Starting Steam…")
+        try await launchSteam(
+            in: bottle,
+            options: clientOptions,
+            gameExeNames: profile.exePatterns,
+            extraEnvironment: clientEnvironment
+        )
+        try await waitForSteamClient(in: bottle, seconds: 120)
+        try await waitForSteamLoggedOn(in: bottle, seconds: 180)
+
+        // Phase 2 — now `-applaunch` means what it says: a command to a client
+        // that is already up. This short process forwards it and exits.
+        var args: [String] = ["-applaunch", "\(appId)"]
+        args.append(contentsOf: resolvedGameArgs)
+        if options.debug {
+            print("[wyn:debug] steam args: \(args.joined(separator: " "))")
+        }
+        progress("Asking Steam to launch \(appId)…")
         try await Wine.runProgram(
             at: steamURL,
             args: args,
             bottle: bottle,
-            environment: environment,
+            environment: clientEnvironment,
             options: playOptions
         )
 
+        // Parity with the old shape: `wyn play` returned when the steam.exe it
+        // started exited. That process is now the client, started above.
+        await waitUntilSteamClientExits(in: bottle)
+
         if options.debug {
             SteamUIDiagnostics.printSnapshot(bottle: bottle, label: "post-exit")
+        }
+    }
+
+    /// Strip graphics-layer overrides out of a `WINEDLLOVERRIDES` string,
+    /// keeping every other clause in order.
+    ///
+    /// A process-wide `d3d11,dxgi,d3d10core=n,b` on the Steam client reaches
+    /// steamwebhelper, and loading a game translation layer into Chromium's GPU
+    /// process kills it at startup (`crash server failed to launch,
+    /// self-terminating`), respawning every 10 s and never logging on. Measured
+    /// 12 Aug: `n,b` FAIL 2/2, absent GOOD 4/4, `b` GOOD 2/2. The game's layer
+    /// comes from its own per-exe AppDefaults instead.
+    ///
+    /// Returns nil when nothing survives the strip.
+    static func steamSafeOverrides(_ raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else { return nil }
+        let graphics: Set<String> = [
+            "d3d8", "d3d9", "d3d10", "d3d10core", "d3d11", "d3d12",
+            "dxgi", "wined3d", "atidxx64", "nvapi", "nvapi64", "nvngx",
+            "winemetal"
+        ]
+        let kept = raw.split(separator: ";").filter { clause in
+            let names = clause.split(separator: "=").first ?? clause
+            return !names
+                .split(separator: ",")
+                .contains { graphics.contains($0.trimmingCharacters(in: .whitespaces).lowercased()) }
+        }
+        guard !kept.isEmpty else { return nil }
+        return kept.joined(separator: ";")
+    }
+
+    /// Block until this bottle's Steam client is gone.
+    private static func waitUntilSteamClientExits(in bottle: Bottle) async {
+        while isSteamClientRunning(in: bottle) {
+            if Task.isCancelled { return }
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
         }
     }
 
