@@ -1,0 +1,31 @@
+{
+  "id": "solarpunk-dxmt",
+  "name": "Solarpunk (DXMT)",
+  "publisher": "Cyberwave",
+  "steamAppId": 1805110,
+  "exePatterns": [
+    "solarpunksteam-win64-shipping.exe",
+    "solarpunk.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxmt",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": false,
+    "metalHud": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "dxgi,d3d11,d3d10core=n,b",
+    "MTL_HUD_ENABLED": "0"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "-NO_EOS_OVERLAY -windowed -ResX=1280 -ResY=720",
+  "unrealProject": "Solarpunk",
+  "status": "verified",
+  "notes": "WORKS. Measured 6 Sep 2026 via `wyn play solarpunk-dxmt`: LogD3D11RHI chose 'Apple M4' VendorId 106b, MainLevel loaded in 1.04 s, clean 'LogExit: Exiting.' lsof on the live process had winemetal.so and winemetal.dll mapped and no libd3dshared.dylib, so this really was DXMT and not D3DMetal wearing its name. Same bottle and tree that runs the d3dmetal `solarpunk` profile minutes earlier and later, with no files rewritten between: the layer is chosen by WINEDLLOVERRIDES alone. Also ran concurrently with a D3DMetal instance in one wineserver, each on its own layer. REQUIRES a DXMT whose DLLs are native PEs. The runtime Wyn installs (v3.1.1, DXMT 0.80) ships native ones, checked at offset 0x40, so a standard install is fine and enableDXMT's isNativePE guard will refuse anything else rather than launching it. If you BUILD DXMT yourself, pass -Dwine_builtin_dll=false: the meson default is true, which stamps 'Wine builtin DLL' at that offset, and Wine's load_builtin() then silently rewrites =n,b into =b,n, searches the tree first and hands you D3DMetal — the run looks like a DXMT result and is not. ALWAYS CHECK THE ADAPTER, never the profile: DXMT reports 'Apple M4' (0x106b), D3DMetal reports 'AMD Compatibility Mode' (0x1002), DXVK reports 'NVIDIA GeForce 6800' (0x10de). Note a D3DMetal log also contains 'Apple M4' and '106b' from dxcore adapter enumeration falling through to wined3d, so key on the 'Chosen D3D11 Adapter' line and nothing else."
+}
