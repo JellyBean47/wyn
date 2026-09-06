@@ -258,6 +258,9 @@ struct LibraryView: View {
             Text("A bottle is a separate Windows environment. Wyn sets each one up the first time something runs in it.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+            Text("Right-click a bottle to change its graphics layer. That is the bottle's default — a game whose profile pins a layer keeps that one.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
             LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
                 ForEach(vm.bottles) { item in
                     Button {
@@ -275,6 +278,19 @@ struct LibraryView: View {
                           ? "Open the C: drive for \(item.name)"
                           : "\(item.name) is set up the first time something runs in it")
                     .accessibilityLabel("Bottle \(item.name)")
+                    .contextMenu {
+                        // Both payloads live in the bottle at once now, so this
+                        // installs nothing — it only changes which one the next
+                        // launch selects.
+                        Picker("Graphics", selection: Binding(
+                            get: { item.layer },
+                            set: { vm.setGraphics($0, for: item) }
+                        )) {
+                            ForEach(TranslationLayer.allCases, id: \.self) { layer in
+                                Text(layer.displayName).tag(layer)
+                            }
+                        }
+                    }
                 }
 
                 Button {

@@ -17,6 +17,9 @@ struct BottleRowItem: Identifiable, Hashable {
     let name: String
     let windowsVersion: String
     let graphics: String
+    /// The same value as `graphics`, unstringified, so the tile's Graphics
+    /// picker has something to bind to.
+    let layer: TranslationLayer
     let url: URL
     /// False until something has run in the bottle and Wine has built the
     /// prefix. Worth showing, so an empty new bottle does not look broken.
@@ -27,6 +30,7 @@ struct BottleRowItem: Identifiable, Hashable {
         self.name = bottle.settings.name
         self.windowsVersion = bottle.settings.windowsVersion.pretty()
         self.graphics = bottle.settings.translationLayer.rawValue.uppercased()
+        self.layer = bottle.settings.translationLayer
         self.url = bottle.url
         self.isInitialised = FileManager.default.fileExists(
             atPath: bottle.url.appending(path: "drive_c").path(percentEncoded: false)
