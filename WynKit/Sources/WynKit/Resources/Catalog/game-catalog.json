@@ -926,7 +926,7 @@
       "name": "Solarpunk",
       "publisher": "Cyberwave",
       "steamAppId": 1805110,
-      "profiles": ["solarpunk.json"],
+      "profiles": ["solarpunk.json", "solarpunk-dxmt.json"],
       "batch": 11
     }
   ]
