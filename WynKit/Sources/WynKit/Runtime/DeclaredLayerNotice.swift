@@ -5,11 +5,7 @@
 //  Say when a launch cannot give a bottle the layer it declares.
 //
 //  A bottle records a `translationLayer`. A launch picks a Wine *tree*, and the
-//  tree decides what the game actually gets: the game-host tree's unix
-//  `d3d11.so`/`dxgi.so`/`d3d12.so`/`d3d10.so` point at libd3dshared, so every
-//  game on it renders through D3DMetal no matter what any bottle or profile
-//  says. `wyn renderer` states this plainly — "if they disagree, the filesystem
-//  wins" — but nothing said it at the moment it mattered.
+//  tree bounds what the game can get.
 //
 //  On 5 September a bottle was created specifically to test DXMT:
 //
@@ -27,6 +23,24 @@
 //  The game came up on D3DMetal and crashed, and the crash was recorded against
 //  DXMT until someone read the adapter string. An entire test measured the
 //  wrong thing.
+//
+//  CORRECTED 6 September 2026. This file used to say the game-host tree gives
+//  D3DMetal and nothing else, because its unix `d3d11.so`/`dxgi.so` point at
+//  libd3dshared. That is true of the *builtin* path and was mistaken for a
+//  property of the tree. DXMT ships native PEs, which `=n` selects without
+//  consulting a single `.so`, so one tree serves both layers and the override
+//  string alone decides. Solarpunk ran on the same tree, same bottle and same
+//  files forty minutes apart: `AMD Compatibility Mode` / `1002` under
+//  `d3d11,dxgi,…=b`, and `Apple M4` / `106b` under `dxgi,d3d11,d3d10core=n,b`.
+//
+//  What defeated `=n` before was not the tree. DXMT's meson `wine_builtin_dll`
+//  defaults to true, stamping `"Wine builtin DLL"` at offset 0x40, and Wine's
+//  `load_builtin()` rewrites `=n,b` into `=b,n` when it sees that marker — so
+//  D3DMetal won and the tree took the blame. Built with
+//  `-Dwine_builtin_dll=false`, `=n` matches.
+//
+//  So the notice below now fires on genuinely unavailable combinations only,
+//  and DXMT on the game-host tree is no longer one of them.
 //
 //  This is the same failure as LayerReality (#49), from the other direction.
 //  That guard asks whether a d3dmetal profile is about to be silently
@@ -57,12 +71,19 @@ public enum DeclaredLayerNotice {
 
     /// What a tree can actually deliver.
     ///
-    /// Deliberately not "what the bottle asked for": the unix d3d entries are a
-    /// single machine-wide pointer, so this is a property of the filesystem, not
-    /// of any bottle.
+    /// Deliberately not "what the bottle asked for": this is a property of what
+    /// is on disk, not of any bottle.
+    ///
+    /// The game-host tree delivers **both** D3DMetal and DXMT — its builtins are
+    /// libd3dshared, and DXMT's natives sit in the bottle's `system32`
+    /// alongside, selected by `=n`. Demonstrated end to end on 6 Sep 2026.
+    ///
+    /// DXVK stays off this list for the game-host tree because it has not been
+    /// demonstrated there, not because it is known to fail — an unproven
+    /// combination is exactly what this notice exists to flag.
     public static func layers(on tree: Tree) -> [TranslationLayer] {
         switch tree {
-        case .gameHost: return [.d3dMetal]
+        case .gameHost: return [.d3dMetal, .dxmt]
         case .frankea: return [.dxmt, .dxvk]
         }
     }
@@ -79,11 +100,10 @@ public enum DeclaredLayerNotice {
         let got = available.map(\.displayName).joined(separator: " or ")
         return """
         NOTE: this bottle declares \(declared.displayName), but launching on \
-        \(tree.displayName) gives \(got). The d3d entries in that tree are a \
-        machine-wide pointer and the bottle does not change them, so anything \
-        started from here renders through \(got) whatever the bottle or profile \
-        says. Check the adapter in the game's log before treating this run as \
-        evidence about \(declared.displayName).
+        \(tree.displayName) gives \(got) — that tree has no \
+        \(declared.displayName) payload to select, so the override string cannot \
+        reach one. Check the adapter in the game's log before treating this run \
+        as evidence about \(declared.displayName).
         """
     }
 }

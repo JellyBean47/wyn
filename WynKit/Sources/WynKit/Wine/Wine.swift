@@ -1044,8 +1044,36 @@ public class Wine {
         return start..<text.endIndex
     }
 
-    /// Put GPTK PE stubs in the bottle. Requires D3DMetal already selected
-    /// (`wyn renderer set d3dmetal`); does not repoint shared unix modules.
+    /// Check that this machine can run D3DMetal. Installs nothing.
+    ///
+    /// This function used to rewrite the bottle's `system32`: it copied the GPTK
+    /// PE stubs in, and deleted `winemetal.dll` and the other DXMT-exclusive DLLs
+    /// out. That was the single reason DXMT and D3DMetal could not coexist — each
+    /// launch destroyed the other layer's payload, so any alternating test failed
+    /// by construction and the first DXMT attempt on 6 Sep reported
+    /// `AMD Compatibility Mode`.
+    ///
+    /// None of the copying was ever needed. D3DMetal is selected with `=b`
+    /// (builtin only), and a builtin is resolved from the Wine tree's
+    /// `lib/wine/x86_64-windows/`, not from the bottle. Wine never looks at
+    /// `system32` for a name overridden to `b`, so whatever sits there is
+    /// irrelevant to a D3DMetal launch.
+    ///
+    /// Demonstrated end to end on 6 Sep 2026: Solarpunk launched with the D3DMetal
+    /// env and DXMT's 22 MB `d3d11.dll`, 14 MB `dxgi.dll`, 13 MB `d3d10core.dll`
+    /// and `winemetal.dll` all left resident in `system32` — chose
+    /// `AMD Compatibility Mode` / VendorId `1002`, reached MainLevel in 0.90 s,
+    /// played 25 minutes and exited on `LogExit: Exiting.` with rc=0. `lsof` on
+    /// the live process showed the tree's `x86_64-windows/d3d11.dll` and
+    /// `libd3dshared.dylib` mapped and no `winemetal.so` anywhere: the resident
+    /// DXMT payload was never even opened.
+    ///
+    /// The layer is now chosen per launch by `WINEDLLOVERRIDES` alone, backed by
+    /// the per-exe AppDefaults in `applyD3DMetalGameOverrides` /
+    /// `applyD3DMetalSteamIsolation` for children that inherit no environment.
+    ///
+    /// Requires D3DMetal already selected (`wyn renderer set d3dmetal`); does not
+    /// repoint shared unix modules.
     public static func enableD3DMetal(bottle: Bottle) throws {
         if !GPTKInstaller.isInstalled() {
             throw D3DMetalError.gptkMissing
@@ -1058,62 +1086,6 @@ public class Wine {
             throw D3DMetalError.rendererNotSelected
         }
         try RendererWiring.verify(.d3dMetal)
-
-        let fm = FileManager.default
-        let peDir = GPTKInstaller.wineLibFolder
-            .appending(path: "wine")
-            .appending(path: "x86_64-windows")
-        let system32 = bottle.url
-            .appending(path: "drive_c")
-            .appending(path: "windows")
-            .appending(path: "system32")
-        let syswow64 = bottle.url
-            .appending(path: "drive_c")
-            .appending(path: "windows")
-            .appending(path: "syswow64")
-
-        // Core GPTK D3D stubs + MetalFX complement (nvngx / nvapi64).
-        let peNames = [
-            "d3d11.dll", "dxgi.dll", "d3d12.dll", "d3d10.dll", "atidxx64.dll",
-            "nvapi64.dll", "nvngx.dll"
-        ]
-        for name in peNames {
-            let src = peDir.appending(path: name)
-            guard fm.fileExists(atPath: src.path(percentEncoded: false)) else { continue }
-            try fm.installFileIfContentDiffers(at: system32.appending(path: name), from: src)
-        }
-
-        for name in dxmtExclusiveDLLs + ["d3d10core.dll"] {
-            let x64 = system32.appending(path: name)
-            if fm.fileExists(atPath: x64.path(percentEncoded: false)) {
-                let winePE = peDir.appending(path: name)
-                if fm.fileExists(atPath: winePE.path(percentEncoded: false)) {
-                    try fm.installFileIfContentDiffers(at: x64, from: winePE)
-                } else if name != "d3d10core.dll" {
-                    try fm.removeItem(at: x64)
-                } else {
-                    let stock = WynWineInstaller.libraryFolder
-                        .appending(path: "Wine")
-                        .appending(path: "lib")
-                        .appending(path: "wine")
-                        .appending(path: "x86_64-windows")
-                        .appending(path: "d3d10core.dll")
-                    if fm.fileExists(atPath: stock.path(percentEncoded: false)) {
-                        try fm.installFileIfContentDiffers(at: x64, from: stock)
-                    }
-                }
-            }
-            let x32 = syswow64.appending(path: name)
-            if name != "d3d10core.dll", fm.fileExists(atPath: x32.path(percentEncoded: false)) {
-                try? fm.removeItem(at: x32)
-            }
-        }
-        for dir in [system32, syswow64] {
-            let wm = dir.appending(path: "winemetal.dll")
-            if fm.fileExists(atPath: wm.path(percentEncoded: false)) {
-                try? fm.removeItem(at: wm)
-            }
-        }
     }
 
     private static let dxmtNativeTrio = ["d3d11.dll", "dxgi.dll", "d3d10core.dll"]
@@ -1133,6 +1105,21 @@ public class Wine {
         return marker != Data("Wine builtin DLL".utf8)
     }
 
+    /// Install the DXMT payload into the bottle. The only function that writes
+    /// a translation layer into `system32`, and the only one that needs to.
+    ///
+    /// Idempotent by content, and no longer undone by anything: since
+    /// `enableD3DMetal` stopped rewriting `system32`, the trio plus
+    /// `winemetal.dll` are installed once and stay installed. A D3DMetal launch
+    /// runs straight past them on `=b`, so alternating DXMT → D3DMetal → DXMT
+    /// costs no file copying at all.
+    ///
+    /// `trioIsNative` is the install-time guard that matters and is kept:
+    /// DXMT's meson `wine_builtin_dll` defaults to **true**, which stamps
+    /// `"Wine builtin DLL"` at offset `0x40`, and Wine's `load_builtin()`
+    /// (`dlls/ntdll/unix/loader.c:1512`) silently rewrites `=n,b` into `=b,n`
+    /// when it sees that marker — searching the tree first, so D3DMetal wins and
+    /// the run looks like a DXMT failure. Build with `-Dwine_builtin_dll=false`.
     public static func enableDXMT(bottle: Bottle) throws {
         let fileManager = FileManager.default
         let payload = resolveDXMTPayload()
