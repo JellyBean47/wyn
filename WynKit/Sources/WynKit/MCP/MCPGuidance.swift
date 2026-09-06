@@ -56,23 +56,41 @@ public enum MCPGuidance {
       fallback, and the gap is large: measured on the same game, same settings, \
       same resolution, D3DMetal held 119.7 fps median where DXVK managed 45.4. \
       DXVK also could not create a fullscreen swapchain on that title at all.
+    - "dxmt" is a real option for a D3D11 game since 6 Sep 2026 — it no longer \
+      conflicts with D3DMetal, so a second profile can carry it. But nothing has \
+      compared the two for frame rate, so do not move a working title onto DXMT \
+      on a hunch. Add a `-dxmt` profile beside the working one, measure both \
+      with read_session_performance, and let the numbers decide.
 
     THE PROFILE DOES NOT DECIDE THE LAYER
 
-    The Wine tree the bottle is running decides it. `WINEDLLOVERRIDES d3d11=b` \
-    asks for *builtin*, and builtin is D3DMetal only in the game-host tree; if \
-    Steam was started on the frankea tree the game gets the bottle's own native \
-    DXVK instead — silently, with a correct-looking profile.
+    The overrides do, and the tree bounds what they can reach. \
+    `WINEDLLOVERRIDES d3d11=b` asks for *builtin*, which resolves from the Wine \
+    tree; `=n,b` asks for native first, which resolves from the bottle's \
+    system32. So if Steam was started on the frankea tree, a d3dmetal profile's \
+    `=b` reaches frankea's builtins and the game gets DXVK instead — silently, \
+    with a correct-looking profile.
 
     This is not hypothetical. A d3dmetal profile ran a two-hour session on DXVK \
     at a third of the frame rate, and the only symptom was a warm Mac.
 
-    So never conclude a layer is in use because the profile names it. After a \
+    On the game-host tree, D3DMetal (`=b`, from the tree) and DXMT (`=n,b`, \
+    from system32) both work and no longer overwrite each other — measured 6 Sep \
+    2026, including two games running at once in one wineserver, one on each. \
+    So there the override string alone picks the layer, per process.
+
+    Never conclude a layer is in use because the profile names it. After a \
     launch, call read_session_performance: it reads the adapter out of the \
     game's own log, which is the only reliable answer.
 
       D3DMetal reports "AMD Compatibility Mode" (VendorId 0x1002)
+      DXMT     reports "Apple M4"               (VendorId 0x106b)
       DXVK     reports "NVIDIA GeForce 6800"    (VendorId 0x10de)
+
+    Read the *Chosen D3D11 Adapter* line and nothing else. A D3DMetal log also \
+    contains "Apple M4" and "106b", from dxcore adapter enumeration falling \
+    through to wined3d — grep for the vendor id alone and you will call a \
+    D3DMetal run DXMT.
 
     PERFORMANCE IS PART OF THE JOB
 

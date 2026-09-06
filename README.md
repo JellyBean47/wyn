@@ -133,6 +133,33 @@ Read Apple’s Game Porting Toolkit license first. Default graphics are **DXMT**
 (D3D11 → Metal). D3DMetal is an opt-in upgrade for D3D12-only titles, not a
 replacement.
 
+## Choosing the graphics layer
+
+DXMT and D3DMetal are installed side by side and **do not replace each other**.
+The layer is chosen per launch by `WINEDLLOVERRIDES`, so one game can run on
+D3DMetal while another runs on DXMT — including at the same time, in the same
+Wine session.
+
+- **Per game:** pick the profile. `wyn play solarpunk` runs on D3DMetal;
+  `wyn play solarpunk-dxmt` runs the same game on DXMT.
+- **Per bottle:** in the app, right-click a bottle → **Graphics**. That is the
+  bottle's *default*, used by games whose profile does not pin a layer — a
+  profile that names one still wins for that game.
+
+**Check the adapter, never the profile.** The only reliable answer is the
+`Chosen D3D11 Adapter` line in the game's own log
+(`wyn profiles performance <profile>` reads it for you):
+
+| layer | adapter | VendorId |
+|---|---|---|
+| D3DMetal | `AMD Compatibility Mode` | `0x1002` |
+| DXMT | `Apple M4` (your GPU) | `0x106b` |
+| DXVK | `NVIDIA GeForce 6800` | `0x10de` |
+
+A D3DMetal log *also* contains `Apple M4` and `106b`, from adapter enumeration
+falling through to wined3d. Grep for the vendor id alone and you will call a
+D3DMetal run DXMT — read the `Chosen D3D11 Adapter` line and nothing else.
+
 ## Legal
 
 - [DEPENDENCIES.md](DEPENDENCIES.md) — versions, URLs, hashes
