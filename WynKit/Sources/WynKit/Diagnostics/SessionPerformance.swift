@@ -449,7 +449,31 @@ public enum SessionPerformance {
         guard let report = read(logURL: log) else {
             return "Could not read \(log.lastPathComponent)."
         }
-        return rendered(report, expecting: profile.bottle?.translationLayer)
+        return "\(logProvenance(of: log))\n\(rendered(report, expecting: profile.bottle?.translationLayer))"
+    }
+
+    /// Which Wine user wrote the log being reported, and when.
+    ///
+    /// A bottle can hold a user directory per Wine version — this one has
+    /// `ebenoelofse` from wine 11.0 and `crossover` from winecx 11.15, each with
+    /// its own full set of logs — and which one a launch writes is decided at
+    /// runtime by the tree. Naming the source is what stops a report from a
+    /// different user, or from yesterday, reading as the run just finished.
+    static func logProvenance(of log: URL) -> String {
+        let user: String
+        if let idx = log.pathComponents.firstIndex(of: "users"),
+           idx + 1 < log.pathComponents.count {
+            user = log.pathComponents[idx + 1]
+        } else {
+            user = "?"
+        }
+        let mtime = (try? log.resourceValues(forKeys: [.contentModificationDateKey])
+            .contentModificationDate)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = TimeZone.current
+        let when = mtime.map(formatter.string(from:)) ?? "unknown time"
+        return "Source: users/\(user)/…/\(log.lastPathComponent), last written \(when)."
     }
 
     // MARK: - Parsing helpers

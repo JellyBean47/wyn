@@ -568,20 +568,32 @@ public enum LaunchDiagnostics {
         }
 
         let sorted = candidates.sorted { a, b in
-            let da = (try? a.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
-                ?? .distantPast
-            let db = (try? b.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
-                ?? .distantPast
-            return da > db
+            mtime(of: a) > mtime(of: b)
         }
+
+        // Which Wine user a launch writes as is decided at runtime by the tree —
+        // winecx 11.15 runs as `crossover`, wine 11.0 ran as the macOS user — and
+        // this bottle has a user directory from each, holding a full set of logs.
+        // Picking the newest file across all of them was right only by luck: at
+        // pre-launch the newest is whatever ran *last*, which is how `wyn play
+        // solarpunk` came to print yesterday's lines from users/ebenoelofse as
+        // though they were this session's.
+        //
+        // So resolve it by time instead of by guessing the name: a log older than
+        // this wyn process cannot have been written by the launch this process is
+        // performing. Prefer the ones that can be; when none can, still show the
+        // newest — a stale log is useful — but say plainly that it is stale
+        // rather than letting it read as evidence.
+        let fresh = sorted.filter { mtime(of: $0) >= processStart }
+        let stale = fresh.isEmpty
+        let shown = stale ? Array(sorted.prefix(2)) : Array(fresh.prefix(2))
 
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
         formatter.timeZone = TimeZone.current
 
-        for url in sorted.prefix(2) {
-            let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
-            let mtimeStr = mtime.map { formatter.string(from: $0) } ?? "?"
+        for url in shown {
+            let mtimeStr = formatter.string(from: mtime(of: url))
             let user: String
             if let idx = url.pathComponents.firstIndex(of: "users"),
                idx + 1 < url.pathComponents.count {
@@ -589,11 +601,31 @@ public enum LaunchDiagnostics {
             } else {
                 user = "?"
             }
-            out.append("FactoryGame.log: users/\(user) mtime=\(mtimeStr)")
+            let staleness = stale ? "  ← STALE: written before this launch" : ""
+            out.append("FactoryGame.log: users/\(user) mtime=\(mtimeStr)\(staleness)")
             out.append("  \(url.path(percentEncoded: false))")
             out.append(contentsOf: grepAuthRHILines(in: url).map { "  · \($0)" })
         }
         return out
+    }
+
+    /// When this wyn process started. Anything on disk older than this belongs
+    /// to a previous session, whichever Wine user wrote it.
+    static let processStart = Date()
+
+    /// True when a log's modification time could belong to the launch this
+    /// process is performing.
+    static func isFromThisSession(
+        mtime: Date?,
+        processStart: Date = LaunchDiagnostics.processStart
+    ) -> Bool {
+        guard let mtime else { return false }
+        return mtime >= processStart
+    }
+
+    private static func mtime(of url: URL) -> Date {
+        (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+            ?? .distantPast
     }
 
     /// One-liners that matter for SteamAPI / RHI — never MoltenVK extension lists.
