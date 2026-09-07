@@ -1,0 +1,21 @@
+{
+  "name": "wyn-dev-site",
+  "private": true,
+  "description": "Wyn community game catalog, JSON API, and reviewed profile submissions.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs",
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "preview": "npm run build && wrangler dev --port 8787",
+    "deploy": "npm test && npm run build && wrangler deploy"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.129.1"
+  }
+}

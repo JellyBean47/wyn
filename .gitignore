@@ -87,3 +87,7 @@ ConnectSecureStorage.dat
 .env
 .env.*
 credentials.json
+
+# Local wyn-dev.com submissions (not reviewed into Profiles/)
+website/submissions/*.json
+website/dist/

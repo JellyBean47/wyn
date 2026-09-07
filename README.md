@@ -1,11 +1,23 @@
 # Wyn
 
-Wyn is a macOS Wine wrapper for running Windows games. It is a modified
-version of [Whisky](https://github.com/Whisky-App/Whisky), licensed under
-**GPL-3.0-or-later**. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Windows games on Mac. Open source. [Compatibility catalog](https://wyn-dev.com).
+
+Wyn is a macOS Wine wrapper for running Windows games. Per-game profiles pick
+the translation layer (DXMT / D3DMetal / DXVK), not a star rating. The site
+tells you which profiles were **verified** on a real Mac and which are still
+**guessed**. Wyn is GPL-3.0-or-later and free; [support testing](https://wyn-dev.com/support)
+if it saved you time.
 
 This repository is **source only**. It does not contain Wine binaries, Apple
-Game Porting Toolkit / D3DMetal, store clients, or game files.
+Game Porting Toolkit / D3DMetal, store clients, or game files. It is a modified
+version of [Whisky](https://github.com/Whisky-App/Whisky). See [LICENSE](LICENSE)
+and [NOTICE](NOTICE).
+
+**Install today** still needs Xcode (below). A signed, notarized `Wyn.dmg` (drag
+to Applications) is the next packaging step — see
+[Documentation/user/apple-developer.md](Documentation/user/apple-developer.md)
+and [Documentation/user/packaging.md](Documentation/user/packaging.md). Do not
+treat an ad-hoc build as 1.0.
 
 ## What you need
 
@@ -165,6 +177,8 @@ D3DMetal run DXMT — read the `Chosen D3D11 Adapter` line and nothing else.
 - [DEPENDENCIES.md](DEPENDENCIES.md) — versions, URLs, hashes
 - [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)
 - [Documentation/user/install.md](Documentation/user/install.md)
+- [Documentation/user/apple-developer.md](Documentation/user/apple-developer.md)
+- [Documentation/verify-next.md](Documentation/verify-next.md)
 
 Wyn is a Wine wrapper. It does **not** include Xbox Game Pass, the Xbox
 app, a Windows guest (UTM / QEMU / Parallels), or a `wyn gamepass`
@@ -173,14 +187,28 @@ command.
 Wyn is not affiliated with Apple, Valve, Microsoft, or Whisky-App.
 Trademarks of other Wine products are theirs; see [NOTICE](NOTICE).
 
+## Compatibility catalog
+
+[wyn-dev.com](https://wyn-dev.com) is the public catalog and JSON API. Verified
+means measured; guessed is not evidence. Local preview:
+
+```bash
+cd website
+node server.mjs
+```
+
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000). See [website/README.md](website/README.md).
+To update production: `cd website && npm run deploy`.
+
 ## Layout
 
 ```
 WynKit/          core library (GPL-3.0-or-later, from WhiskyKit)
 WynApp/          SwiftUI app
 Sources/WynCmd/  `wyn` CLI
-scripts/         check-environment, build, setup
+website/         wyn-dev.com (catalog, JSON API, profile submit)
+scripts/         check-environment, build, setup, package-dmg
 patches/wine/    Wine patch notes (LGPL source form)
-Documentation/   user docs and license texts
+Documentation/   user docs, packaging, verify-next, share
 Tools/           first-party helper sources (binaries are built locally)
 ```

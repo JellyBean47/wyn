@@ -35,6 +35,9 @@ Needs Swift 6 (Xcode 16+). `macos-14` / Swift 5.10 will fail.
 
 Do not require `~/Desktop/wyn` or a local `whisky-wine/` tree.
 
+Funding: [`.github/FUNDING.yml`](.github/FUNDING.yml) and
+[wyn-dev.com/support](https://wyn-dev.com/support). Wyn stays free.
+
 ## Code of conduct
 
 Be respectful. This is a compatibility tool: do not contribute exploits against
