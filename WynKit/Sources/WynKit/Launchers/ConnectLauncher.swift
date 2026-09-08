@@ -2,8 +2,8 @@
 //  ConnectLauncher.swift
 //  WynKit
 //
-//  Ubisoft Connect on frankea Wine + FLY4 present. Never GPTK — that is the
-//  transparent window. Do not wineserver -k a Logged-On GPTK Steam session.
+//  Connect uses parent-native shared memory plus the Cocoa login bridge.
+//  The FLY4 Cocoa fast path is EA-only. Never stop an existing shared session.
 //
 
 import Darwin
@@ -13,17 +13,19 @@ public enum ConnectLauncher {
     private static let connectDllOverrides =
         "winemenubuilder.exe=d;dwrite=b;d2d1,d3d10core=d;d3d11,dxgi=b;d3dcompiler_47=n"
 
+    // Verified with Connect 173.1 on Wine 11: software rendering supplies
+    // pixels to the login bridge; the older in-process GPU recipe can stall.
     private static let cefArgs = [
         "--no-sandbox",
-        "--in-process-gpu",
+        "--disable-gpu",
         "--disable-gpu-compositing",
         "--use-gl=angle",
         "--use-angle=swiftshader-webgl"
     ]
 
     private static let attempts = 6
-    private static let startViewTimeoutSeconds = 40
-    private static let startViewGraceSeconds = 10
+    // CEF can take over a minute to reach StartView on a fresh cache.
+    static let startViewTimeoutSeconds = 120
 
     private static let spawned = SpawnedProcesses()
 
@@ -63,8 +65,11 @@ public enum ConnectLauncher {
         if frankeaUp {
             try prepareConnectFiles(in: bottle)
             unlinkFLY4()
-            restoreHTTP2(in: bottle)
+            let (logURL, offset) = launcherLogPosition(in: bottle)
+            let startedAt = Date()
             try spawnConnect(in: bottle)
+            try await waitForWindow(logURL: logURL, offset: offset,
+                                       bridgeURL: bridgeURL(in: bottle), startedAt: startedAt)
             return
         }
 
@@ -79,7 +84,7 @@ public enum ConnectLauncher {
                 LaunchProgress.emit("Ubisoft Connect: retry \(attempt)/\(attempts)…")
                 try await Task.sleep(nanoseconds: 5_000_000_000)
             } else {
-                LaunchProgress.emit("Ubisoft Connect: waiting for StartView…")
+                LaunchProgress.emit("Ubisoft Connect: waiting for the window to paint…")
             }
             do {
                 try await coldStartAttempt(in: bottle)
@@ -98,8 +103,14 @@ public enum ConnectLauncher {
         await drainConnect(in: bottle)
         try prepareConnectFiles(in: bottle)
         unlinkFLY4()
-        restoreHTTP2(in: bottle)
+        let (logURL, offset) = launcherLogPosition(in: bottle)
+        let startedAt = Date()
+        try spawnConnect(in: bottle)
+        try await waitForWindow(logURL: logURL, offset: offset,
+                                   bridgeURL: bridgeURL(in: bottle), startedAt: startedAt)
+    }
 
+    private static func launcherLogPosition(in bottle: Bottle) -> (URL, Int) {
         let logURL = installDirectory(in: bottle)
             .appending(path: "logs")
             .appending(path: "launcher_log.txt")
@@ -107,8 +118,7 @@ public enum ConnectLauncher {
             atPath: logURL.path(percentEncoded: false)
         )[.size] as? NSNumber)?.intValue ?? 0
 
-        try spawnConnect(in: bottle)
-        try await waitForStartView(logURL: logURL, offset: offset)
+        return (logURL, offset)
     }
 
     private static func spawnConnect(in bottle: Bottle) throws {
@@ -125,21 +135,23 @@ public enum ConnectLauncher {
         let logURL = outDir.appending(path: "wine.log")
         FileManager.default.createFile(atPath: logURL.path(percentEncoded: false), contents: nil)
         let logHandle = try FileHandle(forWritingTo: logURL)
+        defer { try? logHandle.close() }
 
         var assignments = [
             "DYLD_INSERT_LIBRARIES=\(dylibs.epi.path(percentEncoded: false)):\(dylibs.inject.path(percentEncoded: false))",
             "WINEPREFIX=\(prefix)",
             "WINEESYNC=1",
+            "WINEMSYNC=1",
             "WINE_SIMULATE_WRITECOPY=1",
             "WINEDLLOVERRIDES=\(connectDllOverrides)",
             "WINEDEBUG=-all",
-            "FLY_FAST_PRESENT=1",
+            "FLY_FAST_PRESENT=0",
             "FLY_PARENT_PRESENT=1",
-            "FLY_BRIDGE_SHM=0",
-            "FLY_BRIDGE_FILE=0",
+            "FLY_BRIDGE_SHM=1",
+            "FLY_BRIDGE_FILE=1",
             "FLY_OPTION_B=0",
             "FLY_SURFACE_MAP=0",
-            "PRESENT_FORCE_LOGIN_BRIDGE=0",
+            "PRESENT_FORCE_LOGIN_BRIDGE=1",
             "PRESENT_FORCE_OPAQUE=0",
             "PRESENT_FORCE_LOGIN_FILL=0",
             "PRESENT_FORCE_LOGIN_SYNC=0",
@@ -168,28 +180,57 @@ public enum ConnectLauncher {
         spawned.retain(process)
     }
 
-    private static func waitForStartView(logURL: URL, offset: Int) async throws {
-        var cefAt: Int?
+    private static func bridgeURL(in bottle: Bottle) -> URL {
+        bottle.url.appending(path: "drive_c/windows/temp/fly-stretch-bridge.bgra")
+    }
+
+    private static func waitForWindow(logURL: URL, offset: Int,
+                                         bridgeURL: URL, startedAt: Date) async throws {
         for second in 1...startViewTimeoutSeconds {
             try Task.checkCancellation()
             try await Task.sleep(nanoseconds: 1_000_000_000)
             let chunk = logTail(logURL, offset: offset)
-            if chunk.contains("StartView.cpp") {
-                return
-            }
-            if cefAt == nil, chunk.contains("Using CEF with native rendering") {
-                cefAt = second
-            } else if let cefAt, second - cefAt >= startViewGraceSeconds {
-                throw PlatformLaunchError.connectWedged
-            }
-            if !PlatformCatalog.isRunning(.ubisoft) && second > 3 {
-                throw PlatformLaunchError.connectWedged
+            switch startupStatus(log: chunk, elapsedSeconds: second,
+                                 isRunning: PlatformCatalog.isRunning(.ubisoft),
+                                 hasFrame: hasFreshFrame(at: bridgeURL, since: startedAt)) {
+            case .ready: return
+            case .waiting: continue
+            case .failed: throw PlatformLaunchError.connectWedged
             }
         }
         throw PlatformLaunchError.connectWedged
     }
 
-    private static func logTail(_ url: URL, offset: Int) -> String {
+    enum StartupStatus { case waiting, ready, failed }
+
+    /// A CEF initialization line is progress, not a deadline. Only the new
+    /// launch's log tail is considered; old StartView entries cannot pass it.
+    static func startupStatus(log: String, elapsedSeconds: Int, isRunning: Bool, hasFrame: Bool) -> StartupStatus {
+        if !isRunning && elapsedSeconds > 3 { return .failed }
+        if log.contains("StartView.cpp") && hasFrame { return .ready }
+        return elapsedSeconds >= startViewTimeoutSeconds ? .failed : .waiting
+    }
+
+    /// The bridge publishes FLY2 only for nonblank frames. An older launch's
+    /// buffer must not make a new transparent window appear ready.
+    static func hasFreshFrame(at url: URL, since startedAt: Date) -> Bool {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let modified = attributes[.modificationDate] as? Date, modified >= startedAt,
+              let size = attributes[.size] as? NSNumber,
+              let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        guard let header = try? handle.read(upToCount: 20), header.count == 20 else { return false }
+        func uint32(_ offset: Int) -> UInt32 {
+            (0..<4).reduce(UInt32(0)) { $0 | UInt32(header[offset + $1]) << (8 * $1) }
+        }
+        let width = uint32(4), height = uint32(8)
+        guard uint32(0) == 0x32594C46, width >= 8, height >= 8,
+              width <= 4096, height <= 4096,
+              header[12..<20].contains(where: { $0 != 0 }) else { return false }
+        return size.intValue == 20 + Int(width) * Int(height) * 4
+    }
+
+    static func logTail(_ url: URL, offset: Int) -> String {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return "" }
         defer { try? handle.close() }
         let start = UInt64(max(0, offset))
@@ -250,68 +291,8 @@ public enum ConnectLauncher {
         _ = "/fly-upc-stretch-bridge4".withCString { shm_unlink($0) }
     }
 
-    private static func restoreHTTP2(in bottle: Bottle) {
-        guard let cache = connectCacheDir(in: bottle) else { return }
-        let fm = FileManager.default
-        let http2 = cache.appending(path: "http2")
-        try? fm.removeItem(at: http2)
-        if let snap = http2Snapshot() {
-            try? fm.createDirectory(at: cache, withIntermediateDirectories: true)
-            try? fm.copyItem(at: snap, to: http2)
-            return
-        }
-        let bak = cache.appending(path: "http2.bak-20260809-2330")
-        if fm.fileExists(atPath: bak.path(percentEncoded: false)) {
-            try? fm.copyItem(at: bak, to: http2)
-        }
-    }
-
-    private static func connectCacheDir(in bottle: Bottle) -> URL? {
-        let fm = FileManager.default
-        let users = bottle.url.appending(path: "drive_c").appending(path: "users")
-        var names = [NSUserName(), "ebenoelofse", "crossover"] // crossover: common Wine prefix user
-        if let children = try? fm.contentsOfDirectory(at: users, includingPropertiesForKeys: nil) {
-            names.append(contentsOf: children.map(\.lastPathComponent))
-        }
-        var seen = Set<String>()
-        for name in names where seen.insert(name).inserted {
-            let cache = users
-                .appending(path: name)
-                .appending(path: "AppData")
-                .appending(path: "Local")
-                .appending(path: "Ubisoft Game Launcher")
-                .appending(path: "cache")
-            if fm.fileExists(atPath: cache.path(percentEncoded: false)) {
-                return cache
-            }
-        }
-        return users
-            .appending(path: NSUserName())
-            .appending(path: "AppData")
-            .appending(path: "Local")
-            .appending(path: "Ubisoft Game Launcher")
-            .appending(path: "cache")
-    }
-
-    private static func http2Snapshot() -> URL? {
-        let fm = FileManager.default
-        let scratch = PlatformCatalog.repoRootFromSource().appending(path: ".scratch")
-        let relatives = [
-            "checkpoint-bridge-working-LATEST/http2/http2",
-            "checkpoint-parent-native-LATEST/http2/http2",
-            "checkpoint-fast-present-LATEST/http2/http2",
-            "checkpoint-bridge-working-20260810-205958/http2/http2",
-            "checkpoint-parent-native-20260810-231523/http2/http2",
-            "checkpoint-fast-present-20260811-184128/http2/http2"
-        ]
-        for rel in relatives {
-            let url = URL(fileURLWithPath: scratch.path(percentEncoded: false) + "/" + rel)
-            if fm.fileExists(atPath: url.path(percentEncoded: false)) {
-                return url
-            }
-        }
-        return nil
-    }
+    // Let Connect create and maintain its own CEF cache. Developer snapshots
+    // are neither required on first launch nor safe to restore over user data.
 
     private static func presentDylibs() -> (epi: URL, inject: URL)? {
         guard let bin = PlatformCatalog.toolsBinURL() else { return nil }
@@ -336,7 +317,7 @@ public enum ConnectLauncher {
     /// Drop inherited Wine/GPTK/Steam vars so Connect cannot pick up the game tree.
     private static func scrubbedMacEnvironment() -> [String: String] {
         var env = ProcessInfo.processInfo.environment
-        let prefixes = ["WINE", "CX_", "DYLD_", "VK_", "D3DM_", "STEAM", "MVK_", "FLY_"]
+        let prefixes = ["WINE", "CX_", "DYLD_", "VK_", "D3DM_", "STEAM", "MVK_", "FLY_", "PRESENT_", "STRETCHBLT_"]
         for key in env.keys {
             if prefixes.contains(where: { key.hasPrefix($0) }) {
                 env.removeValue(forKey: key)
