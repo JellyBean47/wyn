@@ -2240,11 +2240,17 @@ public enum SteamLauncher {
         _ = try WynWineInstaller.ensureSteamWineTree()
         try Wine.prepareFrankeaSteamClient(bottle: bottle, debug: options.debug)
 
-        if effectiveLayer == .dxmt {
-            // Game EXEs: DXMT natives. Steam: frankea builtins (set by prepareFrankea).
-            // These per-exe AppDefaults are how the game gets its layer now — the
-            // client process no longer carries d3d overrides for it to inherit.
-            let gameDXMT: [String: String] = [
+        if effectiveLayer == .dxmt || effectiveLayer == .dxvk {
+            // Game EXEs: the layer's natives. Steam: frankea builtins (set by
+            // prepareFrankea). These per-exe AppDefaults are how the game gets
+            // its layer now — the client process no longer carries d3d
+            // overrides for it to inherit.
+            //
+            // This used to be `== .dxmt` alone, so a DXVK title arriving here
+            // got no per-exe overrides at all and ran on whatever the prefix
+            // happened to hold. DXVK needs the same native trio; the shape is
+            // identical either way.
+            let gameNativeD3D: [String: String] = [
                 "d3d11": "n",
                 "dxgi": "n",
                 "d3d10core": "n",
@@ -2254,7 +2260,7 @@ public enum SteamLauncher {
             for raw in profile.exePatterns {
                 let exe = (raw as NSString).lastPathComponent
                 guard exe.lowercased().hasSuffix(".exe") else { continue }
-                try Wine.setAppDllOverrides(bottle: bottle, exeName: exe, overrides: gameDXMT)
+                try Wine.setAppDllOverrides(bottle: bottle, exeName: exe, overrides: gameNativeD3D)
             }
         }
 
@@ -2277,6 +2283,12 @@ public enum SteamLauncher {
 
         var playOptions = options
         playOptions.wineTree = .steam
+        // Without this, `Wine.runProgram` falls back to the *bottle's* layer —
+        // and on `tree == .steam` it coerces a `.d3dMetal` bottle to `.dxmt`.
+        // A DXVK-declared game then had the DXMT payload written into system32
+        // under it. The game's layer is decided here; say so, the way the
+        // direct-EXE DXVK path already does.
+        playOptions.translationLayerOverride = effectiveLayer
 
         if options.debug {
             print("[wyn:debug] play → frankea Steam Wine (\(WynWineInstaller.steamLibraryFolder.path))")
