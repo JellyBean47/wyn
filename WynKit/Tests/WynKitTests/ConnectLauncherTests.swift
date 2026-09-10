@@ -68,6 +68,22 @@ struct ConnectLauncherTests {
         ) == .ready)
     }
 
+    /// Pins the settle, because the number is the whole fix and a future
+    /// tidy-up would otherwise delete it as a magic constant.
+    ///
+    /// 10 Sep, six runs: a game launched ~1s after `AccountStartupUser` made
+    /// Connect re-run its startup and crash (2/2); at 35s–7min it was healthy
+    /// (4/4). The shortest observed healthy gap was 35s, so the settle must
+    /// stay meaningfully above the failing case. If someone finds a real
+    /// readiness marker in Connect's log, replace the wait — do not just
+    /// shrink it because launches feel slow.
+    @Test func connectSettlesLongEnoughForAGameToBeAccepted() {
+        #expect(ConnectLauncher.signedInSettleSeconds >= 20,
+                "below ~20s this stops protecting against the observed 1s failure")
+        #expect(ConnectLauncher.signedInSettleSeconds <= 60,
+                "a minute of dead time per launch needs a better answer than a longer wait")
+    }
+
     @Test func slowCEFInitializationCanStillPaint() {
         let cef = "Using CEF with native rendering"
         for second in [10, 20, 40, 60, 90] {

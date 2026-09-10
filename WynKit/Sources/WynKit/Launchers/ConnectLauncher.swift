@@ -49,6 +49,42 @@ public enum ConnectLauncher {
     // CEF can take over a minute to reach StartView on a fresh cache.
     static let startViewTimeoutSeconds = 120
 
+    /// How long to hold after sign-in before letting a game start.
+    ///
+    /// `AccountStartupUser` means Connect resolved an account. It does **not**
+    /// mean Connect can accept a game, and the gap between the two is where
+    /// this bug lives: a session request arriving ~1s after sign-in makes
+    /// Connect re-run its entire startup and then die, one second after the
+    /// second sign-in. Measured 10 Sep, six runs, no exceptions:
+    ///
+    /// | sign-in to game launch | runs | outcome                  |
+    /// |------------------------|------|--------------------------|
+    /// | 1 s                    | 2    | restart, then crash      |
+    /// | 35 s – 7 min           | 4    | healthy, `Early return`  |
+    ///
+    /// The CLI never hit it because `wyn play` does Steam checks, D3DMetal
+    /// overrides and its auth-signal dumps after this returns, which bought
+    /// ~37s by accident. The app went almost straight to launching the game.
+    /// Depending on one caller being incidentally slow is not a design.
+    ///
+    /// A fixed wait is unsatisfying. It is also the honest option: Connect
+    /// logs no positive readiness marker to wait on — `Early return` only
+    /// appears *after* a game request, so it cannot be a precondition. 30s
+    /// sits below the shortest observed healthy gap (35s) but far above the
+    /// failing one, and it converts a reproducible crash into a non-event.
+    /// If a real readiness signal is ever found, replace this with it.
+    static let signedInSettleSeconds: UInt64 = 30
+
+    /// Hold after a *freshly started* Connect signs in. Not called when
+    /// `launch()` early-returns on an already-running client — that one has
+    /// had whatever time it has had, and re-waiting would punish the fast path.
+    private static func settleAfterSignIn() async throws {
+        LaunchProgress.emit(
+            "Ubisoft Connect: signed in — settling for \(signedInSettleSeconds)s before the game starts."
+        )
+        try await Task.sleep(nanoseconds: signedInSettleSeconds * 1_000_000_000)
+    }
+
     private static let spawned = SpawnedProcesses()
 
     public static func installDirectory(in bottle: Bottle) -> URL {
@@ -86,6 +122,7 @@ public enum ConnectLauncher {
             let (logURL, offset) = launcherLogPosition(in: bottle)
             try spawnConnect(in: bottle, wineTree: .game, injectPresent: false)
             try await waitForWindow(logURL: logURL, offset: offset, requirePaintedFrame: false)
+            try await settleAfterSignIn()
             return
         }
 
@@ -103,6 +140,7 @@ public enum ConnectLauncher {
             let (logURL, offset) = launcherLogPosition(in: bottle)
             try spawnConnect(in: bottle, wineTree: .steam, injectPresent: true)
             try await waitForWindow(logURL: logURL, offset: offset, requirePaintedFrame: true)
+            try await settleAfterSignIn()
             return
         }
 
@@ -139,6 +177,7 @@ public enum ConnectLauncher {
         let (logURL, offset) = launcherLogPosition(in: bottle)
         try spawnConnect(in: bottle, wineTree: .steam, injectPresent: true)
         try await waitForWindow(logURL: logURL, offset: offset, requirePaintedFrame: true)
+        try await settleAfterSignIn()
     }
 
     private static func launcherLogPosition(in bottle: Bottle) -> (URL, Int) {
