@@ -204,6 +204,30 @@ public class Wine {
         )
     }
 
+    /// Which payload a launch writes into `system32`, given the layer that was
+    /// resolved for it.
+    ///
+    /// Steam tree is frankea Wine — D3DMetal/GPTK stubs are not available there.
+    /// DXMT/DXVK still work (payload lives under game Libraries/) *if* Vulkan is
+    /// loadable. D3DMetal play must use `wineTree = .game` (Option A); the
+    /// coercion below is a safety net only.
+    ///
+    /// The `hasExplicitOverride` guard is the part worth stating out loud: when
+    /// a caller has named the layer for this launch, that name is final. Without
+    /// it — and this is how `launchGameViaSteam` shipped — a caller that named
+    /// nothing fell through to the bottle's stored layer, and a `.d3dMetal`
+    /// bottle silently deployed the DXMT payload underneath a DXVK title.
+    static func deployLayer(
+        resolved: TranslationLayer,
+        tree: WineTree,
+        hasExplicitOverride: Bool,
+        useWineBuiltinD3D: Bool
+    ) -> TranslationLayer {
+        if useWineBuiltinD3D { return resolved } // unused for deploy
+        if tree == .steam, resolved == .d3dMetal, !hasExplicitOverride { return .dxmt }
+        return resolved
+    }
+
     /// Execute a `wine start /unix {url}` command. Returns the wine process exit status.
     @discardableResult
     public static func runProgram(
@@ -232,19 +256,14 @@ public class Wine {
             }
         }
 
-        // Steam tree is frankea Wine — D3DMetal/GPTK stubs are not available there.
-        // DXMT/DXVK still work (payload lives under game Libraries/) *if* Vulkan is loadable.
-        // D3DMetal play must use wineTree=.game (Option A); this branch is a safety net only.
-        let graphicsLayer: TranslationLayer
-        if options.useWineBuiltinD3D {
-            graphicsLayer = layer // unused for deploy
-        } else if tree == .steam, layer == .d3dMetal, options.translationLayerOverride == nil {
-            graphicsLayer = .dxmt
-            if options.debug {
-                print("[wyn:debug] D3DMetal unavailable on frankea Steam Wine → DXMT (unexpected for play)")
-            }
-        } else {
-            graphicsLayer = layer
+        let graphicsLayer = deployLayer(
+            resolved: layer,
+            tree: tree,
+            hasExplicitOverride: options.translationLayerOverride != nil,
+            useWineBuiltinD3D: options.useWineBuiltinD3D
+        )
+        if options.debug, graphicsLayer != layer {
+            print("[wyn:debug] D3DMetal unavailable on frankea Steam Wine → DXMT (unexpected for play)")
         }
 
         if !options.useWineBuiltinD3D {

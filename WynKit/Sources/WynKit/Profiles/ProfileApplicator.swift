@@ -13,11 +13,16 @@ public enum ProfileApplicator {
         if let windowsVersion = overrides.windowsVersion {
             bottle.settings.windowsVersion = windowsVersion
         }
+        // `dxvk` is the legacy boolean, and its setter rewrites the layer:
+        // `false` on a `.dxvk` bottle sends it to `.dxmt`. Applying both in
+        // order therefore undid the layer the profile had just named — a
+        // profile carrying `translationLayer: dxvk` with `dxvk: false`
+        // (no-mans-sky, doom-eternal, detroit-become-human, enshrouded) landed
+        // the bottle on DXMT with nothing said. A named layer is the profile's
+        // answer; the boolean is only consulted when there is no named layer.
         if let layer = overrides.translationLayer {
             bottle.settings.translationLayer = layer
-            bottle.settings.dxvk = layer == .dxvk
-        }
-        if let dxvk = overrides.dxvk {
+        } else if let dxvk = overrides.dxvk {
             bottle.settings.dxvk = dxvk
         }
         if let dxvkAsync = overrides.dxvkAsync {
