@@ -2,9 +2,24 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { loadCatalog, filterGames, profileApiPayload } from '../lib/catalog.mjs';
-import { gamesPage, submitPage, gamePage, homePage, supportPage } from '../lib/html.mjs';
+import { gamesPage, submitPage, gamePage, homePage, SUPPORT_PAGE_ENABLED, supportPage } from '../lib/html.mjs';
 const data = loadCatalog(fileURLToPath(new URL('../../', import.meta.url)));
 test('catalog profile references resolve', () => assert.deepEqual(data.missingProfiles, []));
+test('launched titles are the ones with Mac evidence, not theoretical ports', () => {
+  const launched = data.games.filter((game) => game.status === 'launched').map((game) => game.slug).sort();
+  // ac-odyssey graduated to `verified` on 10 Sep 2026 — see its profile notes
+  // for what backs that claim, and what does not.
+  assert.deepEqual(launched, ['army-men-rts', 'assetto-corsa', 'cities-skylines', 'skyrim-se']);
+  assert.equal(data.counts.verified, 4);
+});
+test('home lists verified and launched titles', () => {
+  const html = homePage(data);
+  assert.ok(html.includes('Solarpunk'));
+  assert.ok(html.includes('Ready or Not'));
+  assert.ok(html.includes('Assetto Corsa'));
+  assert.ok(html.includes('badge launched'));
+  assert.ok(html.includes('badge verified'));
+});
 test('search supports variant ids and layers', () => {
   const variant = data.games.find(game => game.profiles.some(p => p.id === 'satisfactory-dxmt'));
   assert.ok(variant);
@@ -27,9 +42,13 @@ test('all rows exist even with initial filters; submission starts empty', () => 
 });
 test('support page explains free app, guessed vs verified, and has no paywall tiers', () => {
   const html = supportPage(data);
-  assert.ok(html.includes('href="/support"'));
   assert.ok(html.includes('github.com/sponsors/JellyBean47'));
   assert.ok(html.includes('verified'));
   assert.ok(!html.includes('$7/month'));
-  assert.ok(homePage(data).includes('href="/support"'));
+});
+test('support is unpublished until SUPPORT_PAGE_ENABLED is true', () => {
+  assert.equal(SUPPORT_PAGE_ENABLED, false);
+  const home = homePage(data);
+  assert.ok(!home.includes('href="/support"'));
+  assert.ok(!home.includes('>Support</a>'));
 });

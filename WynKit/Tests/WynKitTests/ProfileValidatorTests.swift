@@ -1,3 +1,21 @@
+//
+//  ProfileValidatorTests.swift
+//  WynKit
+//
+//  This file is part of Wyn.
+//
+//  Wyn is free software: you can redistribute it and/or modify it under the terms
+//  of the GNU General Public License as published by the Free Software Foundation,
+//  either version 3 of the License, or (at your option) any later version.
+//
+//  Wyn is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+//  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Wyn.
+//  If not, see https://www.gnu.org/licenses/.
+//
+
 import Foundation
 import Testing
 @testable import WynKit
@@ -58,11 +76,43 @@ struct ProfileValidatorTests {
     /// measured may claim to have been. Each name here was played to a loaded
     /// map on this machine and the log kept; adding one without that is the
     /// failure this test exists to catch.
+    ///
+    /// `ac-odyssey` (10 Sep 2026) is the weakest entry and is deliberately
+    /// marked as such in its own notes: it was played to a loaded map and the
+    /// log kept, and its layer was confirmed by lsof on the live process, but
+    /// there is no launch record and no frame count, because Wyn cannot time a
+    /// Steam `-applaunch` title — `wine start` returns 0 immediately. If the
+    /// bar here is ever tightened from "a person and a log" to "a recorded
+    /// session", this is the id that has to come back out.
     @Test func onlyMeasuredProfilesClaimVerified() {
         let userAdded = ProfileStore.userProfileIDs()
         let verified = ProfileStore.loadAll()
             .filter { $0.status == .verified && !userAdded.contains($0.id) }
-        #expect(verified.map(\.id).sorted() == ["satisfactory", "solarpunk"])
+        #expect(verified.map(\.id).sorted() == [
+            "ac-odyssey", "ready-or-not", "satisfactory", "solarpunk",
+        ])
+    }
+
+    /// `launched` on a shipped profile is a catalog claim: this Mac ran the
+    /// title and notes say what was seen. It is not §5 verified. The names
+    /// here are the only bundled ids allowed to say it; adding one without
+    /// that evidence is the failure this test exists to catch.
+    @Test func onlyDocumentedProfilesClaimLaunched() {
+        let expected = [
+            // ac-odyssey graduated to `verified` on 10 Sep 2026.
+            "army-men-rts",
+            "assetto-corsa",
+            "cities-skylines",
+            "skyrim-se",
+        ]
+        let userAdded = ProfileStore.userProfileIDs()
+        let launched = ProfileStore.loadAll()
+            .filter { $0.status == .launched && !userAdded.contains($0.id) }
+            .map(\.id)
+        for id in expected {
+            #expect(ProfileStore.profile(id: id)?.status == .launched, "\(id) should be launched")
+        }
+        #expect(Set(launched).subtracting(expected).isEmpty)
     }
 
     /// A profile with no `status` in its JSON is a guess. If this ever defaults
