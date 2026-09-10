@@ -1,3 +1,21 @@
+//
+//  GameCatalogTests.swift
+//  WynKit
+//
+//  This file is part of Wyn.
+//
+//  Wyn is free software: you can redistribute it and/or modify it under the terms
+//  of the GNU General Public License as published by the Free Software Foundation,
+//  either version 3 of the License, or (at your option) any later version.
+//
+//  Wyn is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+//  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Wyn.
+//  If not, see https://www.gnu.org/licenses/.
+//
+
 import Foundation
 import Testing
 @testable import WynKit
@@ -229,9 +247,14 @@ struct GameCatalogTests {
     /// ones keeps the real invariant and lets people own their own library.
     @Test func catalogProfilesMatchCanonicalSlugs() {
         let catalog = GameCatalog.load()
+        let catalogSlugs = Set(catalog.games.map(\.slug))
         let shown = Set(GameLibrary.catalogProfiles().map(\.id))
         let userAdded = ProfileStore.userProfileIDs()
-        #expect(shown.subtracting(userAdded) == Set(catalog.games.map(\.slug)))
+        // A title can exist in both places — MCP writes the user copy first,
+        // then the same id later ships. Subtracting every user id would drop
+        // that slug from the shipped side and fail an otherwise correct library.
+        #expect(catalogSlugs.isSubset(of: shown))
+        #expect(shown.subtracting(userAdded) == catalogSlugs.subtracting(userAdded))
         #expect(!shown.contains { $0.hasPrefix("satisfactory-") })
     }
 
@@ -289,15 +312,57 @@ struct GameCatalogTests {
         #expect(batch10.count == 10)
 
         // Batches 1–10 were generated ten at a time. Batch 11 onward is one
-        // entry per game actually played and measured, so it does not come in
-        // tens and has no fixed-size assertion.
+        // entry per game, so it does not come in tens and has no fixed-size
+        // assertion. Solarpunk is the measured one; later slugs may still be
+        // guesses written so a title can be installed and launched.
         #expect(Set(catalog.games.filter { $0.batch == 11 }.map(\.slug)) == ["solarpunk"])
-        #expect(catalog.games.count == 115)
+        #expect(Set(catalog.games.filter { $0.batch == 12 }.map(\.slug)) == ["assetto-corsa"])
+        #expect(catalog.games.count == 116)
+    }
+
+    /// 6 Sep 19:20: D3DMetal created the swapchain, then Wine's builtin
+    /// `d3dx11_43` stubbed `D3DX11CreateShaderResourceViewFromFileW` and the
+    /// process died. Native-first on that helper (not on d3d11/dxgi) is the fix.
+    @Test func assettoCorsaUsesNativeD3DX11() throws {
+        let profile = try #require(ProfileStore.profile(id: "assetto-corsa"))
+        let overrides = profile.environment["WINEDLLOVERRIDES"] ?? ""
+        #expect(overrides.contains("d3dx11_43,d3dcompiler_43=n"))
+        #expect(overrides.contains("d3d11,dxgi,d3d12,d3d10"))
+        #expect(!overrides.contains("d3d11=n"), "D3DMetal still needs builtin d3d11")
+    }
+
+    /// Direct `acs.exe` is the 64-bit sim that reached a loaded session.
+    /// `AssettoCorsa.exe` is a separate 32-bit .NET launcher; it has not.
+    @Test func assettoCorsaLaunchesTheSimFirst() throws {
+        let profile = try #require(ProfileStore.profile(id: "assetto-corsa"))
+        #expect(profile.exePatterns.first?.lowercased() == "acs.exe")
+        #expect(profile.exePatterns.contains { $0.lowercased() == "assettocorsa.exe" })
+        #expect(profile.launchArgs == "-windowed")
+        let session = try #require(profile.assettoCorsa)
+        #expect(session.track == "monza")
+        #expect(session.aiCount == 7)
     }
 
     @Test func newBatchProfilesLoad() {
         for slug in laterBatchSlugs {
             #expect(ProfileStore.profile(id: slug) != nil, "missing bundled profile \(slug)")
         }
+    }
+
+    /// First RoN run was Low+40 — unjudgeable. Absent on every other profile
+    /// still means pin, so Satisfactory/Solarpunk keep the diagnostic.
+    @Test func readyOrNotOptsOutOfTheLowFortyPin() throws {
+        let ron = try #require(ProfileStore.profile(id: "ready-or-not"))
+        #expect(ron.pinUnrealLowScalability == false)
+        #expect(ron.launchArgs?.contains("-log") == true)
+        #expect(ron.launchArgs?.contains("-ResX=1920") == true)
+        #expect(ron.launchArgs?.contains("-ResY=1080") == true)
+
+        let satisfactory = try #require(ProfileStore.profile(id: "satisfactory"))
+        #expect(satisfactory.pinUnrealLowScalability == true)
+
+        let json = Data(#"{"id":"x","name":"X","exePatterns":["x.exe"]}"#.utf8)
+        let decoded = try JSONDecoder().decode(GameProfile.self, from: json)
+        #expect(decoded.pinUnrealLowScalability == true)
     }
 }

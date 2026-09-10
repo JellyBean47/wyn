@@ -1,3 +1,21 @@
+//
+//  main.swift
+//  Wyn
+//
+//  This file is part of Wyn.
+//
+//  Wyn is free software: you can redistribute it and/or modify it under the terms
+//  of the GNU General Public License as published by the Free Software Foundation,
+//  either version 3 of the License, or (at your option) any later version.
+//
+//  Wyn is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+//  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Wyn.
+//  If not, see https://www.gnu.org/licenses/.
+//
+
 import ArgumentParser
 import WynKit
 import Foundation
@@ -26,7 +44,8 @@ struct WynCLI: AsyncParsableCommand {
             Steam.self,
             GPTK.self,
             Renderer.self,
-            MCP.self
+            MCP.self,
+            AC.self
         ]
     )
 }
@@ -595,8 +614,20 @@ extension WynCLI {
         @Option(name: .customLong("bottle"), help: "Bottle to play in (default: Steam).")
         var bottleName: String = SteamLauncher.defaultBottleName
 
+        @Option(name: .customLong("ac-car"), help: "Assetto Corsa car id or name (e.g. lotus_elise_sc, elise). Writes race.ini before launch.")
+        var acCar: String?
+
+        @Option(name: .customLong("ac-track"), help: "Assetto Corsa track id, or id/layout (e.g. spa, ks_nurburgring/layout_gp_a).")
+        var acTrack: String?
+
+        @Option(name: .customLong("ac-ai"), help: "Assetto Corsa AI count (player is extra).")
+        var acAi: Int?
+
+        @Option(name: .customLong("ac-aggression"), help: "Assetto Corsa AI aggression 0–100.")
+        var acAggression: Int?
+
         mutating func run() async throws {
-            guard let profile = ProfileStore.profile(id: profileId) else {
+            guard var profile = ProfileStore.profile(id: profileId) else {
                 throw ValidationError("Unknown profile \"\(profileId)\". Run: wyn profiles list")
             }
 
@@ -623,6 +654,36 @@ extension WynCLI {
                   2. Install \"\(profile.name)\" in Steam
                   3. wyn play \(profileId)
                 """)
+            }
+
+            let installRoot = exe.deletingLastPathComponent()
+            if let saved = AssettoCorsaSession.loadUser(installRoot: installRoot, bottle: bottle) {
+                profile.assettoCorsa = saved
+            }
+            if acCar != nil || acTrack != nil || acAi != nil || acAggression != nil {
+                do {
+                    profile = try AssettoCorsaLibrary.applyingOverrides(
+                        to: profile,
+                        installRoot: installRoot,
+                        car: acCar,
+                        track: acTrack,
+                        aiCount: acAi,
+                        aiAggression: acAggression
+                    )
+                    if let session = profile.assettoCorsa {
+                        AssettoCorsaSession.persistUser(
+                            session,
+                            installRoot: installRoot,
+                            bottle: bottle
+                        )
+                        let layout = session.layout.isEmpty ? "" : "/\(session.layout)"
+                        print(
+                            "Assetto Corsa session: \(session.track)\(layout), \(session.car), \(session.aiCount) AI, aggression \(session.aiAggression)"
+                        )
+                    }
+                } catch {
+                    throw ValidationError(error.localizedDescription)
+                }
             }
 
             ProfileApplicator.apply(profile: profile, to: bottle)
@@ -891,7 +952,7 @@ extension WynCLI {
     struct Steam: ParsableCommand {
         static let configuration = CommandConfiguration(
             abstract: "Install and launch the Steam client.",
-            subcommands: [SteamInstall.self, SteamLaunch.self, SteamQuit.self]
+            subcommands: [SteamInstall.self, SteamGames.self, SteamLaunch.self, SteamQuit.self]
         )
     }
 
@@ -966,6 +1027,21 @@ extension WynCLI {
                 throw ValidationError("No bottle named \"\(name)\". Create with: wyn create \"\(name)\"")
             }
             return found
+        }
+    }
+
+    struct SteamGames: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "games",
+            abstract: "List Steam-installed games Wyn can see, including host /Volumes SteamLibrary folders."
+        )
+
+        @Option(name: .long, help: "Bottle to scan (default: Steam).")
+        var bottle: String = SteamLauncher.defaultBottleName
+
+        mutating func run() throws {
+            let target = try SteamInstall.resolveBottle(named: bottle, createIfMissing: false)
+            print(GameLibrary.describeInstalled(in: target))
         }
     }
 
@@ -1470,3 +1546,207 @@ extension WynCLI {
         }
     }
 }
+
+// MARK: - Assetto Corsa (no Kunos menu)
+
+extension WynCLI {
+    /// Pick car / track / AI by writing `race.ini`. `AssettoCorsa.exe` still
+    /// crashes; `acs.exe` already runs the 180 cars if the session names them.
+    struct AC: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "ac",
+            abstract: "Pick an Assetto Corsa car and track without the Kunos menu.",
+            discussion: """
+            The 64-bit sim (acs.exe) loads cfg/race.ini. The 32-bit Kunos UI that \
+            normally writes that file does not stay up. These commands list the \
+            install and write the session, then Play launches the sim.
+
+              wyn ac list-cars
+              wyn ac list-tracks
+              wyn ac set --car "elise" --track spa --ai 11
+              wyn play assetto-corsa
+            """,
+            subcommands: [ACListCars.self, ACListTracks.self, ACSet.self, ACShow.self]
+        )
+    }
+
+    fileprivate static func acInstall() throws -> (bottle: Bottle, profile: GameProfile, root: URL) {
+        guard let profile = ProfileStore.profile(id: "assetto-corsa") else {
+            throw ValidationError("No assetto-corsa profile.")
+        }
+        guard let bottle = GameLibrary.steamBottle() else {
+            throw ValidationError("No Steam bottle. Run: wyn install")
+        }
+        guard let appId = profile.steamAppId,
+              let exe = SteamLauncher.findGameExecutable(forAppId: appId, in: bottle, profile: profile)
+        else {
+            throw ValidationError("Assetto Corsa is not installed in the Steam bottle.")
+        }
+        return (bottle, profile, exe.deletingLastPathComponent())
+    }
+
+    struct ACListCars: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "list-cars",
+            abstract: "List cars from the Assetto Corsa install."
+        )
+
+        @Option(name: .shortAndLong, help: "Filter by id, brand, or name.")
+        var query: String?
+
+        @Flag(name: .long, help: "Include Steam DLC stubs that have no meshes.")
+        var all: Bool = false
+
+        mutating func run() throws {
+            let install = try WynCLI.acInstall()
+            var cars = AssettoCorsaLibrary.cars(in: install.root)
+            let stubCount = cars.filter { !$0.playable }.count
+            if !all {
+                cars = cars.filter(\.playable)
+            }
+            if let query, !query.isEmpty {
+                cars = cars.filter {
+                    $0.id.localizedCaseInsensitiveContains(query)
+                        || $0.displayName.localizedCaseInsensitiveContains(query)
+                }
+            }
+            var table = TextTable(columns: [
+                TextTableColumn(header: "ID"),
+                TextTableColumn(header: "Car"),
+            ])
+            if all {
+                table = TextTable(columns: [
+                    TextTableColumn(header: "ID"),
+                    TextTableColumn(header: "Car"),
+                    TextTableColumn(header: "Files"),
+                ])
+            }
+            for car in cars {
+                if all {
+                    table.addRow(values: [
+                        car.id,
+                        car.displayName,
+                        car.playable ? "installed" : "DLC stub",
+                    ])
+                } else {
+                    table.addRow(values: [car.id, car.displayName])
+                }
+            }
+            if all {
+                print("\(cars.count) cars")
+            } else {
+                print("\(cars.count) installed cars (\(stubCount) DLC stubs hidden; wyn ac list-cars --all)")
+            }
+            print(table.render())
+        }
+    }
+
+    struct ACListTracks: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "list-tracks",
+            abstract: "List tracks and layouts from the Assetto Corsa install."
+        )
+
+        mutating func run() throws {
+            let install = try WynCLI.acInstall()
+            let tracks = AssettoCorsaLibrary.tracks(in: install.root)
+            var table = TextTable(columns: [
+                TextTableColumn(header: "ID"),
+                TextTableColumn(header: "Name"),
+            ])
+            for track in tracks {
+                table.addRow(values: [track.token, track.name])
+            }
+            print("\(tracks.count) tracks/layouts")
+            print(table.render())
+        }
+    }
+
+    struct ACShow: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "show",
+            abstract: "Show the session Play will load."
+        )
+
+        mutating func run() throws {
+            let install = try WynCLI.acInstall()
+            let race = install.root.appending(path: "cfg").appending(path: "race.ini")
+            guard let text = try? String(contentsOf: race, encoding: .utf8) else {
+                throw ValidationError("No race.ini at \(race.path(percentEncoded: false))")
+            }
+            print(race.path(percentEncoded: false))
+            for key in ["TRACK", "CONFIG_TRACK", "MODEL", "CARS", "AI_LEVEL"] {
+                if let line = text.split(whereSeparator: \.isNewline).first(where: {
+                    $0.trimmingCharacters(in: .whitespaces).hasPrefix("\(key)=")
+                }) {
+                    print(line.trimmingCharacters(in: .whitespaces))
+                }
+            }
+            if let saved = AssettoCorsaSession.loadUser(
+                installRoot: install.root,
+                bottle: install.bottle
+            ) {
+                let layout = saved.layout.isEmpty ? "" : "/\(saved.layout)"
+                print(
+                    "wyn-session: \(saved.track)\(layout) \(saved.car) ai=\(saved.aiCount) agg=\(saved.aiAggression)"
+                )
+            }
+            if let session = install.profile.assettoCorsa {
+                print(
+                    "profile default: \(session.track) \(session.car) ai=\(session.aiCount) agg=\(session.aiAggression)"
+                )
+            }
+        }
+    }
+
+    struct ACSet: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "set",
+            abstract: "Write race.ini for a car/track/AI grid, then Play in Wyn."
+        )
+
+        @Option(help: "Car id or name (e.g. lotus_elise_sc, elise).")
+        var car: String?
+
+        @Option(help: "Track id or id/layout (e.g. spa, ks_nurburgring/layout_gp_a).")
+        var track: String?
+
+        @Option(help: "AI opponents (player is extra).")
+        var ai: Int?
+
+        @Option(help: "AI aggression 0–100 (100 is Kunos max).")
+        var aggression: Int?
+
+        mutating func run() throws {
+            if car == nil && track == nil && ai == nil && aggression == nil {
+                throw ValidationError("Pass --car, --track, --ai, or --aggression.")
+            }
+            let install = try WynCLI.acInstall()
+            let profile = try AssettoCorsaLibrary.applyingOverrides(
+                to: install.profile,
+                installRoot: install.root,
+                car: car,
+                track: track,
+                aiCount: ai,
+                aiAggression: aggression
+            )
+            guard let session = profile.assettoCorsa else {
+                throw ValidationError("No session to write.")
+            }
+            let written = AssettoCorsaSession.write(
+                session,
+                installRoot: install.root,
+                bottle: install.bottle
+            )
+            guard !written.isEmpty else {
+                throw ValidationError("Track or car missing on disk — race.ini not written.")
+            }
+            let layout = session.layout.isEmpty ? "" : "/\(session.layout)"
+            print(
+                "Wrote \(session.track)\(layout), \(session.car), \(session.aiCount) AI, aggression \(session.aiAggression)"
+            )
+            print("Play Assetto Corsa in Wyn (acs.exe), or: wyn play assetto-corsa")
+        }
+    }
+}
+

@@ -1,0 +1,41 @@
+{
+  "id": "assetto-corsa",
+  "name": "Assetto Corsa",
+  "publisher": "Kunos Simulazioni",
+  "steamAppId": 244210,
+  "exePatterns": [
+    "acs.exe",
+    "assettocorsa.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "d3dmetal",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": false,
+    "metalHud": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b;d3dx11_43,d3dcompiler_43=n",
+    "MTL_HUD_ENABLED": "0",
+    "D3DM_ENABLE_METALFX": "0",
+    "D3DM_ENABLE_ASYNC_COMMIT": "0",
+    "D3DM_SHOW_HUD_STATS": "0",
+    "MONO_PATH": "launcher\\support"
+  },
+  "winetricks": [
+    "vcrun2019",
+    "vcrun2022"
+  ],
+  "launchArgs": "-windowed",
+  "assettoCorsa": {
+    "track": "monza",
+    "layout": "",
+    "car": "lotus_elise_sc",
+    "aiCount": 7,
+    "aiAggression": 100
+  },
+  "notes": "LAUNCHED on the current stack (game-host Wine + D3DMetal via WINEDLLOVERRIDES d3d*=b; native d3dx11_43,d3dcompiler_43=n). Not verified: Kunos UI still dies, standing-start AI stuck at TTS inf. Measured 6 Sep 2026 on M4, macOS 26.5.1, /Volumes/SSD1TB/SteamLibrary/steamapps/common/assettocorsa. Play launches acs.exe (22.8 MB, 64-bit D3D11 sim), not AssettoCorsa.exe (32-bit .NET 4 WPF+CEF). 19:53 Magione solo Lotus; ~22:33 Monza 8 Lotuses loaded then sat still (TYPE=3 start lights TTS 1.#INF00). Session is practice TYPE=1 pits. Launch records on this Mac: up to 514s. Do not launch AssettoCorsa.exe first. Do not switch the bottle to 32-bit. Content Manager / CSP / Pure are not this profile.",
+  "status": "launched"
+}

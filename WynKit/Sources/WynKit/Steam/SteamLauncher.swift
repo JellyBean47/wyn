@@ -2,6 +2,19 @@
 //  SteamLauncher.swift
 //  WynKit
 //
+//  This file is part of Wyn.
+//
+//  Wyn is free software: you can redistribute it and/or modify it under the terms
+//  of the GNU General Public License as published by the Free Software Foundation,
+//  either version 3 of the License, or (at your option) any later version.
+//
+//  Wyn is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+//  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Wyn.
+//  If not, see https://www.gnu.org/licenses/.
+//
 
 import Foundation
 
@@ -45,7 +58,14 @@ public enum SteamLauncher {
 
     /// All `steamapps` roots known to Wine Steam (default C: library + extras from libraryfolders.vdf).
     /// External drives show up as e.g. `Z:\Volumes\SSD1TB\SteamLibrary` when `z:` → `/`.
-    public static func steamappsRoots(in bottle: Bottle) -> [URL] {
+    ///
+    /// Wine Steam's own VDF often only lists `C:\Program Files (x86)\Steam`. Games
+    /// already installed into a host `SteamLibrary` on a mounted volume would
+    /// otherwise be invisible, so those folders are scanned as well.
+    public static func steamappsRoots(
+        in bottle: Bottle,
+        hostVolumesRoot: URL = URL(fileURLWithPath: "/Volumes")
+    ) -> [URL] {
         let steamRoot = bottle.url
             .appending(path: "drive_c")
             .appending(path: "Program Files (x86)")
@@ -56,11 +76,11 @@ public enum SteamLauncher {
         var seen = Set<String>()
 
         func appendRoot(_ url: URL) {
-            let path = url.standardizedFileURL.path(percentEncoded: false)
+            let path = canonicalPath(url)
             guard !seen.contains(path) else { return }
             guard FileManager.default.fileExists(atPath: path) else { return }
             seen.insert(path)
-            roots.append(url)
+            roots.append(URL(fileURLWithPath: path, isDirectory: true))
         }
 
         appendRoot(defaultApps)
@@ -77,7 +97,160 @@ public enum SteamLauncher {
             }
         }
 
+        for extra in hostVolumeSteamappsRoots(volumesRoot: hostVolumesRoot) {
+            appendRoot(extra)
+        }
+
         return roots
+    }
+
+    /// `SteamLibrary` / `Steam` folders directly under each mounted volume.
+    /// One level, not a recursive hunt — `/Volumes/SSD1TB/SteamLibrary/steamapps`
+    /// is the shape this exists for.
+    static func hostVolumeSteamappsRoots(
+        volumesRoot: URL = URL(fileURLWithPath: "/Volumes")
+    ) -> [URL] {
+        let fm = FileManager.default
+        guard let volumes = try? fm.contentsOfDirectory(
+            at: volumesRoot,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        var roots: [URL] = []
+        for volume in volumes {
+            let isDirectory = (try? volume.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            guard isDirectory else { continue }
+            for folder in ["SteamLibrary", "Steam"] {
+                let steamapps = volume.appending(path: folder).appending(path: "steamapps")
+                if fm.fileExists(atPath: steamapps.path(percentEncoded: false)) {
+                    roots.append(steamapps)
+                }
+            }
+        }
+        return roots
+    }
+
+    /// Library roots (`…/SteamLibrary`) that correspond to `hostVolumeSteamappsRoots`.
+    static func hostVolumeSteamLibraryRoots(
+        volumesRoot: URL = URL(fileURLWithPath: "/Volumes")
+    ) -> [URL] {
+        hostVolumeSteamappsRoots(volumesRoot: volumesRoot).map { $0.deletingLastPathComponent() }
+    }
+
+    /// Point Wine Steam at mounted host `SteamLibrary` folders so the client
+    /// itself — not just Wyn's scanner — can see games on an external SSD.
+    /// No-op when the client is running; those files are Steam's to write.
+    @discardableResult
+    public static func registerHostSteamLibraries(
+        in bottle: Bottle,
+        hostVolumesRoot: URL = URL(fileURLWithPath: "/Volumes")
+    ) -> [URL] {
+        guard !isSteamClientRunning(in: bottle) else { return [] }
+
+        let extras = hostVolumeSteamLibraryRoots(volumesRoot: hostVolumesRoot)
+        guard !extras.isEmpty else { return [] }
+
+        let steamRoot = bottle.url
+            .appending(path: "drive_c")
+            .appending(path: "Program Files (x86)")
+            .appending(path: "Steam")
+        let vdfs = [
+            steamRoot.appending(path: "steamapps").appending(path: "libraryfolders.vdf"),
+            steamRoot.appending(path: "config").appending(path: "libraryfolders.vdf"),
+        ]
+
+        var added: [URL] = []
+        for extra in extras {
+            guard let windowsPath = windowsPath(forHostURL: extra, in: bottle) else { continue }
+            var wrote = false
+            for vdf in vdfs {
+                if insertLibraryFolder(at: vdf, windowsPath: windowsPath) {
+                    wrote = true
+                }
+            }
+            if wrote { added.append(extra) }
+        }
+        return added
+    }
+
+    /// Insert a `"path"` folder into a Steam `libraryfolders.vdf` if missing.
+    /// Returns true when the file was changed.
+    static func insertLibraryFolder(at vdf: URL, windowsPath: String) -> Bool {
+        let fm = FileManager.default
+        let existing = (try? String(contentsOf: vdf, encoding: .utf8)) ?? """
+        "libraryfolders"
+        {
+        }
+        """
+        let already = parseManifestValues(named: "path", in: existing).contains { recorded in
+            recorded.compare(windowsPath, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+                || recorded.replacingOccurrences(of: "/", with: "\\")
+                    .compare(windowsPath, options: [.caseInsensitive]) == .orderedSame
+        }
+        if already { return false }
+
+        let nextIndex = parseManifestValues(named: "path", in: existing).count
+        let block = """
+        	"\(nextIndex)"
+        	{
+        		"path"		"\(windowsPath)"
+        		"label"		""
+        		"contentid"		"0"
+        		"totalsize"		"0"
+        		"apps"
+        		{
+        		}
+        	}
+        """
+
+        var updated = existing
+        if let range = updated.range(of: "}", options: .backwards) {
+            updated.replaceSubrange(range, with: block + "}")
+        } else {
+            updated = """
+            "libraryfolders"
+            {
+            \(block)
+            }
+            """
+        }
+
+        do {
+            try fm.createDirectory(at: vdf.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try updated.write(to: vdf, atomically: true, encoding: .utf8)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Map a host path onto a Wine DOS path (`Z:\Volumes\…` when `z:` → `/`).
+    static func windowsPath(forHostURL url: URL, in bottle: Bottle) -> String? {
+        let unix = url.resolvingSymlinksInPath().path(percentEncoded: false)
+        for letter in ["z", "c"] {
+            let dos = bottle.url.appending(path: "dosdevices").appending(path: "\(letter):")
+            guard fmExists(dos) else { continue }
+            let root = dos.resolvingSymlinksInPath().path(percentEncoded: false)
+            if root == "/" {
+                let rest = unix.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                    .replacingOccurrences(of: "/", with: "\\")
+                return "\(letter.uppercased()):\\\(rest)"
+            }
+            if unix == root {
+                return "\(letter.uppercased()):"
+            }
+            let prefix = root.hasSuffix("/") ? root : root + "/"
+            if unix.hasPrefix(prefix) {
+                let rest = String(unix.dropFirst(prefix.count)).replacingOccurrences(of: "/", with: "\\")
+                return "\(letter.uppercased()):\\\(rest)"
+            }
+        }
+        return nil
+    }
+
+    private static func fmExists(_ url: URL) -> Bool {
+        FileManager.default.fileExists(atPath: url.path(percentEncoded: false))
     }
 
     /// Steamworks redistributables and similar non-game app IDs.
@@ -87,11 +260,14 @@ public enum SteamLauncher {
 
     /// Installed Steam apps across every library folder, one tile per install directory.
     /// When several manifests share a folder (DLC), the lowest app ID is kept (usually the base game).
-    public static func installedApps(in bottle: Bottle) -> [SteamInstalledApp] {
+    public static func installedApps(
+        in bottle: Bottle,
+        hostVolumesRoot: URL = URL(fileURLWithPath: "/Volumes")
+    ) -> [SteamInstalledApp] {
         let fm = FileManager.default
         var byInstallDir: [String: SteamInstalledApp] = [:]
 
-        for steamApps in steamappsRoots(in: bottle) {
+        for steamApps in steamappsRoots(in: bottle, hostVolumesRoot: hostVolumesRoot) {
             let listing = (try? fm.contentsOfDirectory(
                 at: steamApps,
                 includingPropertiesForKeys: nil,
@@ -112,11 +288,16 @@ public enum SteamLauncher {
 
                 let path = steamApps.appending(path: "common").appending(path: installdir)
                 guard fm.fileExists(atPath: path.path(percentEncoded: false)) else { continue }
-                guard hasWindowsGameExecutable(in: path) else { continue }
+                let resolved = resolvedInstallDirectory(path)
+                guard hasWindowsGameExecutable(in: resolved) else { continue }
 
                 let name = parseManifestValue(named: "name", in: text) ?? installdir
-                let app = SteamInstalledApp(appId: appId, name: name, installDirectory: path)
-                let key = path.standardizedFileURL.path(percentEncoded: false)
+                let key = canonicalPath(resolved)
+                let app = SteamInstalledApp(
+                    appId: appId,
+                    name: name,
+                    installDirectory: URL(fileURLWithPath: key, isDirectory: true)
+                )
                 if let existing = byInstallDir[key] {
                     if app.appId < existing.appId {
                         byInstallDir[key] = app
@@ -133,33 +314,68 @@ public enum SteamLauncher {
     }
 
     /// Resolve a game's install folder from `appmanifest_<id>.acf` across all Steam libraries.
-    public static func installDirectory(forAppId appId: Int, in bottle: Bottle) -> URL? {
-        for steamApps in steamappsRoots(in: bottle) {
+    /// Prefers a folder that actually contains a Windows game EXE. A `C:` copy of
+    /// the manifest that only points at a directory symlink (or an empty staging
+    /// dir) is skipped when another library has the files.
+    public static func installDirectory(
+        forAppId appId: Int,
+        in bottle: Bottle,
+        hostVolumesRoot: URL = URL(fileURLWithPath: "/Volumes")
+    ) -> URL? {
+        var fallback: URL?
+        for steamApps in steamappsRoots(in: bottle, hostVolumesRoot: hostVolumesRoot) {
             let manifest = steamApps.appending(path: "appmanifest_\(appId).acf")
             guard let contents = try? String(contentsOf: manifest, encoding: .utf8) else { continue }
             guard let installdir = parseManifestValue(named: "installdir", in: contents) else { continue }
             let path = steamApps.appending(path: "common").appending(path: installdir)
             guard FileManager.default.fileExists(atPath: path.path(percentEncoded: false)) else { continue }
-            return path
+            let resolved = resolvedInstallDirectory(path)
+            if hasWindowsGameExecutable(in: resolved) {
+                return resolved
+            }
+            if fallback == nil { fallback = resolved }
         }
-        return nil
+        return fallback
     }
 
     /// Find the first matching game executable under a Steam app install.
-    public static func findGameExecutable(forAppId appId: Int, in bottle: Bottle, profile: GameProfile) -> URL? {
-        let searchRoots: [URL]
-        if let installDir = installDirectory(forAppId: appId, in: bottle) {
-            searchRoots = [installDir]
-        } else {
-            searchRoots = []
-        }
+    public static func findGameExecutable(
+        forAppId appId: Int,
+        in bottle: Bottle,
+        profile: GameProfile,
+        hostVolumesRoot: URL = URL(fileURLWithPath: "/Volumes")
+    ) -> URL? {
+        guard let installDir = installDirectory(
+            forAppId: appId,
+            in: bottle,
+            hostVolumesRoot: hostVolumesRoot
+        ) else { return nil }
+        return findGameExecutable(matching: profile, under: installDir)
+    }
 
-        for root in searchRoots {
-            if let match = findExecutable(matching: profile, under: root) {
-                return match
-            }
+    /// Search one install folder. Resolves directory symlinks first —
+    /// `FileManager` enumerators do not enter them.
+    public static func findGameExecutable(matching profile: GameProfile, under installDirectory: URL) -> URL? {
+        findExecutable(matching: profile, under: resolvedInstallDirectory(installDirectory))
+    }
+
+    /// Directory enumerators do not follow directory symlinks. Extra Steam
+    /// libraries are often linked into `steamapps/common` from `/Volumes/…`.
+    static func resolvedInstallDirectory(_ url: URL) -> URL {
+        URL(fileURLWithPath: canonicalPath(url), isDirectory: true)
+    }
+
+    /// `URL.standardizedFileURL.path` keeps a trailing slash on directory URLs
+    /// created with `fileURLWithPath`, and drops it on paths built with
+    /// `appending(path:)`. Wine Steam's VDF uses the latter; a `/Volumes` scan
+    /// uses the former. Without stripping, the same `SteamLibrary` is scanned
+    /// twice and every game appears twice in the library.
+    static func canonicalPath(_ url: URL) -> String {
+        var path = url.resolvingSymlinksInPath().standardizedFileURL.path(percentEncoded: false)
+        if path.count > 1, path.hasSuffix("/") {
+            path.removeLast()
         }
-        return nil
+        return path
     }
 
     public static func downloadInstaller() async throws -> URL {
@@ -314,6 +530,13 @@ public enum SteamLauncher {
         gameExeNames: [String] = [],
         extraEnvironment: [String: String] = [:]
     ) async throws {
+        // Point Wine Steam at mounted host Steam libraries so its UI matches
+        // what Wyn already lists from /Volumes. Skip when the client is up —
+        // it owns these files and will overwrite a write from underneath it.
+        if !isSteamClientRunning(in: bottle) {
+            registerHostSteamLibraries(in: bottle)
+        }
+
         let plan = try makeSteamLaunchPlan(
             in: bottle,
             options: options,
@@ -808,7 +1031,8 @@ public enum SteamLauncher {
         try await waitOutPreviousD3DMetalSession(profile: profile, bottle: bottle)
 
         var options = options
-        if profile.needsUbisoftConnectPlay {
+        if profile.needsUbisoftConnectPlay,
+           ubisoftConnectForcesFrankea(options: options) {
             try await prepareUbisoftConnectThenFrankeaSteam(in: bottle, options: &options)
         }
 
@@ -855,14 +1079,34 @@ public enum SteamLauncher {
                         print("[wyn:debug] Pinned DX11 in \(url.path(percentEncoded: false))")
                     }
                 }
-                // Translated GPUs cannot sustain Epic UE5 defaults — force Low + 40 FPS.
+                // Translated GPUs cannot sustain Epic UE5 defaults — first
+                // diagnostic is Low + 40 FPS. A profile that has already
+                // reached a map can opt out so the layer is actually judgeable.
                 if layer == .dxvk || layer == .d3dMetal || layer == .dxmt {
-                    let scaled = (try? UnrealCompatibility.pinLowScalability(
-                        in: bottle, projectName: projectName
-                    )) ?? []
-                    if options.debug, !scaled.isEmpty {
-                        for url in scaled {
-                            print("[wyn:debug] Pinned low scalability in \(url.path(percentEncoded: false))")
+                    if profile.pinUnrealLowScalability {
+                        let scaled = (try? UnrealCompatibility.pinLowScalability(
+                            in: bottle, projectName: projectName
+                        )) ?? []
+                        if options.debug, !scaled.isEmpty {
+                            for url in scaled {
+                                print("[wyn:debug] Pinned low scalability in \(url.path(percentEncoded: false))")
+                            }
+                        }
+                    } else {
+                        let res = UnrealCompatibility.resolutionFromLaunchArgs(gameArgs)
+                        let width = res?.width ?? 1280
+                        let height = res?.height ?? 720
+                        let scaled = (try? UnrealCompatibility.pinPlayableScalability(
+                            in: bottle,
+                            projectName: projectName,
+                            width: width,
+                            height: height
+                        )) ?? []
+                        print("Unreal scalability: High, uncapped, VSync on, \(width)×\(height) (not the Low+40 diagnostic pin).")
+                        if options.debug, !scaled.isEmpty {
+                            for url in scaled {
+                                print("[wyn:debug] Pinned playable scalability in \(url.path(percentEncoded: false))")
+                            }
                         }
                     }
                     let hitch = (try? UnrealCompatibility.pinHitchLogging(
@@ -1634,6 +1878,9 @@ public enum SteamLauncher {
                 throw Wine.D3DMetalError.wineNotGPTKAware
             }
             progress("D3DMetal play: game EXE + Logged-On Steam on game-host Wine (one wineserver).")
+            if profile.needsUbisoftConnectPlay {
+                try await ensureUbisoftConnectOnGameHost(in: bottle)
+            }
             try await launchGameOnGPTKWithD3DMetal(
                 appId: appId,
                 executable: executable,
@@ -1661,6 +1908,26 @@ public enum SteamLauncher {
             gameArgs: gameArgs,
             options: options
         )
+    }
+
+    /// Connect CEF only paints on frankea, and that wineserver has no D3DMetal.
+    /// `--frankea-steam` keeps Connect+DXVK. Default D3DMetal play starts
+    /// `upc.exe` on the game-host wineserver (UI may be transparent).
+    static func ubisoftConnectForcesFrankea(options: Wine.LaunchOptions) -> Bool {
+        options.preferFrankeaSteam
+    }
+
+    /// Attach Connect to the live game-host wineserver. Never wineserver -k.
+    private static func ensureUbisoftConnectOnGameHost(in bottle: Bottle) async throws {
+        if PlatformCatalog.isRunning(.ubisoft) {
+            progress("Ubisoft Connect is already running on this wineserver.")
+            return
+        }
+        progress("Opening Ubisoft Connect on game-host Wine (same wineserver as Steam).")
+        try await ConnectLauncher.launch(in: bottle)
+        guard PlatformCatalog.isRunning(.ubisoft) else {
+            throw PlatformLaunchError.connectWedged
+        }
     }
 
     /// Connect on frankea, then Steam on the same wineserver, then play with `preferFrankeaSteam`.
@@ -1816,9 +2083,11 @@ public enum SteamLauncher {
         progress(options.debug
             ? "[wyn:debug] Applying D3DMetal game DLL overrides…"
             : "Preparing D3DMetal overrides…")
+        let profileDllOverrides = profile.environment["WINEDLLOVERRIDES"]
         try Wine.applyD3DMetalGameOverrides(
             bottle: bottle,
             gameExeNames: gameExeNames,
+            extraNative: dllOverrideMap(steamSafeOverrides(profileDllOverrides)),
             debug: options.debug
         )
 
@@ -1827,13 +2096,38 @@ public enum SteamLauncher {
         environment["SteamAppId"] = "\(appId)"
         environment["SteamGameId"] = "\(appId)"
         environment.removeValue(forKey: "WINESERVER")
+        let profileOverrides = environment["WINEDLLOVERRIDES"]
         let gptkOverrides = TranslationLayer.d3dMetal.environmentOverrides()
         environment.merge(gptkOverrides, uniquingKeysWith: { _, new in new })
+        // Layer builtins must stay (`d3d11=b`). The merge above used to replace
+        // the whole string and drop profile extras — Assetto Corsa's
+        // `d3dx11_43=n` never reached Wine, so the builtin stub crashed after
+        // swapchain create (6 Sep 19:20 and 19:27).
         let overlayOff = "gameoverlayrenderer64=d;gameoverlayrenderer=d"
-        if let existing = environment["WINEDLLOVERRIDES"], !existing.isEmpty {
-            environment["WINEDLLOVERRIDES"] = "\(overlayOff);\(existing)"
-        } else {
-            environment["WINEDLLOVERRIDES"] = overlayOff
+        let layerDll = environment["WINEDLLOVERRIDES"] ?? ""
+        let combined = combiningDllOverrides(layer: layerDll, profile: profileOverrides)
+        environment["WINEDLLOVERRIDES"] = combined.isEmpty
+            ? overlayOff
+            : "\(overlayOff);\(combined)"
+        KunosLauncher.prepare(executable: executable, bottle: bottle, environment: &environment)
+        let installRoot = executable.deletingLastPathComponent()
+        if let session = AssettoCorsaSession.resolved(
+            declared: profile.assettoCorsa,
+            installRoot: installRoot,
+            bottle: bottle
+        ) {
+            let urls = AssettoCorsaSession.write(
+                session,
+                installRoot: installRoot,
+                bottle: bottle
+            )
+            if urls.isEmpty {
+                progress("Assetto Corsa session not written — track or car missing on disk.")
+            } else {
+                progress(
+                    "Assetto Corsa session: \(session.track), \(session.aiCount) AI (\(urls.count) files)."
+                )
+            }
         }
 
         var playOptions = options
@@ -2036,6 +2330,34 @@ public enum SteamLauncher {
         }
     }
 
+    /// Layer `WINEDLLOVERRIDES` plus any non-graphics clauses from the profile.
+    /// Graphics names stay on the layer (D3DMetal needs `d3d11=b`); helpers
+    /// like `d3dx11_43=n` survive.
+    static func combiningDllOverrides(layer: String, profile: String?) -> String {
+        guard let extra = steamSafeOverrides(profile), !extra.isEmpty else {
+            return layer
+        }
+        if layer.isEmpty { return extra }
+        return "\(layer);\(extra)"
+    }
+
+    /// `d3dx11_43,d3dcompiler_43=n` → `["d3dx11_43": "n", "d3dcompiler_43": "n"]`.
+    static func dllOverrideMap(_ raw: String?) -> [String: String] {
+        guard let raw, !raw.isEmpty else { return [:] }
+        var map: [String: String] = [:]
+        for clause in raw.split(separator: ";") {
+            let parts = clause.split(separator: "=", maxSplits: 1)
+            guard parts.count == 2 else { continue }
+            let mode = parts[1].trimmingCharacters(in: .whitespaces)
+            for name in parts[0].split(separator: ",") {
+                let key = name.trimmingCharacters(in: .whitespaces)
+                guard !key.isEmpty else { continue }
+                map[key] = mode
+            }
+        }
+        return map
+    }
+
     /// Strip graphics-layer overrides out of a `WINEDLLOVERRIDES` string,
     /// keeping every other clause in order.
     ///
@@ -2138,6 +2460,7 @@ public enum SteamLauncher {
     }
 
     /// True when the Steam install folder has a Windows game EXE (not Mac `.app` / redistributables).
+    /// Follows directory symlinks; the enumerator used below does not.
     public static func hasWindowsGameExecutable(in installDirectory: URL) -> Bool {
         let skipFolders: Set<String> = [
             "_commonredist",
@@ -2155,8 +2478,9 @@ public enum SteamLauncher {
             "ue4prereq",
         ]
 
+        let root = resolvedInstallDirectory(installDirectory)
         guard let enumerator = FileManager.default.enumerator(
-            at: installDirectory,
+            at: root,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else { return false }
@@ -2186,8 +2510,9 @@ public enum SteamLauncher {
     }
 
     private static func findExecutable(matching profile: GameProfile, under root: URL) -> URL? {
+        let resolved = resolvedInstallDirectory(root)
         guard let enumerator = FileManager.default.enumerator(
-            at: root,
+            at: resolved,
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
         ) else { return nil }

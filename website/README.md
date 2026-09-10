@@ -49,7 +49,8 @@ No GitHub deployment hook is configured.
 
 ## What to edit
 
-- `lib/html.mjs`: page content, markup, submission guidance, `/support`.
+- `lib/html.mjs`: page content, markup, submission guidance. `/support` is
+  kept in the file; set `SUPPORT_PAGE_ENABLED` to publish it.
 - `public/styles.css`: colour, typography, layout, mobile rules.
 - `public/client.js`: search, upload interaction, drafts, feedback.
 - `lib/validate.mjs`: shared browser/server validation, based on Wyn’s Swift schema and selected validator rules; not a substitute for maintainer review or the full Swift validator.

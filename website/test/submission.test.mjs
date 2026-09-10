@@ -80,6 +80,11 @@ test('API errors are JSON and pending submissions have no public read route', as
   const response = await worker.fetch(new Request('https://wyn-dev.com/api/v1/submissions/test'), env);
   assert.equal(response.status, 404); assert.equal((await response.json()).ok, false);
 });
+test('support page is unpublished', async () => {
+  const { env } = setup();
+  const response = await worker.fetch(new Request('https://wyn-dev.com/support'), env);
+  assert.equal(response.status, 404);
+});
 test('presentation metadata is stripped and missing status defaults to guessed', () => {
   const { status, ...profile } = good;
   const parsed = prepareSubmission(JSON.stringify({ ...profile, href: '/test', filename: 'test.json' }));

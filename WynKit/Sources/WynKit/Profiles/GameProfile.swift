@@ -2,6 +2,19 @@
 //  GameProfile.swift
 //  WynKit
 //
+//  This file is part of Wyn.
+//
+//  Wyn is free software: you can redistribute it and/or modify it under the terms
+//  of the GNU General Public License as published by the Free Software Foundation,
+//  either version 3 of the License, or (at your option) any later version.
+//
+//  Wyn is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+//  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Wyn.
+//  If not, see https://www.gnu.org/licenses/.
+//
 
 import Foundation
 
@@ -44,8 +57,15 @@ public struct GameProfile: Codable, Identifiable, Sendable {
     /// Defaults to `.guessed`: a profile is a guess until someone says otherwise,
     /// and an absent field must never read as "tested".
     public var status: ProfileStatus
-    /// Play must start Ubisoft Connect on frankea, then Steam on the same wineserver.
+    /// `--frankea-steam` starts Connect on frankea (DXVK). Default D3DMetal play
+    /// starts `upc.exe` on the game-host wineserver (UI may be transparent).
     public var requiresUbisoftConnect: Bool
+    /// Offline `acs.exe` session. Written at Play because the Kunos menu does not stay up.
+    public var assettoCorsa: AssettoCorsaSession?
+    /// When false, Play does not rewrite Unreal `GameUserSettings` to Low + 40 FPS.
+    /// Absent means true — that pin is the safe first diagnostic, and an old
+    /// profile must keep it. Ready or Not's first run was unjudgeable because of it.
+    public var pinUnrealLowScalability: Bool
 
     public var needsUbisoftConnectPlay: Bool {
         requiresUbisoftConnect || id == "ac-odyssey"
@@ -64,7 +84,9 @@ public struct GameProfile: Codable, Identifiable, Sendable {
         unrealProject: String? = nil,
         notes: String? = nil,
         status: ProfileStatus = .guessed,
-        requiresUbisoftConnect: Bool = false
+        requiresUbisoftConnect: Bool = false,
+        assettoCorsa: AssettoCorsaSession? = nil,
+        pinUnrealLowScalability: Bool = true
     ) {
         self.id = id
         self.name = name
@@ -79,6 +101,8 @@ public struct GameProfile: Codable, Identifiable, Sendable {
         self.notes = notes
         self.status = status
         self.requiresUbisoftConnect = requiresUbisoftConnect
+        self.assettoCorsa = assettoCorsa
+        self.pinUnrealLowScalability = pinUnrealLowScalability
     }
 
     public init(from decoder: Decoder) throws {
@@ -97,6 +121,10 @@ public struct GameProfile: Codable, Identifiable, Sendable {
         // Absent means guessed. An unstated provenance must never read as tested.
         status = try container.decodeIfPresent(ProfileStatus.self, forKey: .status) ?? .guessed
         requiresUbisoftConnect = try container.decodeIfPresent(Bool.self, forKey: .requiresUbisoftConnect) ?? false
+        assettoCorsa = try container.decodeIfPresent(AssettoCorsaSession.self, forKey: .assettoCorsa)
+        pinUnrealLowScalability = try container.decodeIfPresent(
+            Bool.self, forKey: .pinUnrealLowScalability
+        ) ?? true
     }
 
     public func matches(executable: URL) -> Bool {

@@ -1,3 +1,21 @@
+//
+//  UnrealIniWritingTests.swift
+//  WynKit
+//
+//  This file is part of Wyn.
+//
+//  Wyn is free software: you can redistribute it and/or modify it under the terms
+//  of the GNU General Public License as published by the Free Software Foundation,
+//  either version 3 of the License, or (at your option) any later version.
+//
+//  Wyn is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+//  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Wyn.
+//  If not, see https://www.gnu.org/licenses/.
+//
+
 import Foundation
 import Testing
 @testable import WynKit
@@ -174,5 +192,85 @@ struct UnrealIniWritingTests {
         #expect(UnrealCompatibility.lineEnding(of: "a\r\nb") == "\r\n")
         #expect(UnrealCompatibility.lineEnding(of: "a\nb") == "\n")
         #expect(UnrealCompatibility.lineEnding(of: "") == "\n")
+    }
+
+    // MARK: - Playable scalability (opt out of Low+40)
+
+    @Test("gameUserSettingsSections finds every *GameUserSettings header")
+    func findsAllUserSettingsSections() {
+        let contents = """
+        [/Script/ReadyOrNot.FGGameUserSettings]
+        FrameRateLimit=40.000000
+
+        [/Script/ReadyOrNot.ReadyOrNotGameUserSettings]
+        FrameRateLimit=0.000000
+
+        [/Script/Engine.GameUserSettings]
+        bUseVSync=False
+        """
+        let sections = UnrealCompatibility.gameUserSettingsSections(
+            in: contents, projectName: "ReadyOrNot"
+        )
+        #expect(sections.contains("[/Script/ReadyOrNot.FGGameUserSettings]"))
+        #expect(sections.contains("[/Script/ReadyOrNot.ReadyOrNotGameUserSettings]"))
+        #expect(sections.contains("[/Script/Engine.GameUserSettings]"))
+        #expect(sections.count == 3)
+    }
+
+    @Test("resolutionFromLaunchArgs reads ResX and ResY")
+    func resolutionFromLaunchArgs() {
+        let parsed = UnrealCompatibility.resolutionFromLaunchArgs([
+            "-dx11", "-windowed", "-ResX=1920", "-ResY=1080", "-log"
+        ])
+        #expect(parsed?.width == 1920)
+        #expect(parsed?.height == 1080)
+        #expect(UnrealCompatibility.resolutionFromLaunchArgs(["-dx11"]) == nil)
+        #expect(UnrealCompatibility.resolutionFromLaunchArgs(["-ResX=1920"]) == nil)
+    }
+
+    @Test("absent GameUserSettings falls back to the FG section")
+    func emptyFileFallsBackToFG() {
+        let sections = UnrealCompatibility.gameUserSettingsSections(
+            in: "", projectName: "ReadyOrNot"
+        )
+        #expect(sections == ["[/Script/ReadyOrNot.FGGameUserSettings]"])
+    }
+
+    @Test("pinPlayableScalability clears leftover Low+40 in every section")
+    func pinPlayableClearsLowCap() throws {
+        let root = URL.temporaryDirectory.appending(path: UUID().uuidString)
+        let bottleURL = root.appending(path: "bottle")
+        let config = bottleURL.appending(
+            path: "drive_c/users/crossover/AppData/Local/ReadyOrNot/Saved/Config/Windows"
+        )
+        try FileManager.default.createDirectory(at: config, withIntermediateDirectories: true)
+        let ini = config.appending(path: "GameUserSettings.ini")
+        try """
+        [/Script/ReadyOrNot.FGGameUserSettings]
+        FrameRateLimit=40.000000
+        bUseVSync=False
+
+        [/Script/ReadyOrNot.ReadyOrNotGameUserSettings]
+        FrameRateLimit=40.000000
+        ViewDistanceQuality=0
+
+        [ScalabilityGroups]
+        sg.ViewDistanceQuality=0
+        sg.ResolutionQuality=50
+        """.write(to: ini, atomically: true, encoding: .utf8)
+
+        let bottle = Bottle(bottleUrl: bottleURL)
+        let written = try UnrealCompatibility.pinPlayableScalability(
+            in: bottle, projectName: "ReadyOrNot"
+        )
+        #expect(!written.isEmpty)
+        let out = try read(ini)
+        #expect(!out.contains("FrameRateLimit=40"))
+        #expect(out.contains("FrameRateLimit=0.000000"))
+        #expect(out.contains("bUseVSync=True"))
+        #expect(out.contains("sg.ViewDistanceQuality=2"))
+        #expect(out.contains("sg.ResolutionQuality=100"))
+        #expect(out.contains("ViewDistanceQuality=2"))
+        #expect(out.contains("FullscreenMode=2"))
     }
 }

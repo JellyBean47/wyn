@@ -1,12 +1,16 @@
 {
   "images" : [
     {
-      "filename" : "wyn-logo.png",
+      "filename" : "wyn-logo.svg",
       "idiom" : "universal"
     }
   ],
   "info" : {
     "author" : "xcode",
     "version" : 1
+  },
+  "properties" : {
+    "preserves-vector-representation" : true,
+    "template-rendering-intent" : "original"
   }
 }

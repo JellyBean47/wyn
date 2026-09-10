@@ -31,8 +31,18 @@ export function layerLabel(layer) {
   return layer ?? "—";
 }
 
+// Flip to true to publish /support (nav, footer, home link, static build, local server).
+export const SUPPORT_PAGE_ENABLED = false;
+
 function layout({ title, description, path, body }) {
   const pageTitle = title ? `${title} · Wyn` : "Wyn — Windows games on Mac";
+  const supportNav = SUPPORT_PAGE_ENABLED
+    ? `
+      <a href="/support"${path === "/support" ? ' aria-current="page"' : ""}>Support</a>`
+    : "";
+  const supportFooter = SUPPORT_PAGE_ENABLED
+    ? ` · <a href="/support">Support Wyn</a>`
+    : "";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -46,31 +56,46 @@ function layout({ title, description, path, body }) {
 <body>
   <a class="skip" href="#main">Skip to content</a>
   <header class="top">
-    <a class="mark" href="/">Wyn</a>
+    <a class="mark" href="/"><img class="mark-icon" src="/favicon.svg" width="32" height="32" alt="">Wyn</a>
     <nav>
       <a href="/games"${path.startsWith("/games") ? ' aria-current="page"' : ""}>Games</a>
-      <a href="/submit"${path === "/submit" ? ' aria-current="page"' : ""}>Submit</a>
-      <a href="/support"${path === "/support" ? ' aria-current="page"' : ""}>Support</a>
+      <a href="/submit"${path === "/submit" ? ' aria-current="page"' : ""}>Submit</a>${supportNav}
       <a href="/api"${path === "/api" ? ' aria-current="page"' : ""}>API</a>
     </nav>
   </header>
   <main id="main">${body}</main>
   <footer>
     <p>Wyn runs Windows games on macOS through Wine. Profiles here are the launch settings that actually get used — layer, DLLs, arguments — not a star rating.</p>
-    <p>Built for the Wyn community. <a href="https://github.com/JellyBean47/wyn">Source</a> · <a href="/support">Support Wyn</a> · GPL-3.0-or-later.</p>
+    <p>Built for the Wyn community. <a href="https://github.com/JellyBean47/wyn">Source</a>${supportFooter} · GPL-3.0-or-later.</p>
   </footer>
   <script src="/client.js" type="module"></script>
 </body>
 </html>`;
 }
 
+function gameCards(games) {
+  if (!games.length) return "";
+  return `
+      <ul class="cards">
+        ${games.map((game) => `
+          <li>
+            <a href="/games/${escapeHtml(game.slug)}">
+              <span class="badge ${escapeHtml(game.status)}">${statusLabel(game.status)}</span>
+              <strong>${escapeHtml(game.name)}</strong>
+              <span>${escapeHtml(game.publisher ?? "")}</span>
+            </a>
+          </li>`).join("")}
+      </ul>`;
+}
+
 export function homePage(data) {
   const verified = data.games.filter((g) => g.status === "verified");
+  const launched = data.games.filter((g) => g.status === "launched");
   const body = `
     <section class="hero">
       <p class="kicker">Compatibility catalog</p>
       <h1>Windows games. Mac settings. Shared progress.</h1>
-      <p class="lede">Find launch settings for Windows games on your Mac. See what has actually been tested, download a profile, and share the settings that worked for you. Wyn is free. A signed Mac download is coming; until then the <a href="https://github.com/JellyBean47/wyn">source install</a> is the supported path. <a href="/support">Support testing</a>.</p>
+      <p class="lede">Find launch settings for Windows games on your Mac. See what has actually been tested, download a profile, and share the settings that worked for you. Wyn is free. A signed Mac download is coming; until then the <a href="https://github.com/JellyBean47/wyn">source install</a> is the supported path.${SUPPORT_PAGE_ENABLED ? ' <a href="/support">Support testing</a>.' : ""}</p>
       <form class="search" action="/games" method="get">
         <label class="sr-only" for="q">Search games</label>
         <input id="q" name="q" type="search" placeholder="Satisfactory, Solarpunk, Steam app id…" autocomplete="off">
@@ -89,19 +114,10 @@ export function homePage(data) {
     </section>
     <section>
       <h2>Know what has been tested</h2>
-      <p><strong>Launched</strong> means the game ran, but does not promise a complete or stable playthrough.</p>
-      <p>Most shipped profiles are <strong>guessed</strong>: written from the install layout, never launched. A guessed profile is still useful as a starting point. It is not evidence the game runs. Only <strong>verified</strong> means someone measured it on a Mac and wrote down what they saw.</p>
-      ${verified.length ? `
-      <ul class="cards">
-        ${verified.map((game) => `
-          <li>
-            <a href="/games/${escapeHtml(game.slug)}">
-              <span class="badge verified">${statusLabel(game.status)}</span>
-              <strong>${escapeHtml(game.name)}</strong>
-              <span>${escapeHtml(game.publisher ?? "")}</span>
-            </a>
-          </li>`).join("")}
-      </ul>` : "<p>No verified titles yet.</p>"}
+      <p><strong>Launched</strong> means the game ran on a Mac and notes say what was seen. It is not a promise of a complete playthrough, and older launches were on the previous Wine tree.</p>
+      <p>Most shipped profiles are <strong>guessed</strong>: written from the install layout, never launched. A guessed profile is still useful as a starting point. It is not evidence the game runs. Only <strong>verified</strong> means someone measured a loaded map on the current Wyn stack and wrote it down.</p>
+      ${verified.length ? gameCards(verified) : "<p>No verified titles yet.</p>"}
+      ${launched.length ? `<h3>Launched</h3>${gameCards(launched)}` : ""}
     </section>
     <section class="split">
       <div>
@@ -235,7 +251,7 @@ export function gamePage(game) {
       <h1>${escapeHtml(game.name)}</h1>
       <p>${escapeHtml(game.publisher ?? "")}${game.publisher ? " · " : ""}Steam ${steam} · <span class="badge ${escapeHtml(game.status)}">${statusLabel(game.status)}</span></p>
     </header>
-    <p class="notice">${game.status === "guessed" ? "This game has no tested profile yet. These settings are a starting point, not evidence that it runs." : "Results depend on your Mac, macOS, Wyn version, and game version. Read each profile’s notes before using it."}</p>
+    <p class="notice">${game.status === "guessed" ? "This game has no tested profile yet. These settings are a starting point, not evidence that it runs." : game.status === "launched" ? "This title launched on a Mac. Notes say what was seen. That is not verified: verified needs a loaded-map measurement on the current Wyn stack." : "Results depend on your Mac, macOS, Wyn version, and game version. Read each profile’s notes before using it."}</p>
     <details class="guide"><summary>How to use or share a profile</summary><p>Download the JSON to keep a copy of the launch settings. Your Wyn agent can inspect it and apply the profile. Test it on your Mac before treating it as compatible.</p><p>To contribute an improvement, choose “Improve this profile”, update the settings and notes, then submit for review. Uploading here does not change your installed Wyn profiles.</p></details>
     ${game.profiles.map((p) => profileSection(p, game.slug)).join("")}
   `;
@@ -324,7 +340,7 @@ export function supportPage(data) {
     </section>
     <section>
       <h2>Verified is not guessed</h2>
-      <p>The catalog currently lists <strong>${games} games</strong>, <strong>${verified} verified</strong>, <strong>${guessed} guessed</strong>. A guessed profile is a starting point written from the install layout. It is not evidence the game runs. Verified means someone measured a loaded map on a Mac and wrote it down.</p>
+      <p>The catalog currently lists <strong>${games} games</strong>, <strong>${verified} verified</strong>, <strong>${data?.counts?.launched ?? 0} launched</strong>, <strong>${guessed} guessed</strong>. A guessed profile is a starting point written from the install layout. It is not evidence the game runs. Launched means it ran and notes say what was seen. Verified means someone measured a loaded map on the current Wyn stack and wrote it down.</p>
       <p>Do not treat a guessed Elden Ring page as a review. Prefer <a href="/games?status=verified">verified titles</a>. If you get a guessed game to a loaded map, <a href="/submit">submit the JSON</a>.</p>
     </section>
     <section>

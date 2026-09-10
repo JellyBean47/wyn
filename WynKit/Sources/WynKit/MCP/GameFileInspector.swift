@@ -2,6 +2,19 @@
 //  GameFileInspector.swift
 //  WynKit
 //
+//  This file is part of Wyn.
+//
+//  Wyn is free software: you can redistribute it and/or modify it under the terms
+//  of the GNU General Public License as published by the Free Software Foundation,
+//  either version 3 of the License, or (at your option) any later version.
+//
+//  Wyn is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+//  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Wyn.
+//  If not, see https://www.gnu.org/licenses/.
+//
 //  What the game's own files say about it.
 //
 //  This is the difference between an assistant that recalls and one that looks.
@@ -63,7 +76,10 @@ public enum GameFileInspector {
     /// Directories never worth walking into.
     static let skippedDirectories: Set<String> = [
         "_commonredist", "redist", "directx", "vcredist", "shadercache",
-        "savedata", "saves", "logs", "crashes"
+        "savedata", "saves", "logs", "crashes",
+        // Asset dumps (Assetto Corsa `content/` is tens of thousands of
+        // cars/tracks). Engine signatures and launch EXEs live outside these.
+        "content"
     ]
 
     static let maxDepth = 3
@@ -94,21 +110,26 @@ public enum GameFileInspector {
                 options: [.skipsHiddenFiles]
             ) else { return }
 
+            // Files first. Depth-first into `content/` (or any large tree that
+            // happens to be enumerated first) used to burn the entry budget
+            // before the install root's own EXEs were seen — Assetto Corsa's
+            // inspector report was just `wow_helper.exe`.
+            var files: [URL] = []
+            var directories: [URL] = []
             for entry in entries {
                 seen += 1
-                if seen > maxEntries { return }
+                if seen > maxEntries { break }
+                let isDirectory = (try? entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+                if isDirectory {
+                    directories.append(entry)
+                } else {
+                    files.append(entry)
+                }
+            }
+
+            for entry in files {
                 let name = entry.lastPathComponent
                 let lower = name.lowercased()
-                let isDirectory = (try? entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-
-                if isDirectory {
-                    // Unreal and Unity announce themselves with a directory.
-                    if lower == "engine" { note("Unreal Engine", "\(relative(entry, to: root))/") }
-                    if lower.hasSuffix("_data") { note("Unity", "\(relative(entry, to: root))/") }
-                    guard !skippedDirectories.contains(lower) else { continue }
-                    walk(entry, depth: depth + 1)
-                    continue
-                }
 
                 if lower.hasSuffix(".exe") {
                     let size = (try? entry.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
@@ -130,6 +151,15 @@ public enum GameFileInspector {
                 for signature in engineSignatures where lower == signature.needle {
                     note(signature.engine, name)
                 }
+            }
+
+            for entry in directories {
+                let name = entry.lastPathComponent
+                let lower = name.lowercased()
+                if lower == "engine" { note("Unreal Engine", "\(relative(entry, to: root))/") }
+                if lower.hasSuffix("_data") { note("Unity", "\(relative(entry, to: root))/") }
+                guard !skippedDirectories.contains(lower) else { continue }
+                walk(entry, depth: depth + 1)
             }
         }
 

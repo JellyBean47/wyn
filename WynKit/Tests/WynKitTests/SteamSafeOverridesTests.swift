@@ -1,3 +1,21 @@
+//
+//  SteamSafeOverridesTests.swift
+//  WynKit
+//
+//  This file is part of Wyn.
+//
+//  Wyn is free software: you can redistribute it and/or modify it under the terms
+//  of the GNU General Public License as published by the Free Software Foundation,
+//  either version 3 of the License, or (at your option) any later version.
+//
+//  Wyn is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+//  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Wyn.
+//  If not, see https://www.gnu.org/licenses/.
+//
+
 import Foundation
 import Testing
 @testable import WynKit
@@ -49,6 +67,29 @@ struct SteamSafeOverridesTests {
     @Test func emptyAndNilAreNil() {
         #expect(SteamLauncher.steamSafeOverrides(nil) == nil)
         #expect(SteamLauncher.steamSafeOverrides("") == nil)
+    }
+
+    /// D3DMetal play used to `merge` the layer string over the profile and
+    /// drop `d3dx11_43=n`. The layer builtins stay; the helper clause is kept.
+    @Test func combiningKeepsProfileHelpersOnTopOfD3DMetalBuiltins() {
+        let layer = "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b"
+        let profile = "\(layer);d3dx11_43,d3dcompiler_43=n"
+        let combined = SteamLauncher.combiningDllOverrides(layer: layer, profile: profile)
+        #expect(combined.hasPrefix(layer))
+        #expect(combined.contains("d3dx11_43,d3dcompiler_43=n"))
+        #expect(!combined.contains("d3d11=n"))
+    }
+
+    @Test func combiningWithNoProfileExtrasIsTheLayer() {
+        let layer = "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b"
+        #expect(SteamLauncher.combiningDllOverrides(layer: layer, profile: layer) == layer)
+        #expect(SteamLauncher.combiningDllOverrides(layer: layer, profile: nil) == layer)
+    }
+
+    @Test func dllOverrideMapSplitsANativeHelperClause() {
+        let map = SteamLauncher.dllOverrideMap("d3dx11_43,d3dcompiler_43=n")
+        #expect(map["d3dx11_43"] == "n")
+        #expect(map["d3dcompiler_43"] == "n")
     }
 
     /// Spacing and case are the caller's, not ours.

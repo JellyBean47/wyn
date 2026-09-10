@@ -2,6 +2,19 @@
 //  MCPTools.swift
 //  WynKit
 //
+//  This file is part of Wyn.
+//
+//  Wyn is free software: you can redistribute it and/or modify it under the terms
+//  of the GNU General Public License as published by the Free Software Foundation,
+//  either version 3 of the License, or (at your option) any later version.
+//
+//  Wyn is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+//  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Wyn.
+//  If not, see https://www.gnu.org/licenses/.
+//
 //  The tools Wyn exposes to whatever Claude the person already has.
 //
 //  Wyn is the MCP *server*, not the client: no API key lives in the app, no
@@ -230,31 +243,7 @@ public enum MCPTools {
     }
 
     static func listInstalledGames() throws -> String {
-        let bottle = try steamBottle()
-        let records = LaunchRecordStore.load()
-        let items = GameLibrary.installed(in: bottle)
-        guard !items.isEmpty else {
-            return "No games installed in the Steam bottle yet."
-        }
-
-        var lines = ["\(items.count) installed game(s):", ""]
-        for item in items {
-            let profile = item.profile
-            let synthesised = profile.id.hasPrefix("steam-")
-            let status = synthesised
-                ? "no profile"
-                : LaunchRecordStore.effectiveStatus(for: profile, in: records).rawValue
-            lines.append("\(profile.name)")
-            lines.append("  steamAppId=\(profile.steamAppId.map(String.init) ?? "-")"
-                         + "  profile=\(synthesised ? "none" : profile.id)"
-                         + "  status=\(status)")
-        }
-        lines.append("")
-        lines.append("""
-        "no profile" means Wyn has the game but no launch settings for it — \
-        inspect_game_files on its app id is the next step.
-        """)
-        return lines.joined(separator: "\n")
+        GameLibrary.describeInstalled(in: try steamBottle())
     }
 
     static func inspectGameFiles(_ arguments: [String: Any]) throws -> String {

@@ -27,6 +27,7 @@ import {
   homePage,
   notFoundPage,
   submitPage,
+  SUPPORT_PAGE_ENABLED,
   supportPage,
 } from "./lib/html.mjs";
 
@@ -62,7 +63,7 @@ write("validate.mjs", fs.readFileSync(path.join(here, "lib/validate.mjs")));
 html("index.html", homePage(data));
 html("games/index.html", gamesPage(data.games, {}));
 html("submit/index.html", submitPage());
-html("support/index.html", supportPage(data));
+if (SUPPORT_PAGE_ENABLED) html("support/index.html", supportPage(data));
 html("api/index.html", apiPage());
 html("404.html", notFoundPage());
 
@@ -106,7 +107,6 @@ Availability: GET /api/v1/submit
 
 Status values: guessed (never launched), launched (it ran), verified
 (measured; notes must say what was seen). Do not treat guessed as evidence.
-Support / sponsor: /support
 Install: source until a notarized Wyn.dmg exists.
 `,
 );
