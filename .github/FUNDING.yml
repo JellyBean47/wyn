@@ -1,4 +1,5 @@
-# These platforms appear as Sponsor on https://github.com/JellyBean47/wyn
-github: JellyBean47
-custom:
-  - https://wyn-dev.com/support
+# Funding links stay off until the catalog has more traction.
+# Restore with SUPPORT_PAGE_ENABLED in website/lib/html.mjs:
+# github: JellyBean47
+# custom:
+#   - https://wyn-dev.com/support

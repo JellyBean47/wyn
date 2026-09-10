@@ -31,6 +31,7 @@ import {
   homePage,
   notFoundPage,
   submitPage,
+  SUPPORT_PAGE_ENABLED,
   supportPage,
 } from "./lib/html.mjs";
 import { MAX_BODY, prepareSubmission, submissionRecord } from "./lib/submission.mjs";
@@ -213,7 +214,7 @@ const server = http.createServer(async (req, res) => {
       sendHtml(res, 200, submitPage());
       return;
     }
-    if (req.method === "GET" && pathname === "/support") {
+    if (SUPPORT_PAGE_ENABLED && req.method === "GET" && pathname === "/support") {
       sendHtml(res, 200, supportPage(data));
       return;
     }

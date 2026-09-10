@@ -8,7 +8,6 @@ Wyn is free. Do not pitch paid tiers until there are installs.
 ## Landing URLs
 
 - Catalog: https://wyn-dev.com/
-- Support / sponsor: https://wyn-dev.com/support
 - Source: https://github.com/JellyBean47/wyn
 - A title: https://wyn-dev.com/games/solarpunk
 - JSON: https://wyn-dev.com/api/v1/games/solarpunk.json

@@ -2,6 +2,19 @@
 //  LaunchRecord.swift
 //  WynKit
 //
+//  This file is part of Wyn.
+//
+//  Wyn is free software: you can redistribute it and/or modify it under the terms
+//  of the GNU General Public License as published by the Free Software Foundation,
+//  either version 3 of the License, or (at your option) any later version.
+//
+//  Wyn is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+//  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Wyn.
+//  If not, see https://www.gnu.org/licenses/.
+//
 //  Evidence that a profile actually ran.
 //
 //  Wyn ships 120 profiles and exactly one of them was ever measured, because
@@ -79,7 +92,13 @@ extension GameProfile {
         parts.append("avx=\(bottle?.avxEnabled.map(String.init) ?? "-")")
         parts.append("metalHud=\(bottle?.metalHud.map(String.init) ?? "-")")
         parts.append("args=\(launchArgs ?? "-")")
+        parts.append("pinLow=\(pinUnrealLowScalability)")
         parts.append("winetricks=\(winetricks.sorted().joined(separator: ","))")
+        parts.append("ac.track=\(assettoCorsa?.track ?? "-")")
+        parts.append("ac.layout=\(assettoCorsa?.layout ?? "-")")
+        parts.append("ac.car=\(assettoCorsa?.car ?? "-")")
+        parts.append("ac.ai=\(assettoCorsa.map { String($0.aiCount) } ?? "-")")
+        parts.append("ac.agg=\(assettoCorsa.map { String($0.aiAggression) } ?? "-")")
         for key in environment.keys.sorted() {
             parts.append("env.\(key)=\(environment[key] ?? "")")
         }

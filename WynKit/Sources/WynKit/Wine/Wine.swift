@@ -730,9 +730,10 @@ public class Wine {
     public static func applyD3DMetalGameOverrides(
         bottle: Bottle,
         gameExeNames: [String],
+        extraNative: [String: String] = [:],
         debug: Bool = false
     ) throws {
-        let gameGPTK: [String: String] = [
+        var gameGPTK: [String: String] = [
             "d3d11": "b",
             "dxgi": "b",
             "d3d12": "b",
@@ -741,6 +742,9 @@ public class Wine {
             "gameoverlayrenderer64": "d",
             "gameoverlayrenderer": "d"
         ]
+        for (name, mode) in extraNative {
+            gameGPTK[name] = mode
+        }
         var applied: [String] = []
         for raw in gameExeNames {
             let exe = (raw as NSString).lastPathComponent

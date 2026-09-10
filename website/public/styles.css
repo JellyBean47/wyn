@@ -54,18 +54,28 @@ a:hover { color: var(--ink); }
 .top {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   padding: 1.25rem 8vw 0.75rem;
   border-bottom: 1px solid var(--line);
   background: var(--bg-2);
 }
 
 .mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
   font-family: var(--serif);
   font-size: 1.6rem;
   color: var(--ink);
   text-decoration: none;
   letter-spacing: 0.02em;
+}
+
+.mark-icon {
+  width: 2rem;
+  height: 2rem;
+  display: block;
+  flex-shrink: 0;
 }
 
 nav { display: flex; gap: 1.25rem; }
@@ -169,6 +179,14 @@ button:hover, .btn:hover { filter: brightness(1.08); }
 }
 .cards a:hover { border-color: var(--gold); }
 .cards span { color: var(--muted); font-size: 0.9rem; }
+
+section h3 {
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 1.75rem 0 0.75rem;
+}
 
 .split {
   display: grid;

@@ -27,6 +27,6 @@
     "vcrun2022"
   ],
   "launchArgs": "",
-  "notes": "Creation Engine DX11 → D3DMetal. Prefer SkyrimSE.exe over launcher. Compat ladder: Bethesda / classic DX11.",
-  "status": "guessed"
+  "notes": "LAUNCHED. Creation Engine DX11. Measured ~9 Aug 2026: window titled Skyrim Special Edition, D3DMetal 3.0 loaded, shader cache building, ~1920×1080. Prefer SkyrimSE.exe over the launcher. Old winecx path pinned CX_GRAPHICS_BACKEND=d3dmetal; current stack is translationLayer d3dmetal + WINEDLLOVERRIDES d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b, MetalFX/HUD off, avxEnabled true. Same family as Fallout 4's DX11 path. Not verified: no Tamriel-loaded frame count on the game-host tree.",
+  "status": "launched"
 }

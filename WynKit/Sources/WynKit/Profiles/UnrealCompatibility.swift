@@ -2,6 +2,19 @@
 //  UnrealCompatibility.swift
 //  WynKit
 //
+//  This file is part of Wyn.
+//
+//  Wyn is free software: you can redistribute it and/or modify it under the terms
+//  of the GNU General Public License as published by the Free Software Foundation,
+//  either version 3 of the License, or (at your option) any later version.
+//
+//  Wyn is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+//  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Wyn.
+//  If not, see https://www.gnu.org/licenses/.
+//
 
 import Foundation
 
@@ -13,6 +26,22 @@ public enum UnrealCompatibility {
             let lower = arg.lowercased()
             return lower == "-dx11" || lower == "-d3d11"
         }
+    }
+
+    /// `-ResX=` / `-ResY=` from Unreal launch args, if both are present and positive.
+    public static func resolutionFromLaunchArgs(_ launchArgs: [String]) -> (width: Int, height: Int)? {
+        var width: Int?
+        var height: Int?
+        for arg in launchArgs {
+            let lower = arg.lowercased()
+            if lower.hasPrefix("-resx="), let value = Int(lower.dropFirst(6)), value > 0 {
+                width = value
+            } else if lower.hasPrefix("-resy="), let value = Int(lower.dropFirst(6)), value > 0 {
+                height = value
+            }
+        }
+        guard let width, let height else { return nil }
+        return (width, height)
     }
 
     /// Force D3D11 into Saved Engine.ini (no perf-killing RHI bypass pins).
@@ -91,6 +120,62 @@ public enum UnrealCompatibility {
         }
     }
 
+    /// High scalability, no FPS cap, VSync on. Replaces a leftover Low+40 pin so
+    /// D3DMetal can be judged. Still 1280×720 — one variable at a time.
+    ///
+    /// Writes every `*GameUserSettings` section in the file: Wyn's first RoN
+    /// pin created `[/Script/ReadyOrNot.FGGameUserSettings]` with FrameRateLimit=40
+    /// while the game actually reads `ReadyOrNotGameUserSettings`.
+    @discardableResult
+    public static func pinPlayableScalability(
+        in bottle: Bottle,
+        projectName: String,
+        width: Int = 1280,
+        height: Int = 720
+    ) throws -> [URL] {
+        try mutateConfigIni(in: bottle, projectName: projectName, fileName: "GameUserSettings.ini") { url in
+            let contents = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+            let sections = gameUserSettingsSections(in: contents, projectName: projectName)
+            for section in sections {
+                try upsertKey(in: url, section: section, key: "ResolutionSizeX", value: "\(width)")
+                try upsertKey(in: url, section: section, key: "ResolutionSizeY", value: "\(height)")
+                try upsertKey(in: url, section: section, key: "LastUserConfirmedResolutionSizeX", value: "\(width)")
+                try upsertKey(in: url, section: section, key: "LastUserConfirmedResolutionSizeY", value: "\(height)")
+                try upsertKey(in: url, section: section, key: "FrameRateLimit", value: "0.000000")
+                try upsertKey(in: url, section: section, key: "bFrameLimitEnabled", value: "False")
+                try upsertKey(in: url, section: section, key: "bUseVSync", value: "True")
+                try upsertKey(in: url, section: section, key: "bUseDynamicResolution", value: "False")
+                try upsertKey(in: url, section: section, key: "FullscreenMode", value: "2")
+                try upsertKey(in: url, section: section, key: "PreferredFullscreenMode", value: "2")
+                try upsertKey(in: url, section: section, key: "ViewDistanceQuality", value: "2")
+                try upsertKey(in: url, section: section, key: "AntiAliasingQuality", value: "2")
+                try upsertKey(in: url, section: section, key: "ShadowQuality", value: "2")
+                try upsertKey(in: url, section: section, key: "GlobalIlluminationQuality", value: "2")
+                try upsertKey(in: url, section: section, key: "ReflectionQuality", value: "2")
+                try upsertKey(in: url, section: section, key: "PostProcessQuality", value: "2")
+                try upsertKey(in: url, section: section, key: "TextureQuality", value: "2")
+                try upsertKey(in: url, section: section, key: "EffectsQuality", value: "2")
+                try upsertKey(in: url, section: section, key: "FoliageQuality", value: "2")
+                try upsertKey(in: url, section: section, key: "ShadingQuality", value: "2")
+                try upsertKey(in: url, section: section, key: "LandscapeQuality", value: "2")
+            }
+
+            let high = "2"
+            try upsertKey(in: url, section: "[ScalabilityGroups]", key: "sg.ResolutionQuality", value: "100")
+            try upsertKey(in: url, section: "[ScalabilityGroups]", key: "sg.ViewDistanceQuality", value: high)
+            try upsertKey(in: url, section: "[ScalabilityGroups]", key: "sg.AntiAliasingQuality", value: high)
+            try upsertKey(in: url, section: "[ScalabilityGroups]", key: "sg.ShadowQuality", value: high)
+            try upsertKey(in: url, section: "[ScalabilityGroups]", key: "sg.GlobalIlluminationQuality", value: high)
+            try upsertKey(in: url, section: "[ScalabilityGroups]", key: "sg.ReflectionQuality", value: high)
+            try upsertKey(in: url, section: "[ScalabilityGroups]", key: "sg.PostProcessQuality", value: high)
+            try upsertKey(in: url, section: "[ScalabilityGroups]", key: "sg.TextureQuality", value: high)
+            try upsertKey(in: url, section: "[ScalabilityGroups]", key: "sg.EffectsQuality", value: high)
+            try upsertKey(in: url, section: "[ScalabilityGroups]", key: "sg.FoliageQuality", value: high)
+            try upsertKey(in: url, section: "[ScalabilityGroups]", key: "sg.ShadingQuality", value: high)
+            try upsertKey(in: url, section: "[ScalabilityGroups]", key: "sg.LandscapeQuality", value: high)
+        }
+    }
+
     /// Enable Unreal hitch detection logging so flat→spike frame pacing shows up in FactoryGame.log.
     /// Threshold 33.3 ms ≈ below 30 FPS; anything slower is logged as a hitch.
     @discardableResult
@@ -114,6 +199,31 @@ public enum UnrealCompatibility {
     }
 
     // MARK: - Private
+
+    /// Every Unreal `*GameUserSettings` section in the file. Wyn's Low pin
+    /// targets FactoryGame's `FGGameUserSettings`; Ready or Not also has
+    /// `ReadyOrNotGameUserSettings`, and leftover FrameRateLimit=40 lived in
+    /// the FG section the game does not read.
+    static func gameUserSettingsSections(in contents: String, projectName: String) -> [String] {
+        var found: [String] = []
+        let pattern = "\\[/Script/[^\\]]+GameUserSettings\\]"
+        if let regex = try? NSRegularExpression(pattern: pattern) {
+            let ns = contents as NSString
+            let matches = regex.matches(in: contents, range: NSRange(location: 0, length: ns.length))
+            for match in matches {
+                found.append(ns.substring(with: match.range))
+            }
+        }
+        var seen = Set<String>()
+        var unique: [String] = []
+        for section in found where seen.insert(section).inserted {
+            unique.append(section)
+        }
+        if unique.isEmpty {
+            unique.append("[/Script/\(projectName).FGGameUserSettings]")
+        }
+        return unique
+    }
 
     private static func mutateConfigIni(
         in bottle: Bottle,

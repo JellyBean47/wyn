@@ -197,4 +197,68 @@ public enum WineMono {
             throw MonoError.msiexecFailed
         }
     }
+
+    /// Wine Mono's `CultureInfo.CurrentCulture.NumberFormat` is read-only.
+    /// Assetto Corsa's Kunos launcher writes `NumberDecimalSeparator` in
+    /// `ControllerSetupSlimDX` anyway, which throws `InvalidOperationException`
+    /// ("Instance is read-only") → `XamlParseException` → the "retire from the
+    /// race" dialog (measured 6 Sep 2026 20:12). Microsoft .NET 4 hands out a
+    /// writable format; this nop's `NumberFormatInfo.VerifyWritable` so Mono
+    /// matches that. Bottle-local; wine-mono reinstall undoes it.
+    @discardableResult
+    public static func allowMutatingReadOnlyNumberFormat(in bottle: Bottle) -> Bool {
+        let mscorlib = bottle.url
+            .appending(path: "drive_c")
+            .appending(path: "windows")
+            .appending(path: "mono")
+            .appending(path: "mono-2.0")
+            .appending(path: "lib")
+            .appending(path: "mono")
+            .appending(path: "4.5")
+            .appending(path: "mscorlib.dll")
+        return patchVerifyWritable(at: mscorlib)
+    }
+
+    /// `NumberFormatInfo.VerifyWritable` IL: ldarg.0, ldfld, brfalse.s +16,
+    /// ldstr, call, newobj, throw, ret. Replace the first opcode with `ret`.
+    static func patchVerifyWritable(at url: URL) -> Bool {
+        guard var data = try? Data(contentsOf: url), !data.isEmpty else { return false }
+        guard let offset = verifyWritableILOffset(in: data) else { return false }
+        if data[offset] == 0x2A { return false }
+        data[offset] = 0x2A
+        do {
+            try data.write(to: url)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// File offset of the 25-byte VerifyWritable body, or of an already-patched
+    /// copy that starts with `ret` instead of `ldarg.0`.
+    static func verifyWritableILOffset(in data: Data) -> Int? {
+        data.withUnsafeBytes { buf -> Int? in
+            let bytes = buf.bindMemory(to: UInt8.self)
+            guard bytes.count >= 25 else { return nil }
+            let last = bytes.count - 25
+            var i = 0
+            while i <= last {
+                let first = bytes[i]
+                if (first == 0x02 || first == 0x2A)
+                    && bytes[i + 1] == 0x7B
+                    && bytes[i + 6] == 0x2C
+                    && bytes[i + 7] == 0x10
+                    && bytes[i + 8] == 0x72
+                    && bytes[i + 13] == 0x28
+                    && bytes[i + 18] == 0x73
+                    && bytes[i + 23] == 0x7A
+                    && bytes[i + 24] == 0x2A
+                {
+                    return i
+                }
+                i += 1
+            }
+            return nil
+        }
+    }
 }

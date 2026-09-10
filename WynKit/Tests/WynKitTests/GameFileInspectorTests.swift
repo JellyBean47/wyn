@@ -1,3 +1,21 @@
+//
+//  GameFileInspectorTests.swift
+//  WynKit
+//
+//  This file is part of Wyn.
+//
+//  Wyn is free software: you can redistribute it and/or modify it under the terms
+//  of the GNU General Public License as published by the Free Software Foundation,
+//  either version 3 of the License, or (at your option) any later version.
+//
+//  Wyn is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+//  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Wyn.
+//  If not, see https://www.gnu.org/licenses/.
+//
+
 import Foundation
 import Testing
 @testable import WynKit
@@ -184,5 +202,31 @@ struct GameFileInspectorTests {
 
         let names = GameFileInspector.inspect(installDirectory: root).executables.map(\.name)
         #expect(names == ["game.exe"])
+    }
+
+    /// Assetto Corsa keeps tens of thousands of cars/tracks under `content/`.
+    /// Walking that first burned the entry budget and hid `acs.exe`.
+    @Test func contentFoldersAreSkippedAndRootExesStillCount() throws {
+        let root = try makeTree { root in
+            try write(root.appending(path: "acs.exe"), bytes: 22_890_776)
+            try write(root.appending(path: "content/cars/hidden.exe"), bytes: 100)
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let names = GameFileInspector.inspect(installDirectory: root).executables.map(\.name)
+        #expect(names == ["acs.exe"])
+    }
+
+    @Test func filesInADirectoryAreSeenBeforeSubfolders() throws {
+        let root = try makeTree { root in
+            try write(root.appending(path: "acs.exe"), bytes: 1000)
+            for i in 0..<50 {
+                try write(root.appending(path: "zzz_assets/\(i).dat"))
+            }
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let names = GameFileInspector.inspect(installDirectory: root).executables.map(\.name)
+        #expect(names.contains("acs.exe"))
     }
 }

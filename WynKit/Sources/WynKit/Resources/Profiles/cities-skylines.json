@@ -27,6 +27,6 @@
     "vcrun2022"
   ],
   "launchArgs": "-force-d3d11 -screen-width 1920 -screen-height 1080 -screen-fullscreen 1 -popupwindow",
-  "notes": "Unity 5.6.7f1 D3D11 → D3DMetal (Cyberpunk/FO4 class, not NMS Vulkan). Native macOS depot exists because Unity shipped a Mac player; Windows PE is Cities.exe. Steam's default target is Paradox dowser.exe — skip it. Do not set unix TMPDIR to a Windows path; the TMPDIR fix is the Windows registry Environment key (saves/mods). Pin CX_GRAPHICS_BACKEND=d3dmetal (winecx) so DX11 does not fall onto DXMT. Play script: bash .scratch/cities-skylines-20260815/play-cities-skylines.sh. Do not use Libraries.rgl or Libraries.vk. Do not claim the user has played it until they have.",
-  "status": "guessed"
+  "notes": "LAUNCHED. Unity 5.6.7f1 D3D11. Windows PE is Cities.exe; skip Paradox dowser.exe. Native macOS depot exists (Unity Mac player) — this profile is the Wine path. User launched and quit 15 Aug 2026. Launch args -force-d3d11 -screen-width 1920 -screen-height 1080 -screen-fullscreen 1 -popupwindow. Do not set unix TMPDIR to a Windows path; the TMPDIR fix is the Windows registry Environment key (saves/mods). Old winecx path pinned CX_GRAPHICS_BACKEND=d3dmetal; current stack is translationLayer d3dmetal + WINEDLLOVERRIDES d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b, MetalFX/HUD off. Play: wyn play cities-skylines. Not verified: no city-loaded frame count on the game-host tree.",
+  "status": "launched"
 }

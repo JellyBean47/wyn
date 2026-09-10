@@ -5,8 +5,7 @@ Windows games on Mac. Open source. [Compatibility catalog](https://wyn-dev.com).
 Wyn is a macOS Wine wrapper for running Windows games. Per-game profiles pick
 the translation layer (DXMT / D3DMetal / DXVK), not a star rating. The site
 tells you which profiles were **verified** on a real Mac and which are still
-**guessed**. Wyn is GPL-3.0-or-later and free; [support testing](https://wyn-dev.com/support)
-if it saved you time.
+**guessed**. Wyn is GPL-3.0-or-later and free.
 
 This repository is **source only**. It does not contain Wine binaries, Apple
 Game Porting Toolkit / D3DMetal, store clients, or game files. It is a modified

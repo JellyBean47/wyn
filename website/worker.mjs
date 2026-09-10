@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { MAX_BODY, prepareSubmission, submissionRecord } from './lib/submission.mjs';
+import { SUPPORT_PAGE_ENABLED } from './lib/html.mjs';
 
 function json(data, status = 200, headers = {}) {
   return Response.json(data, { status, headers: {
@@ -32,7 +33,12 @@ async function readLimited(request) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname.replace(/\/$/, '') !== '/api/v1/submit') {
+    const path = url.pathname.replace(/\/$/, '') || '/';
+    if (!SUPPORT_PAGE_ENABLED && path === '/support') {
+      const notFound = await env.ASSETS.fetch(new Request(new URL('/404.html', url), request));
+      return new Response(notFound.body, { status: 404, headers: notFound.headers });
+    }
+    if (path !== '/api/v1/submit') {
       const response = await env.ASSETS.fetch(request);
       if (url.pathname.startsWith('/api/') && response.status === 404) return json({ ok: false, error: 'Unknown endpoint.' }, 404);
       return response;

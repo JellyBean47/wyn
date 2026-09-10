@@ -928,6 +928,14 @@
       "steamAppId": 1805110,
       "profiles": ["solarpunk.json", "solarpunk-dxmt.json"],
       "batch": 11
+    },
+    {
+      "slug": "assetto-corsa",
+      "name": "Assetto Corsa",
+      "publisher": "Kunos Simulazioni",
+      "steamAppId": 244210,
+      "profiles": ["assetto-corsa.json"],
+      "batch": 12
     }
   ]
 }
