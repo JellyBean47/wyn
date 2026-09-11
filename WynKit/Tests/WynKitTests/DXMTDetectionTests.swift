@@ -27,8 +27,9 @@ import Testing
 ///
 /// Correct at the time and better than guessing, but it means the one thing
 /// this file exists to answer went unanswered for the layer most users will
-/// actually be on. 119 of 121 bundled profiles are `guessed` and both verified
-/// ones were D3DMetal, so DXMT is the path nobody had measured.
+/// actually be on. `rv-there-yet` (11 Sep 2026) is the first bundled title
+/// whose live process opened the DXMT payload — adapter `Apple M4`,
+/// VendorId `0x106b` — rather than D3DMetal's AMD fake.
 ///
 /// DXMT is also the odd one out: D3DMetal claims to be an AMD card and DXVK an
 /// NVIDIA one, so both are identified by an invented vendor id. DXMT reports

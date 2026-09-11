@@ -7,16 +7,27 @@ const data = loadCatalog(fileURLToPath(new URL('../../', import.meta.url)));
 test('catalog profile references resolve', () => assert.deepEqual(data.missingProfiles, []));
 test('launched titles are the ones with Mac evidence, not theoretical ports', () => {
   const launched = data.games.filter((game) => game.status === 'launched').map((game) => game.slug).sort();
+  const verified = data.games.filter((game) => game.status === 'verified').map((game) => game.slug).sort();
   // ac-odyssey graduated to `verified` on 10 Sep 2026 — see its profile notes
   // for what backs that claim, and what does not.
+  // rv-there-yet graduated on 11 Sep 2026: Ride.log LoadMap(RideMap), 1514
+  // frames, LogExit: Exiting., adapter Apple M4 through DXMT.
+  // witcher-3 graduated the same night on the Ready or Not bar (in-world play,
+  // D3DMetal lsof, no REDengine log).
   assert.deepEqual(launched, ['army-men-rts', 'assetto-corsa', 'cities-skylines', 'skyrim-se']);
-  assert.equal(data.counts.verified, 4);
+  assert.deepEqual(verified, ['ac-odyssey', 'ready-or-not', 'rv-there-yet', 'satisfactory', 'solarpunk', 'witcher-3']);
+  assert.equal(data.counts.verified, 6);
 });
 test('home lists verified and launched titles', () => {
   const html = homePage(data);
   assert.ok(html.includes('Solarpunk'));
   assert.ok(html.includes('Ready or Not'));
   assert.ok(html.includes('Assetto Corsa'));
+  assert.ok(html.includes('/games/rv-there-yet'));
+  assert.ok(html.includes('RV There Yet?'));
+  assert.ok(html.includes('/games/ac-odyssey'));
+  assert.ok(html.includes('/games/witcher-3'));
+  assert.ok(html.includes('The Witcher 3'));
   assert.ok(html.includes('badge launched'));
   assert.ok(html.includes('badge verified'));
 });
