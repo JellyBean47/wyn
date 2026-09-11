@@ -111,7 +111,13 @@ struct GameLibraryInstalledTests {
         let report = GameLibrary.describeInstalled(in: bottle, hostVolumesRoot: volumes)
         #expect(report.contains("Ready or Not"))
         #expect(report.contains("profile=ready-or-not"))
-        #expect(report.contains("catalog=guessed"))
+        // The catalog column carries the bundled claim, so read the claim from
+        // the profile instead of pinning a status here: `ready-or-not` went
+        // guessed → verified and broke this test, which is about the listing,
+        // not about the ladder. `onlyMeasuredProfilesClaimVerified` is where a
+        // verified claim is deliberately enumerated by name.
+        let readyOrNot = try #require(ProfileStore.loadAll().first { $0.id == "ready-or-not" })
+        #expect(report.contains("profile=ready-or-not  catalog=\(readyOrNot.status.rawValue)"))
         #expect(report.contains("profile=none"))
         #expect(report.contains("thisMac=no profile"))
     }
