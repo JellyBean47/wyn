@@ -663,9 +663,13 @@ public enum SteamLauncher {
                 print("[wyn:debug] Play inherits WINEDLLOVERRIDES=\(environment["WINEDLLOVERRIDES"] ?? "(none)")")
             }
         } else {
-            if let profile {
-                ProfileApplicator.apply(profile: profile, to: bottle)
-            }
+            // The client's layer belongs to *this launch*, not to the bottle.
+            // `steam.json` names dxmt; applying it here used to write that onto
+            // the shared bottle, where it outlived the session and became the
+            // default for the next game that declared no layer of its own.
+            steamOptions.translationLayerOverride = ProfileApplicator.launchLayerOverride(
+                profile: profile, bottle: bottle
+            )
             _ = try WynWineInstaller.ensureSteamWineTree()
             guard WynWineInstaller.isSteamWineInstalled() else {
                 throw SteamError.steamWineMissing
@@ -1051,7 +1055,9 @@ public enum SteamLauncher {
             throw SteamError.gameNotInstalled(appId: appId)
         }
 
-        ProfileApplicator.apply(profile: profile, to: bottle)
+        // No write to the bottle: the profile's layer travels with the launch
+        // (`directOptions.translationLayerOverride` below, and the environment
+        // built by `launchEnvironment`), so the bottle keeps the user's default.
         try ensureSteamAppIdFiles(
             appId: appId,
             executable: exe,
@@ -1156,6 +1162,11 @@ public enum SteamLauncher {
             }
             var directOptions = options
             directOptions.wineTree = .game
+            if directOptions.translationLayerOverride == nil {
+                directOptions.translationLayerOverride = ProfileApplicator.launchLayerOverride(
+                    profile: profile, bottle: bottle
+                )
+            }
             try await Wine.runProgram(
                 at: exe, args: gameArgs, bottle: bottle, environment: environment, options: directOptions
             )
@@ -1439,9 +1450,6 @@ public enum SteamLauncher {
             )
             environment = gameHostSteamEnvironment(program: program)
         } else {
-            if let profile {
-                ProfileApplicator.apply(profile: profile, to: bottle)
-            }
             try Wine.prepareFrankeaSteamClient(bottle: bottle, debug: options.debug)
             var frankeaEnv = ProfileApplicator.launchEnvironment(profile: profile, program: program)
             forwardCEFFlags(into: &frankeaEnv)
@@ -1460,6 +1468,12 @@ public enum SteamLauncher {
         steamOptions.preferFrankeaSteam = !useGameHost
         if useGameHost {
             steamOptions.translationLayerOverride = .d3dMetal
+        } else {
+            // Launch-scoped, as on the other client path: `steam.json`'s dxmt
+            // is this launch's layer, not a new default for the whole bottle.
+            steamOptions.translationLayerOverride = ProfileApplicator.launchLayerOverride(
+                profile: profile, bottle: bottle
+            )
         }
         // steam.exe -silent stays resident for the whole session, so awaiting its
         // exit never returns: the readiness loop below — and its 90s warning —
@@ -2184,9 +2198,9 @@ public enum SteamLauncher {
         }
 
         let viaSteamOnly = profile.exePatterns.isEmpty
-        if !viaSteamOnly {
-            ProfileApplicator.apply(profile: profile, to: bottle)
-        }
+        // The profile is not written to the bottle — `effectiveLayer` below is
+        // passed to the launch as an override instead, so the layer this game
+        // needs does not become the next game's default.
 
         let steamProgram = Program(url: steamURL, bottle: bottle)
         var environment = ProfileApplicator.launchEnvironment(profile: profile, program: steamProgram)

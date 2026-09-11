@@ -174,6 +174,13 @@ public enum LaunchDiagnostics {
         let renderer = RendererWiring.inspect()
         let effective = effectiveLayer(for: bottle)
         lines.append("  EFFECTIVE layer:   \(effective.layer.rawValue) — \(effective.reason)")
+        // The bottle is the default; a profile's layer is passed to the launch
+        // as an override and no longer rewrites the bottle, so say plainly what
+        // *this* launch will run with when the two differ.
+        if let launchLayer = ProfileApplicator.launchLayerOverride(profile: profile, bottle: bottle),
+           launchLayer != effective.layer {
+            lines.append("  THIS LAUNCH:       \(launchLayer.rawValue) — \(profile?.id ?? "profile") declares it (bottle default left alone)")
+        }
         lines.append("── Renderer (shared unix modules) ──")
         for line in renderer.statusLines {
             lines.append("  \(line)")

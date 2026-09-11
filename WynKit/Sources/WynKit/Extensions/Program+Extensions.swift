@@ -9,23 +9,22 @@ import os.log
 
 extension Program {
     public func run(withProfile profile: GameProfile? = nil) async throws {
-        if let profile {
-            ProfileApplicator.apply(profile: profile, to: bottle)
-        }
-
+        // The profile decides this launch, not the bottle's stored defaults:
+        // the layer rides in `options`, everything else in the environment.
         let environment = ProfileApplicator.launchEnvironment(profile: profile, program: self)
         let arguments = ProfileApplicator.launchArguments(profile: profile, program: self)
+        var options = Wine.LaunchOptions()
+        options.translationLayerOverride = ProfileApplicator.launchLayerOverride(
+            profile: profile, bottle: bottle
+        )
 
         try await Wine.runProgram(
-            at: url, args: arguments, bottle: bottle, environment: environment
+            at: url, args: arguments, bottle: bottle, environment: environment, options: options
         )
     }
 
     public func generateTerminalCommand(profile: GameProfile? = nil) -> String {
-        if let profile {
-            ProfileApplicator.apply(profile: profile, to: bottle)
-        }
-
+        // Printing a command must not mutate the bottle.
         let environment = ProfileApplicator.launchEnvironment(profile: profile, program: self)
         let arguments = ProfileApplicator.launchArguments(profile: profile, program: self)
         let argsString = arguments.joined(separator: " ")
