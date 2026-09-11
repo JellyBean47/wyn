@@ -415,6 +415,29 @@ public enum SteamLauncher {
         }
     }
 
+    /// The per-exe `AppDefaults\\<exe>\\DllOverrides` a game needs for this layer,
+    /// or nil when the layer wants none.
+    ///
+    /// DXVK and DXMT both want the native trio, and both have to *overwrite* any
+    /// block a previous D3DMetal run of the same exe left behind: the blocks are
+    /// never removed, so a stale `d3d*=b` silently pins the game to the builtins
+    /// while the layer's natives sit unused in system32. D3DMetal writes its own
+    /// (`applyD3DMetalGameOverrides`), so it is not this function's business.
+    static func perExeNativeD3D(for layer: TranslationLayer) -> [String: String]? {
+        switch layer {
+        case .dxmt, .dxvk:
+            return [
+                "d3d11": "n",
+                "dxgi": "n",
+                "d3d10core": "n",
+                "d3d12": "d",
+                "atidxx64": "d"
+            ]
+        default:
+            return nil
+        }
+    }
+
     /// Default game EXE names for Steam AppDefaults isolation when no profile is in scope.
     private static let defaultD3DMetalGameExeNames: [String] = [
         "factorygamesteam.exe",
@@ -1145,19 +1168,14 @@ public enum SteamLauncher {
             var environment = ProfileApplicator.launchEnvironment(profile: profile, program: program)
             environment["SteamAppId"] = "\(appId)"
             environment["SteamGameId"] = "\(appId)"
-            if layer == .dxmt {
-                // Undo leftover GPTK AppDefaults (d3d*=b) from prior D3DMetal sessions.
-                let gameDXMT: [String: String] = [
-                    "d3d11": "n",
-                    "dxgi": "n",
-                    "d3d10core": "n",
-                    "d3d12": "d",
-                    "atidxx64": "d"
-                ]
+            // Was `== .dxmt` alone, so a DXVK direct launch wrote nothing and an
+            // exe that had once run on D3DMetal kept its `d3d*=b` block — the
+            // same asymmetry #70 fixed in `launchGameViaSteam`.
+            if let gameNativeD3D = perExeNativeD3D(for: layer) {
                 for raw in profile.exePatterns {
                     let name = (raw as NSString).lastPathComponent
                     guard name.lowercased().hasSuffix(".exe") else { continue }
-                    try Wine.setAppDllOverrides(bottle: bottle, exeName: name, overrides: gameDXMT)
+                    try Wine.setAppDllOverrides(bottle: bottle, exeName: name, overrides: gameNativeD3D)
                 }
             }
             var directOptions = options
@@ -2254,23 +2272,12 @@ public enum SteamLauncher {
         _ = try WynWineInstaller.ensureSteamWineTree()
         try Wine.prepareFrankeaSteamClient(bottle: bottle, debug: options.debug)
 
-        if effectiveLayer == .dxmt || effectiveLayer == .dxvk {
-            // Game EXEs: the layer's natives. Steam: frankea builtins (set by
-            // prepareFrankea). These per-exe AppDefaults are how the game gets
-            // its layer now — the client process no longer carries d3d
-            // overrides for it to inherit.
-            //
-            // This used to be `== .dxmt` alone, so a DXVK title arriving here
-            // got no per-exe overrides at all and ran on whatever the prefix
-            // happened to hold. DXVK needs the same native trio; the shape is
-            // identical either way.
-            let gameNativeD3D: [String: String] = [
-                "d3d11": "n",
-                "dxgi": "n",
-                "d3d10core": "n",
-                "d3d12": "d",
-                "atidxx64": "d"
-            ]
+        // Game EXEs: the layer's natives. Steam: frankea builtins (set by
+        // prepareFrankea). These per-exe AppDefaults are how the game gets its
+        // layer now — the client process no longer carries d3d overrides for it
+        // to inherit — and they also overwrite whatever a previous run of the
+        // same exe left behind.
+        if let gameNativeD3D = perExeNativeD3D(for: effectiveLayer) {
             for raw in profile.exePatterns {
                 let exe = (raw as NSString).lastPathComponent
                 guard exe.lowercased().hasSuffix(".exe") else { continue }
