@@ -15,8 +15,8 @@ test('launched titles are the ones with Mac evidence, not theoretical ports', ()
   // witcher-3 graduated the same night on the Ready or Not bar (in-world play,
   // D3DMetal lsof, no REDengine log).
   assert.deepEqual(launched, ['army-men-rts', 'assetto-corsa', 'cities-skylines', 'skyrim-se']);
-  assert.deepEqual(verified, ['ac-odyssey', 'ready-or-not', 'rv-there-yet', 'satisfactory', 'solarpunk', 'witcher-3']);
-  assert.equal(data.counts.verified, 6);
+  assert.deepEqual(verified, ['ac-odyssey', 'doom-2016', 'ready-or-not', 'rv-there-yet', 'satisfactory', 'solarpunk', 'witcher-3', 'wolfenstein-youngblood']);
+  assert.equal(data.counts.verified, 8);
 });
 test('home lists verified and launched titles', () => {
   const html = homePage(data);
@@ -28,6 +28,10 @@ test('home lists verified and launched titles', () => {
   assert.ok(html.includes('/games/ac-odyssey'));
   assert.ok(html.includes('/games/witcher-3'));
   assert.ok(html.includes('The Witcher 3'));
+  assert.ok(html.includes('/games/wolfenstein-youngblood'));
+  assert.ok(html.includes('Wolfenstein: Youngblood'));
+  assert.ok(html.includes('/games/doom-2016'));
+  assert.ok(html.includes('DOOM (2016)'));
   assert.ok(html.includes('badge launched'));
   assert.ok(html.includes('badge verified'));
 });

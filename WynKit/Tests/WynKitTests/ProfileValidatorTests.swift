@@ -89,15 +89,21 @@ struct ProfileValidatorTests {
     /// `witcher-3` and `ready-or-not` are the no-engine-log pair. REDengine /
     /// shipping RoN write nothing Wyn can parse, so the evidence is in-world
     /// play plus lsof (Witcher 3: D3DMetal.framework on live witcher3.exe,
-    /// dx12user.settings 1920x1080 VSync). If the bar is tightened to "a UE
-    /// log with LoadMap and a frame count", those two come out first.
+    /// dx12user.settings 1920x1080 VSync).
+    ///
+    /// `wolfenstein-youngblood` (11 Sep 2026) and `doom-2016` (12 Sep 2026)
+    /// are Vulkan, not D3D. Both need the unshipped fly-mvkshim. DOOM also
+    /// needs Steam `-applaunch` (XAudio2 COM apartment) and the Vulkan exe
+    /// copied over Steam's OpenGL default. Notes say so.
     @Test func onlyMeasuredProfilesClaimVerified() {
-        let userAdded = ProfileStore.userProfileIDs()
-        let verified = ProfileStore.loadAll()
-            .filter { $0.status == .verified && !userAdded.contains($0.id) }
+        // Bundled profiles only. `loadAll()` minus `userProfileIDs()` looks
+        // equivalent but is not: a user file sharing a bundled id exempted the
+        // shipped claim, so a verified `solarpunk-dxmt` passed on this Mac and
+        // failed the first time CI ever ran this test.
+        let verified = ProfileStore.loadBundledProfiles().filter { $0.status == .verified }
         #expect(verified.map(\.id).sorted() == [
-            "ac-odyssey", "ready-or-not", "rv-there-yet", "satisfactory", "solarpunk",
-            "witcher-3",
+            "ac-odyssey", "doom-2016", "ready-or-not", "rv-there-yet", "satisfactory",
+            "solarpunk", "solarpunk-dxmt", "witcher-3", "wolfenstein-youngblood",
         ])
     }
 
@@ -115,12 +121,12 @@ struct ProfileValidatorTests {
             "cities-skylines",
             "skyrim-se",
         ]
-        let userAdded = ProfileStore.userProfileIDs()
-        let launched = ProfileStore.loadAll()
-            .filter { $0.status == .launched && !userAdded.contains($0.id) }
-            .map(\.id)
+        // Bundled only, for the same reason as the verified ladder above: a
+        // user profile must not be able to exempt a shipped claim.
+        let bundled = ProfileStore.loadBundledProfiles()
+        let launched = bundled.filter { $0.status == .launched }.map(\.id)
         for id in expected {
-            #expect(ProfileStore.profile(id: id)?.status == .launched, "\(id) should be launched")
+            #expect(bundled.first { $0.id == id }?.status == .launched, "\(id) should be launched")
         }
         #expect(Set(launched).subtracting(expected).isEmpty)
     }
@@ -315,8 +321,10 @@ struct ProfileValidatorTests {
         #expect(rules(ProfileValidator.validate(bare)).contains("layerCoherence"))
     }
 
-    /// And the four in the catalog really are the exempted shape, not merely
-    /// passing because the rule got loosened for everyone.
+    /// And the shipped Vulkan-native profiles really are the exempted shape,
+    /// not merely passing because the rule got loosened for everyone.
+    /// Youngblood and DOOM (2016) are the measured pair; the other four are
+    /// still guessed.
     @Test func theShippedVulkanProfilesAreTheOnesExempted() {
         let all = ProfileStore.loadAll()
         let exempt = all.filter {
@@ -324,7 +332,8 @@ struct ProfileValidatorTests {
                 && $0.bottle?.dxvk == false
         }
         #expect(exempt.map(\.id).sorted()
-                == ["detroit-become-human", "doom-eternal", "enshrouded", "no-mans-sky"])
+                == ["detroit-become-human", "doom-2016", "doom-eternal",
+                    "enshrouded", "no-mans-sky", "wolfenstein-youngblood"])
         for profile in exempt {
             #expect(ProfileValidator.isVulkanNative(profile), "\(profile.id)")
         }

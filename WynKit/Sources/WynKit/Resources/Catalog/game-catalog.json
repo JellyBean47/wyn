@@ -936,6 +936,22 @@
       "steamAppId": 244210,
       "profiles": ["assetto-corsa.json"],
       "batch": 12
+    },
+    {
+      "slug": "wolfenstein-youngblood",
+      "name": "Wolfenstein: Youngblood",
+      "publisher": "MachineGames / Bethesda",
+      "steamAppId": 1056960,
+      "profiles": ["wolfenstein-youngblood.json"],
+      "batch": 13
+    },
+    {
+      "slug": "doom-2016",
+      "name": "DOOM (2016)",
+      "publisher": "id Software / Bethesda",
+      "steamAppId": 379720,
+      "profiles": ["doom-2016.json"],
+      "batch": 14
     }
   ]
 }

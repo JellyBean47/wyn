@@ -5,8 +5,8 @@ Do not add guessed catalog entries. Do not set `"status": "verified"` unless
 
 Verified today (bundled): `satisfactory`, `solarpunk` (and `solarpunk-dxmt`
 as a measured layer variant), `ready-or-not`, `ac-odyssey`, `rv-there-yet`,
-`witcher-3`.
-Target **5–10 verified titles**, not 75 — six of them now exist.
+`witcher-3`, `wolfenstein-youngblood`, `doom-2016`.
+Target **5–10 verified titles**, not 75 — eight of them now exist.
 
 ## The bar (copy from adding-a-game.md §5)
 
@@ -70,36 +70,46 @@ exit, and the first bundled title measured to actually load a translation layer
 instead of falling through to wined3d.
 
 Already verified: `satisfactory`, `solarpunk`, `ready-or-not`, `ac-odyssey`,
-`rv-there-yet`, `witcher-3`. Already launched (do not promote without a new
-measurement): `skyrim-se`, `cities-skylines`, `army-men-rts`. Ready or Not
-shipping did not write `ReadyOrNot.log`; the verified notes say the layer is
-the GPTK D3DMetal launch path.
+`rv-there-yet`, `witcher-3`, `wolfenstein-youngblood`, `doom-2016`. Already
+launched (do not promote without a new measurement): `skyrim-se`,
+`cities-skylines`, `army-men-rts`. Ready or Not shipping did not write
+`ReadyOrNot.log`; the verified notes say the layer is the GPTK D3DMetal
+launch path.
 
-## Blocked on MoltenVK, not on Wyn (measured 11 Sep 2026)
+## Vulkan titles: the MoltenVK feature wall, and the shim that clears it
 
-Both are installed, both were run, neither can start, and **no layer setting
-can change that** — id Tech does not use D3D at all. Deliberately **not** added
-as catalog profiles (a title that cannot start is not a catalog claim); they
-live as user profiles in `~/Library/Application Support/com.fly.gaming/Profiles/`
-with the evidence in their notes. Full write-up:
-`wyn-handovers/FINDING-20260911-idtech-blocked-on-moltenvk.md`.
+Full treatment in [vulkan-titles.md](vulkan-titles.md); measured 11 Sep 2026.
 
-- **Wolfenstein: Youngblood** (1056960) — `Youngblood_x64vk.exe` is the only
-  executable. MoltenVK 1.4.1 reaches a VkInstance on Apple M4, then
-  `vkCreateDevice` fails `VK_ERROR_FEATURE_NOT_PRESENT` on the **39th flag** of
-  `VkPhysicalDeviceFeatures` — `shaderCullDistance`, which Metal has no
-  equivalent for. One feature bit short. Retest the day MoltenVK gains it.
-- **DOOM (2016)** (379720) — blocked on *both* renderers. `DOOMx64.exe` wants an
-  OpenGL core context above Apple's 4.1 ceiling
-  (`ERROR_INVALID_VERSION_ARB` → `wglCreateContextAttribsARB failed`), and
-  `DOOMx64vk.exe` fails `vkCreateDevice` on the **15th and 39th** flags —
-  `depthBounds` and `shaderCullDistance`.
+id Tech uses no D3D, so no layer setting touches these. MoltenVK refuses the
+device because Metal has no `shaderCullDistance` (39th `VkPhysicalDeviceFeatures`
+flag) and no `depthBounds` (15th). **`fly-mvkshim`** — an interposer in front of
+MoltenVK that reports those features present and strips them from the
+device-create request — clears it, in front of stock MoltenVK 1.4.1.
+
+- **Wolfenstein: Youngblood** (1056960) — **verified** with the shim; played by
+  a person and it wrote `progression.bin` (23:19). Two fragment pipelines fail
+  to compile, probably the price of dropping cull distance; it did not stop
+  play. Bundled profile `wolfenstein-youngblood` — notes say the shim is
+  required and Wyn does not ship it.
+- **DOOM (2016)** (379720) — **verified** 12 Sep 2026. Same shim, plus: launch
+  through Steam (`wyn play doom-2016`, no `--direct`) so XAudio2 gets a COM
+  apartment, and copy `DOOMx64vk.exe` over `DOOMx64.exe` because `-applaunch`
+  runs the OpenGL default. Wrote `DOOMConfig.local` (`r_renderAPI 1`) and
+  `profile.bin`. Bundled profile `doom-2016`.
+
+The shim is still an unshipped recovered Aug 2026 binary. Youngblood and DOOM
+catalog claims are "it played on this Mac with that shim", not "Wyn installs
+Vulkan titles for you". Shipping the shim via `WynWineInstaller` is the
+remaining feature. DOOM's extra trap is the opposite of Youngblood: do **not**
+`--direct` — Steam's overlay is what creates the COM MTA XAudio2 needs.
 
 While measuring those: `wyn play` on a dxmt/dxvk profile goes through
 `steam.exe -applaunch`, and **Steam runs the app's default launch option, not
 the exe the profile resolved** — the log said `DOOMx64vk.exe` and `DOOMx64.exe`
-started. `--direct` runs the resolved exe. That applies to any title shipping
-more than one executable.
+started. `--direct` runs the resolved exe, but on DOOM it is the 91% hang
+(no COM apartment for XAudio2). Youngblood can `--direct`; DOOM must go
+through Steam and the Vulkan exe must sit at `DOOMx64.exe`. That applies to
+any title shipping more than one executable.
 
 Skip for Wine: No Man's Sky (native Mac build; profile says DEFER). EVE
 Online and LEGO DC Super-Villains have no Windows EXE on this disk.

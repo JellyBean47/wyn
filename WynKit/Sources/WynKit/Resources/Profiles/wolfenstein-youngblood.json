@@ -1,0 +1,25 @@
+{
+  "id": "wolfenstein-youngblood",
+  "name": "Wolfenstein: Youngblood",
+  "publisher": "MachineGames / Bethesda",
+  "steamAppId": 1056960,
+  "exePatterns": [
+    "youngblood_x64vk.exe"
+  ],
+  "bottle": {
+    "windowsVersion": "win10",
+    "translationLayer": "dxvk",
+    "dxvk": false,
+    "dxvkAsync": false,
+    "enhancedSync": "msync",
+    "avxEnabled": true,
+    "metalHud": false
+  },
+  "environment": {
+    "WINEDLLOVERRIDES": "vulkan-1=b"
+  },
+  "winetricks": [],
+  "launchArgs": "",
+  "notes": "VERIFIED 11 Sep 2026, Apple M4, macOS 26.5.1. Vulkan-only id Tech (Youngblood_x64vk.exe is the only Windows EXE; no d3d11/d3d12 in the install). No D3D translation layer is involved: winevulkan → fly-mvkshim → stock MoltenVK 1.4.1 → Metal. translationLayer dxvk + dxvk false is the MoltenVK launch path, not DXVK's D3D DLLs. Played by a person; wrote savegame.user/76561199780522060/SLOT0/PROFILE/progression.bin at 23:19 and Wolfenstein YoungbloodConfig.local at 23:18 (1280x720, r_mode 10). Without the shim, vkCreateDevice fails VK_ERROR_FEATURE_NOT_PRESENT on the 39th VkPhysicalDeviceFeatures flag (shaderCullDistance) — Metal has no equivalent, so the game shows 'Startup failure: error while initializing the graphics driver'. The shim reports shaderCullDistance and depthBounds present, then strips them from VkDeviceCreateInfo. Wyn does not ship that binary (135,200 bytes, md5 e8e03ea1b3976f1db16580f5dc3e0bcd, recovered Aug 2026); install it per Wine tree as libMoltenVK.dylib with the stock copy kept as libMoltenVK.real.dylib. Two fragment pipelines fail to compile (Error code 3); that did not stop play. Steam must be up and logged in on the same tree, then wyn play wolfenstein-youngblood --direct — -applaunch is the Steam default and is the wrong path on titles with more than one exe. Do not use Libraries.rgl. Do not expect D3DMetal or DXMT to touch this title.",
+  "status": "verified"
+}
