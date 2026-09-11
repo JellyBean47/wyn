@@ -77,6 +77,11 @@ struct ProfileValidatorTests {
     /// map on this machine and the log kept; adding one without that is the
     /// failure this test exists to catch.
     ///
+    /// `rv-there-yet` (11 Sep 2026) is the strongest: loaded map, 1514 frames,
+    /// `LogExit: Exiting.`, no crash directory, and the layer confirmed twice —
+    /// `lsof` on the live process holding the DXMT payload open, and the UE
+    /// log's own adapter line ('Apple M4' through Forced RHI D3D11).
+    ///
     /// `ac-odyssey` (10 Sep 2026) is the weakest entry and is deliberately
     /// marked as such in its own notes: it was played to a loaded map and the
     /// log kept, and its layer was confirmed by lsof on the live process, but
@@ -89,7 +94,7 @@ struct ProfileValidatorTests {
         let verified = ProfileStore.loadAll()
             .filter { $0.status == .verified && !userAdded.contains($0.id) }
         #expect(verified.map(\.id).sorted() == [
-            "ac-odyssey", "ready-or-not", "satisfactory", "solarpunk",
+            "ac-odyssey", "ready-or-not", "rv-there-yet", "satisfactory", "solarpunk",
         ])
     }
 
