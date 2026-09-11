@@ -18,4 +18,29 @@ jobs:
         run: ./scripts/check-environment.sh
       - name: Build CLI
         run: swift build -c release
+      # Every test lives in the WynKit sub-package: the root manifest declares
+      # no test target, so `swift test` here would only say "no tests found".
+      # This is the step that enforces the status ladder —
+      # onlyMeasuredProfilesClaimVerified and onlyDocumentedProfilesClaimLaunched
+      # enumerate verified and launched ids by name, so a guessed entry promoted
+      # without a measurement fails the build rather than reaching the catalog.
+      - name: Test WynKit
+        working-directory: WynKit
+        run: swift test
       # Do not download Wine or GPTK on CI. Do not upload Libraries.tar.gz.
+
+  website:
+    # The catalog tests are node builtins plus website/lib, with no install
+    # step: wrangler is a deploy-time dependency only. Nothing here is
+    # macOS-specific, so it does not need a macOS runner.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # `npm run deploy` runs these before publishing wyn-dev.com; running them
+      # on the PR is what stops a catalog claim and the site disagreeing.
+      - name: Test catalog and API
+        working-directory: website
+        run: npm test
