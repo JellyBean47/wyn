@@ -88,8 +88,16 @@ re-check the file after.
 
 **`swift test` touches real state.** `GameLibraryInstalledTests` and
 `MCPServerTests` read the actual `~/Library/Application Support/com.fly.gaming/
-Profiles`, so their failures come and go and both fail on clean `main`. Verify
-by stashing before blaming your change.
+Profiles`. Verify by stashing before blaming your change.
+
+~~and both fail on clean `main`~~ — **corrected 12 Sep 2026.** That was one
+stale assertion, not the real state these tests read: `GameLibraryInstalled`
+pinned `catalog=guessed` for Ready or Not, which had been promoted to
+`verified`. The suite is 355/355 on clean `main` both against this Mac's real
+user profiles and with `HOME` pointed at an empty directory. A red `swift test`
+is now a signal again, and CI runs it — see `.github/workflows/ci.yml`. Note
+that every test lives in the WynKit sub-package: `swift test` at the repository
+root reports "no tests found", so run it from `WynKit/`.
 
 ## Profile status is a claim, not a label
 
