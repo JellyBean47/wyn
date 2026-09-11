@@ -75,25 +75,27 @@ measurement): `skyrim-se`, `cities-skylines`, `army-men-rts`. Ready or Not
 shipping did not write `ReadyOrNot.log`; the verified notes say the layer is
 the GPTK D3DMetal launch path.
 
-## Blocked on MoltenVK, not on Wyn (measured 11 Sep 2026)
+## Vulkan titles: the MoltenVK feature wall, and the shim that clears it
 
-Both are installed, both were run, neither can start, and **no layer setting
-can change that** — id Tech does not use D3D at all. Deliberately **not** added
-as catalog profiles (a title that cannot start is not a catalog claim); they
-live as user profiles in `~/Library/Application Support/com.fly.gaming/Profiles/`
-with the evidence in their notes. Full write-up:
-`wyn-handovers/FINDING-20260911-idtech-blocked-on-moltenvk.md`.
+Full treatment in [vulkan-titles.md](vulkan-titles.md); measured 11 Sep 2026.
 
-- **Wolfenstein: Youngblood** (1056960) — `Youngblood_x64vk.exe` is the only
-  executable. MoltenVK 1.4.1 reaches a VkInstance on Apple M4, then
-  `vkCreateDevice` fails `VK_ERROR_FEATURE_NOT_PRESENT` on the **39th flag** of
-  `VkPhysicalDeviceFeatures` — `shaderCullDistance`, which Metal has no
-  equivalent for. One feature bit short. Retest the day MoltenVK gains it.
-- **DOOM (2016)** (379720) — blocked on *both* renderers. `DOOMx64.exe` wants an
-  OpenGL core context above Apple's 4.1 ceiling
-  (`ERROR_INVALID_VERSION_ARB` → `wglCreateContextAttribsARB failed`), and
-  `DOOMx64vk.exe` fails `vkCreateDevice` on the **15th and 39th** flags —
-  `depthBounds` and `shaderCullDistance`.
+id Tech uses no D3D, so no layer setting touches these. MoltenVK refuses the
+device because Metal has no `shaderCullDistance` (39th `VkPhysicalDeviceFeatures`
+flag) and no `depthBounds` (15th). **`fly-mvkshim`** — an interposer in front of
+MoltenVK that reports those features present and strips them from the
+device-create request — clears it, in front of stock MoltenVK 1.4.1.
+
+- **Wolfenstein: Youngblood** (1056960) — **plays** with the shim; played by a
+  person and it wrote `progression.bin`. Two fragment pipelines fail to compile,
+  probably the price of dropping cull distance; it did not stop play.
+- **DOOM (2016)** (379720) — with the shim it creates a device and gets past
+  render init, then spins (one core, no I/O, no window). Its OpenGL exe is a
+  separate dead end: Apple's GL stops at 4.1, id Tech 6 wants 4.3+.
+
+Both stay **user** profiles, not catalog entries: Wyn does not ship the shim,
+and the only copy is a recovered Aug 2026 binary with no source. Shipping it —
+installed by `WynWineInstaller`, chosen per profile — is the feature this
+implies, and until then neither title is a portable claim.
 
 While measuring those: `wyn play` on a dxmt/dxvk profile goes through
 `steam.exe -applaunch`, and **Steam runs the app's default launch option, not
