@@ -5,8 +5,8 @@ Do not add guessed catalog entries. Do not set `"status": "verified"` unless
 
 Verified today (bundled): `satisfactory`, `solarpunk` (and `solarpunk-dxmt`
 as a measured layer variant), `ready-or-not`, `ac-odyssey`, `rv-there-yet`,
-`witcher-3`.
-Target **5–10 verified titles**, not 75 — six of them now exist.
+`witcher-3`, `wolfenstein-youngblood`.
+Target **5–10 verified titles**, not 75 — seven of them now exist.
 
 ## The bar (copy from adding-a-game.md §5)
 
@@ -70,10 +70,10 @@ exit, and the first bundled title measured to actually load a translation layer
 instead of falling through to wined3d.
 
 Already verified: `satisfactory`, `solarpunk`, `ready-or-not`, `ac-odyssey`,
-`rv-there-yet`, `witcher-3`. Already launched (do not promote without a new
-measurement): `skyrim-se`, `cities-skylines`, `army-men-rts`. Ready or Not
-shipping did not write `ReadyOrNot.log`; the verified notes say the layer is
-the GPTK D3DMetal launch path.
+`rv-there-yet`, `witcher-3`, `wolfenstein-youngblood`. Already launched (do
+not promote without a new measurement): `skyrim-se`, `cities-skylines`,
+`army-men-rts`. Ready or Not shipping did not write `ReadyOrNot.log`; the
+verified notes say the layer is the GPTK D3DMetal launch path.
 
 ## Vulkan titles: the MoltenVK feature wall, and the shim that clears it
 
@@ -85,17 +85,20 @@ flag) and no `depthBounds` (15th). **`fly-mvkshim`** — an interposer in front 
 MoltenVK that reports those features present and strips them from the
 device-create request — clears it, in front of stock MoltenVK 1.4.1.
 
-- **Wolfenstein: Youngblood** (1056960) — **plays** with the shim; played by a
-  person and it wrote `progression.bin`. Two fragment pipelines fail to compile,
-  probably the price of dropping cull distance; it did not stop play.
+- **Wolfenstein: Youngblood** (1056960) — **verified** with the shim; played by
+  a person and it wrote `progression.bin` (23:19). Two fragment pipelines fail
+  to compile, probably the price of dropping cull distance; it did not stop
+  play. Bundled profile `wolfenstein-youngblood` — notes say the shim is
+  required and Wyn does not ship it.
 - **DOOM (2016)** (379720) — with the shim it creates a device and gets past
   render init, then spins (one core, no I/O, no window). Its OpenGL exe is a
-  separate dead end: Apple's GL stops at 4.1, id Tech 6 wants 4.3+.
+  separate dead end: Apple's GL stops at 4.1, id Tech 6 wants 4.3+. Stays a
+  **user** profile until it actually plays.
 
-Both stay **user** profiles, not catalog entries: Wyn does not ship the shim,
-and the only copy is a recovered Aug 2026 binary with no source. Shipping it —
-installed by `WynWineInstaller`, chosen per profile — is the feature this
-implies, and until then neither title is a portable claim.
+The shim is still an unshipped recovered Aug 2026 binary. Youngblood's catalog
+claim is "it played on this Mac with that shim", not "Wyn installs Vulkan
+titles for you". Shipping the shim via `WynWineInstaller` is the remaining
+feature.
 
 While measuring those: `wyn play` on a dxmt/dxvk profile goes through
 `steam.exe -applaunch`, and **Steam runs the app's default launch option, not

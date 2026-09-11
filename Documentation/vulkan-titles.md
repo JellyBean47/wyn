@@ -64,18 +64,20 @@ fly-mvkshim: vkCreateDevice: dropped forced features from the request -> VK_SUCC
 
 **Wyn does not ship this.** The only copy on this machine is an Aug 2026 binary
 (135,200 bytes, md5 `e8e03ea1b3976f1db16580f5dc3e0bcd`, universal) recovered
-from a parked `Libraries.vk` tree; no source exists on disk. Until that is
-found or the interposer is rewritten, Vulkan titles stay **user** profiles and
-make no catalog claim — see `wyn-handovers/FINDING-20260911-idtech-blocked-on-moltenvk.md`.
-Shipping it (installed by `WynWineInstaller`, selected per profile) is the
-feature this implies.
+from a parked `Libraries.vk` tree; no source exists on disk. Youngblood is
+bundled as verified anyway, with notes that name the shim; DOOM (2016) stays a
+user profile until it actually plays. See
+`wyn-handovers/FINDING-20260911-idtech-blocked-on-moltenvk.md`. Shipping the
+shim (installed by `WynWineInstaller`, selected per profile) is the remaining
+feature.
 
 ## Results with the shim
 
-- **Wolfenstein: Youngblood — plays.** Device created, played by a person, and
-  it wrote `savegame.user/…/SLOT0/PROFILE/progression.bin`. Two fragment
-  pipelines fail to compile (`Shader library compile failed (Error code 3)`),
-  which is the likely price of dropping cull distance; it did not stop play.
+- **Wolfenstein: Youngblood — verified 11 Sep 2026.** Device created, played by
+  a person, and it wrote `savegame.user/…/SLOT0/PROFILE/progression.bin` at
+  23:19. Two fragment pipelines fail to compile (`Shader library compile failed
+  (Error code 3)`), which is the likely price of dropping cull distance; it did
+  not stop play. Catalog id `wolfenstein-youngblood`.
 - **DOOM (2016) — device yes, game no.** It gets a device and past render init,
   then spins: one core at ~105%, RSS drifting down, no file I/O, no window.
   `sample` cannot unwind Wine stacks, so the next step is
