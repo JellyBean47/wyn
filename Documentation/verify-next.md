@@ -90,10 +90,13 @@ device-create request — clears it, in front of stock MoltenVK 1.4.1.
   to compile, probably the price of dropping cull distance; it did not stop
   play. Bundled profile `wolfenstein-youngblood` — notes say the shim is
   required and Wyn does not ship it.
-- **DOOM (2016)** (379720) — with the shim it creates a device and gets past
-  render init, then spins (one core, no I/O, no window). Its OpenGL exe is a
-  separate dead end: Apple's GL stops at 4.1, id Tech 6 wants 4.3+. Stays a
-  **user** profile until it actually plays.
+- **DOOM (2016)** (379720) — **plays**, with two conditions beyond the shim.
+  Launch through Steam: a hand-launched process has no COM apartment, so
+  XAudio2 2.7 (COM-only) never initialises and the game renders, loads to 91%
+  and waits forever with no error — 401 `apartment not initialised` by hand
+  versus 1 via `-applaunch`. And copy `DOOMx64vk.exe` over `DOOMx64.exe`,
+  because `-applaunch` runs the default launch option: the OpenGL build, a
+  permanent dead end at Apple's GL 4.1 ceiling.
 
 The shim is still an unshipped recovered Aug 2026 binary. Youngblood's catalog
 claim is "it played on this Mac with that shim", not "Wyn installs Vulkan
