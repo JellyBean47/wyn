@@ -276,10 +276,9 @@ extension WynCLI {
                 }
             }
 
-            if let matchedProfile {
-                ProfileApplicator.apply(profile: matchedProfile, to: bottle)
-            }
-
+            // Launch-scoped: the profile's layer is passed to Wine below and
+            // its other knobs ride in the environment. The bottle keeps the
+            // default the user set.
             let environment = ProfileApplicator.launchEnvironment(profile: matchedProfile, program: program)
             var launchArgs = ProfileApplicator.launchArguments(profile: matchedProfile, program: program)
             launchArgs.append(contentsOf: args)
@@ -298,9 +297,13 @@ extension WynCLI {
             if terminal {
                 program.runInTerminal(profile: matchedProfile)
             } else {
+                var runOptions = Wine.LaunchOptions(debug: debug, echoOutput: debug)
+                runOptions.translationLayerOverride = ProfileApplicator.launchLayerOverride(
+                    profile: matchedProfile, bottle: bottle
+                )
                 try await Wine.runProgram(
                     at: url, args: launchArgs, bottle: bottle, environment: environment,
-                    options: Wine.LaunchOptions(debug: debug, echoOutput: debug)
+                    options: runOptions
                 )
 
                 if debug {
@@ -686,7 +689,7 @@ extension WynCLI {
                 }
             }
 
-            ProfileApplicator.apply(profile: profile, to: bottle)
+            // Launch-scoped — see `ProfileApplicator.launchSettings`.
             let launchArgs = ProfileApplicator.launchArguments(
                 profile: profile,
                 program: Program(url: exe, bottle: bottle)
@@ -902,7 +905,7 @@ extension WynCLI {
             var environment: [String: String] = [:]
             var exe: URL?
             if let matched {
-                ProfileApplicator.apply(profile: matched, to: target)
+                // Diagnostics must not mutate the bottle they are reporting on.
                 if let appId = matched.steamAppId {
                     exe = SteamLauncher.findGameExecutable(forAppId: appId, in: target, profile: matched)
                 }

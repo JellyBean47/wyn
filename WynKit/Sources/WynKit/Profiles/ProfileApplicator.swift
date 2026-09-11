@@ -19,40 +19,72 @@
 import Foundation
 
 public enum ProfileApplicator {
-    /// Apply a game profile's bottle overrides to an existing bottle (in-memory; persists via BottleSettings).
-    public static func apply(profile: GameProfile, to bottle: Bottle) {
-        guard let overrides = profile.bottle else { return }
+    /// The settings a launch should run with: the bottle's, with this profile's
+    /// overrides layered on top.
+    ///
+    /// This returns a **value**. The bottle on disk is the user's default and a
+    /// launch must not rewrite it — one bottle is shared by every game, so a
+    /// persisted per-game layer becomes the next game's default. Measured
+    /// 2026-09-11: New Vegas (declaring `dxvk`) left the bottle on `dxmt`,
+    /// which Army Men — declaring no layer — would then have inherited.
+    /// See `FINDING-20260911-taskb-legs.md`.
+    public static func launchSettings(profile: GameProfile?, bottle: Bottle) -> BottleSettings {
+        var settings = bottle.settings
+        guard let overrides = profile?.bottle else { return settings }
 
         if let windowsVersion = overrides.windowsVersion {
-            bottle.settings.windowsVersion = windowsVersion
+            settings.windowsVersion = windowsVersion
         }
         // `dxvk` is the legacy boolean, and its setter rewrites the layer:
-        // `false` on a `.dxvk` bottle sends it to `.dxmt`. Applying both in
-        // order therefore undid the layer the profile had just named — a
-        // profile carrying `translationLayer: dxvk` with `dxvk: false`
-        // (no-mans-sky, doom-eternal, detroit-become-human, enshrouded) landed
-        // the bottle on DXMT with nothing said. A named layer is the profile's
-        // answer; the boolean is only consulted when there is no named layer.
+        // `false` on a `.dxvk` bottle sends it to `.dxmt`. A named layer is the
+        // profile's answer; the boolean is only consulted when none is named.
         if let layer = overrides.translationLayer {
-            bottle.settings.translationLayer = layer
+            settings.translationLayer = layer
         } else if let dxvk = overrides.dxvk {
-            bottle.settings.dxvk = dxvk
+            settings.dxvk = dxvk
         }
         if let dxvkAsync = overrides.dxvkAsync {
-            bottle.settings.dxvkAsync = dxvkAsync
+            settings.dxvkAsync = dxvkAsync
         }
         if let sync = overrides.enhancedSync {
-            bottle.settings.enhancedSync = sync
+            settings.enhancedSync = sync
         }
         if let dxr = overrides.dxrEnabled {
-            bottle.settings.dxrEnabled = dxr
+            settings.dxrEnabled = dxr
         }
         if let avx = overrides.avxEnabled {
-            bottle.settings.avxEnabled = avx
+            settings.avxEnabled = avx
         }
         if let hud = overrides.metalHud {
-            bottle.settings.metalHud = hud
+            settings.metalHud = hud
         }
+        return settings
+    }
+
+    /// The layer to pass as `Wine.LaunchOptions.translationLayerOverride`, or
+    /// `nil` when the profile names no graphics at all — then the bottle's
+    /// default and the unix wiring decide, exactly as they do with no profile.
+    public static func launchLayerOverride(profile: GameProfile?, bottle: Bottle) -> TranslationLayer? {
+        guard let overrides = profile?.bottle else { return nil }
+        if let layer = overrides.translationLayer { return layer }
+        guard let dxvk = overrides.dxvk else { return nil }
+        var settings = bottle.settings
+        settings.dxvk = dxvk
+        let coerced = settings.translationLayer
+        // Only speak up when the legacy boolean actually moves the layer (the
+        // `false` on a `.dxvk` bottle → `.dxmt` case). Returning an override
+        // equal to the bottle's own layer is not a no-op: `Wine.deployLayer`
+        // treats an explicit override as "the caller means it" and stops
+        // coercing `.d3dMetal` → `.dxmt` on the Steam tree.
+        return coerced == bottle.settings.translationLayer ? nil : coerced
+    }
+
+    /// Persist a profile's bottle overrides onto the bottle. This is the
+    /// deliberate, user-asked write (`wyn profiles apply`) — **not** what a
+    /// launch does. Launch paths use `launchSettings` / `launchLayerOverride`.
+    public static func apply(profile: GameProfile, to bottle: Bottle) {
+        guard profile.bottle != nil else { return }
+        bottle.settings = launchSettings(profile: profile, bottle: bottle)
     }
 
     /// Build the merged environment for launching with a profile.
@@ -62,16 +94,16 @@ public enum ProfileApplicator {
     ) -> [String: String] {
         var env = program.generateEnvironment()
 
+        // The profile's knobs reach the launch through the environment rather
+        // than through a write to the shared bottle: layer overrides, sync,
+        // AVX, the Metal HUD. `Wine.constructWineEnvironment` lays the bottle's
+        // own values down first and this dictionary is merged over them.
+        if profile != nil {
+            let settings = launchSettings(profile: profile, bottle: program.bottle)
+            settings.environmentVariables(wineEnv: &env)
+        }
+
         if let profile {
-            if let layer = profile.bottle?.translationLayer {
-                env.merge(
-                    layer.environmentOverrides(
-                        dxvkHud: program.bottle.settings.dxvkHud,
-                        dxvkAsync: program.bottle.settings.dxvkAsync
-                    ),
-                    uniquingKeysWith: { _, new in new }
-                )
-            }
             env.merge(profile.environment, uniquingKeysWith: { _, new in new })
         }
 

@@ -287,11 +287,12 @@ final class LibraryVM: ObservableObject {
     /// nothing is removed, and it takes effect on the next launch.
     ///
     /// It is a *default*, and deliberately not more than that. A game profile
-    /// that declares its own `translationLayer` is applied to the bottle at
-    /// launch by `ProfileApplicator.apply`, so that game keeps the layer its
-    /// profile asks for and this value is overwritten. Making the toggle win
-    /// instead would silently override profiles that pin a layer because the
-    /// title only works on one — which is why the UI says which games this
+    /// that declares its own `translationLayer` wins for that launch — it is
+    /// passed to Wine as a launch override by `ProfileApplicator` — but it no
+    /// longer overwrites this value, because one bottle is shared by every game
+    /// and a persisted per-game layer became the next game's default. Making
+    /// the toggle win over a profile instead would silently override titles
+    /// that only work on one layer, which is why the UI says which games this
     /// applies to rather than quietly doing nothing.
     func setGraphics(_ layer: TranslationLayer, for item: BottleRowItem) {
         let bottle = Bottle(bottleUrl: item.url)
