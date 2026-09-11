@@ -64,12 +64,11 @@ fly-mvkshim: vkCreateDevice: dropped forced features from the request -> VK_SUCC
 
 **Wyn does not ship this.** The only copy on this machine is an Aug 2026 binary
 (135,200 bytes, md5 `e8e03ea1b3976f1db16580f5dc3e0bcd`, universal) recovered
-from a parked `Libraries.vk` tree; no source exists on disk. Youngblood is
-bundled as verified anyway, with notes that name the shim; DOOM (2016) stays a
-user profile until it actually plays. See
-`wyn-handovers/FINDING-20260911-idtech-blocked-on-moltenvk.md`. Shipping the
-shim (installed by `WynWineInstaller`, selected per profile) is the remaining
-feature.
+from a parked `Libraries.vk` tree; no source exists on disk. Youngblood and
+DOOM (2016) are bundled as verified with notes that name the shim. Shipping
+the shim (installed by `WynWineInstaller`, selected per profile) is the
+remaining feature. See
+`wyn-handovers/FINDING-20260911-idtech-blocked-on-moltenvk.md`.
 
 ## Results with the shim
 
@@ -78,22 +77,26 @@ feature.
   23:19. Two fragment pipelines fail to compile (`Shader library compile failed
   (Error code 3)`), which is the likely price of dropping cull distance; it did
   not stop play. Catalog id `wolfenstein-youngblood`.
-- **DOOM (2016) — device yes, game no.** It gets a device and past render init,
-  then spins: one core at ~105%, RSS drifting down, no file I/O, no window.
-  `sample` cannot unwind Wine stacks, so the next step is
-  `MVK_CONFIG_LOG_LEVEL=3` / `WINEDEBUG=+vulkan` to separate pipeline
-  compilation from a fence that never signals.
+- **DOOM (2016) — verified 12 Sep 2026.** Same shim. The 91% hang was not
+  graphics: `--direct` leaves the process with no COM apartment, so XAudio2 2.7
+  never initialises (401 `apartment not initialised` in 45 s). `wyn play
+  doom-2016` through Steam gives it one. Also copy `DOOMx64vk.exe` over
+  `DOOMx64.exe` (`DOOMx64.exe.wyn-bak` keeps the OpenGL original) because
+  `-applaunch` runs Steam's default option. Wrote `DOOMConfig.local`
+  (`r_renderAPI 1`) at 00:06 and `profile.bin` at 00:08. Catalog id
+  `doom-2016`.
 
 ## Two launch-path facts these titles exposed
 
 1. **`-applaunch` runs Steam's default launch option, not the exe the profile
-   resolved.** Wyn's log said `DOOMx64vk.exe`; Steam started `DOOMx64.exe`.
-   `--direct` runs the resolved exe. Any title shipping several executables is
-   exposed to this, not just DOOM.
+   resolved.** For DOOM that is `DOOMx64.exe` (OpenGL). Copy the Vulkan binary
+   over it, or Steam will never start `DOOMx64vk.exe`. `--direct` runs the
+   resolved exe — **except on DOOM**, where `--direct` is the 91% hang (no COM
+   apartment for XAudio2). Youngblood can `--direct`; DOOM must go through
+   Steam.
 2. **A `--direct` launch needs Steam up and logged in on the same tree.**
    `--direct` uses the game tree; without a logged-in Steam there, a Denuvo
    title exits immediately with `e06d7363` before any graphics work happens.
-   `wyn steam launch` first, then `wyn play <id> --direct`.
 
 ## OpenGL is a hard ceiling, separately
 

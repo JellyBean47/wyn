@@ -91,16 +91,17 @@ struct ProfileValidatorTests {
     /// play plus lsof (Witcher 3: D3DMetal.framework on live witcher3.exe,
     /// dx12user.settings 1920x1080 VSync).
     ///
-    /// `wolfenstein-youngblood` (11 Sep 2026) is Vulkan, not D3D: a person
-    /// played it and it wrote progression.bin. id Tech keeps no UE log. It
-    /// needs the unshipped fly-mvkshim in front of MoltenVK; notes say so.
+    /// `wolfenstein-youngblood` (11 Sep 2026) and `doom-2016` (12 Sep 2026)
+    /// are Vulkan, not D3D. Both need the unshipped fly-mvkshim. DOOM also
+    /// needs Steam `-applaunch` (XAudio2 COM apartment) and the Vulkan exe
+    /// copied over Steam's OpenGL default. Notes say so.
     @Test func onlyMeasuredProfilesClaimVerified() {
         let userAdded = ProfileStore.userProfileIDs()
         let verified = ProfileStore.loadAll()
             .filter { $0.status == .verified && !userAdded.contains($0.id) }
         #expect(verified.map(\.id).sorted() == [
-            "ac-odyssey", "ready-or-not", "rv-there-yet", "satisfactory", "solarpunk",
-            "witcher-3", "wolfenstein-youngblood",
+            "ac-odyssey", "doom-2016", "ready-or-not", "rv-there-yet", "satisfactory",
+            "solarpunk", "witcher-3", "wolfenstein-youngblood",
         ])
     }
 
@@ -318,8 +319,10 @@ struct ProfileValidatorTests {
         #expect(rules(ProfileValidator.validate(bare)).contains("layerCoherence"))
     }
 
-    /// And the four in the catalog really are the exempted shape, not merely
-    /// passing because the rule got loosened for everyone.
+    /// And the shipped Vulkan-native profiles really are the exempted shape,
+    /// not merely passing because the rule got loosened for everyone.
+    /// Youngblood and DOOM (2016) are the measured pair; the other four are
+    /// still guessed.
     @Test func theShippedVulkanProfilesAreTheOnesExempted() {
         let all = ProfileStore.loadAll()
         let exempt = all.filter {
@@ -327,7 +330,8 @@ struct ProfileValidatorTests {
                 && $0.bottle?.dxvk == false
         }
         #expect(exempt.map(\.id).sorted()
-                == ["detroit-become-human", "doom-eternal", "enshrouded", "no-mans-sky"])
+                == ["detroit-become-human", "doom-2016", "doom-eternal",
+                    "enshrouded", "no-mans-sky", "wolfenstein-youngblood"])
         for profile in exempt {
             #expect(ProfileValidator.isVulkanNative(profile), "\(profile.id)")
         }
