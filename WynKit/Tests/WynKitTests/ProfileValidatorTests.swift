@@ -82,19 +82,22 @@ struct ProfileValidatorTests {
     /// `lsof` on the live process holding the DXMT payload open, and the UE
     /// log's own adapter line ('Apple M4' through Forced RHI D3D11).
     ///
-    /// `ac-odyssey` (10 Sep 2026) is the weakest entry and is deliberately
-    /// marked as such in its own notes: it was played to a loaded map and the
-    /// log kept, and its layer was confirmed by lsof on the live process, but
-    /// there is no launch record and no frame count, because Wyn cannot time a
-    /// Steam `-applaunch` title — `wine start` returns 0 immediately. If the
-    /// bar here is ever tightened from "a person and a log" to "a recorded
-    /// session", this is the id that has to come back out.
+    /// `ac-odyssey` (10 Sep 2026) is a weak Unreal-less entry: played to a
+    /// loaded map, layer confirmed by lsof, but no launch record and no frame
+    /// count, because Wyn cannot time a Steam `-applaunch` title.
+    ///
+    /// `witcher-3` and `ready-or-not` are the no-engine-log pair. REDengine /
+    /// shipping RoN write nothing Wyn can parse, so the evidence is in-world
+    /// play plus lsof (Witcher 3: D3DMetal.framework on live witcher3.exe,
+    /// dx12user.settings 1920x1080 VSync). If the bar is tightened to "a UE
+    /// log with LoadMap and a frame count", those two come out first.
     @Test func onlyMeasuredProfilesClaimVerified() {
         let userAdded = ProfileStore.userProfileIDs()
         let verified = ProfileStore.loadAll()
             .filter { $0.status == .verified && !userAdded.contains($0.id) }
         #expect(verified.map(\.id).sorted() == [
             "ac-odyssey", "ready-or-not", "rv-there-yet", "satisfactory", "solarpunk",
+            "witcher-3",
         ])
     }
 
@@ -105,14 +108,12 @@ struct ProfileValidatorTests {
     @Test func onlyDocumentedProfilesClaimLaunched() {
         let expected = [
             // ac-odyssey graduated to `verified` on 10 Sep 2026.
+            // witcher-3 graduated to `verified` on 11 Sep 2026 (Ready or Not
+            // bar: in-world play, no engine log, lsof on D3DMetal).
             "army-men-rts",
             "assetto-corsa",
             "cities-skylines",
             "skyrim-se",
-            // Played on D3DMetal 11 Sep 2026 and cannot go further: REDengine
-            // writes no log, so there is no LoadMap line or frame count to
-            // meet §5 with. Its notes carry the lsof evidence instead.
-            "witcher-3",
         ]
         let userAdded = ProfileStore.userProfileIDs()
         let launched = ProfileStore.loadAll()

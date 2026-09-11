@@ -4,8 +4,9 @@ Do not add guessed catalog entries. Do not set `"status": "verified"` unless
 §5 of [adding-a-game.md](adding-a-game.md) is true on **this** Mac.
 
 Verified today (bundled): `satisfactory`, `solarpunk` (and `solarpunk-dxmt`
-as a measured layer variant), `ready-or-not`, `ac-odyssey`, `rv-there-yet`.
-Target **5–10 verified titles**, not 75 — five of them now exist.
+as a measured layer variant), `ready-or-not`, `ac-odyssey`, `rv-there-yet`,
+`witcher-3`.
+Target **5–10 verified titles**, not 75 — six of them now exist.
 
 ## The bar (copy from adding-a-game.md §5)
 
@@ -44,11 +45,10 @@ Installed catalog titles, verification order:
    verified without a loaded-world measurement on GPTK D3DMetal.
 2. STAR WARS Jedi: Fallen Order (`jedi-fallen-order`) — UE4, `guessed`.
 3. Fallout 4 (`fallout-4`) — same DX11 family as launched Skyrim SE.
-4. Cyberpunk 2077 (`cyberpunk-2077`) — heavier DX12, and now the one to try:
-   Witcher 3 (`witcher-3`) is the same REDengine DX12 family and was played on
-   D3DMetal 11 Sep 2026 (`launched`; see its notes). Neither can reach §5 —
-   REDengine writes no log — so the bar for this family is the lsof + D3DMetal
-   shader-cache evidence Witcher 3 now carries.
+4. Cyberpunk 2077 (`cyberpunk-2077`) — heavier DX12, same REDengine family as
+   verified `witcher-3`. There is no UE log; use the Witcher 3 notes as the
+   bar (in-world play + lsof on D3DMetal + per-exe shader cache). Do not
+   `--frankea-steam` for this DX12 title.
 5. Fallout: New Vegas (`fallout-new-vegas`) — `guessed`, and **measured**
    11 Sep 2026: `lsof` on the live `FalloutNV.exe` shows builtin `d3d9` +
    `wined3d` + `opengl32` from the running tree and nothing from the DXVK
@@ -58,31 +58,48 @@ Installed catalog titles, verification order:
    `wyn-handovers/FINDING-20260911-taskb-legs.md`.
 6. Assetto Corsa (`assetto-corsa`) — Magione/Monza loaded, still `launched`.
    Finish the bar or leave it launched.
-7. **DOOM (2016)** (appid 379720, 69 GB) — no profile yet, and a new class for
-   this catalog: `DOOMx64vk.exe` is **Vulkan**, so no translation layer is
-   involved at all — MoltenVK + `winevulkan`, and `DOOMx64.exe` is the OpenGL
-   fallback. Write the profile from what `lsof` shows, not from the layer
-   fields. Denuvo.
-8. **Wolfenstein: Youngblood** (appid 1056960, 43 GB) — no profile yet,
-   `Youngblood_x64vk.exe` only, so **Vulkan-only**. Same class as DOOM; there is
-   no D3D path to fall back to if MoltenVK will not do it.
 
-`witcher-3` also ran that day on GPTK D3DMetal from `bin/x64_dx12`, played
-in-world and quit cleanly — `launched`, and stuck there because REDengine keeps
-no log. Its notes hold the evidence that was available: D3DMetal.framework and
-libd3dshared open on the live process, `d3d12`/`dxgi` served as builtins from
-the tree while another game's DXMT natives sat unused in system32, and a
-populated per-exe D3DMetal shader cache.
+`witcher-3` ran that day on GPTK D3DMetal from `bin/x64_dx12`, played
+in-world and quit from the menu. REDengine keeps no log, so it is verified
+on the Ready or Not bar: lsof of D3DMetal.framework on the live process,
+`d3d12`/`dxgi` as builtins, a populated per-exe D3DMetal shader cache, and
+`dx12user.settings` at 1920x1080 VSync.
 
 `rv-there-yet` was the 11 Sep 2026 run: DXMT, loaded map, 1514 frames, clean
 exit, and the first bundled title measured to actually load a translation layer
 instead of falling through to wined3d.
 
 Already verified: `satisfactory`, `solarpunk`, `ready-or-not`, `ac-odyssey`,
-`rv-there-yet`. Already launched (do not promote without a new measurement):
-`skyrim-se`, `cities-skylines`, `army-men-rts`. Ready or Not shipping did
-not write `ReadyOrNot.log`; the verified notes say the layer is the GPTK
-D3DMetal launch path.
+`rv-there-yet`, `witcher-3`. Already launched (do not promote without a new
+measurement): `skyrim-se`, `cities-skylines`, `army-men-rts`. Ready or Not
+shipping did not write `ReadyOrNot.log`; the verified notes say the layer is
+the GPTK D3DMetal launch path.
+
+## Blocked on MoltenVK, not on Wyn (measured 11 Sep 2026)
+
+Both are installed, both were run, neither can start, and **no layer setting
+can change that** — id Tech does not use D3D at all. Deliberately **not** added
+as catalog profiles (a title that cannot start is not a catalog claim); they
+live as user profiles in `~/Library/Application Support/com.fly.gaming/Profiles/`
+with the evidence in their notes. Full write-up:
+`wyn-handovers/FINDING-20260911-idtech-blocked-on-moltenvk.md`.
+
+- **Wolfenstein: Youngblood** (1056960) — `Youngblood_x64vk.exe` is the only
+  executable. MoltenVK 1.4.1 reaches a VkInstance on Apple M4, then
+  `vkCreateDevice` fails `VK_ERROR_FEATURE_NOT_PRESENT` on the **39th flag** of
+  `VkPhysicalDeviceFeatures` — `shaderCullDistance`, which Metal has no
+  equivalent for. One feature bit short. Retest the day MoltenVK gains it.
+- **DOOM (2016)** (379720) — blocked on *both* renderers. `DOOMx64.exe` wants an
+  OpenGL core context above Apple's 4.1 ceiling
+  (`ERROR_INVALID_VERSION_ARB` → `wglCreateContextAttribsARB failed`), and
+  `DOOMx64vk.exe` fails `vkCreateDevice` on the **15th and 39th** flags —
+  `depthBounds` and `shaderCullDistance`.
+
+While measuring those: `wyn play` on a dxmt/dxvk profile goes through
+`steam.exe -applaunch`, and **Steam runs the app's default launch option, not
+the exe the profile resolved** — the log said `DOOMx64vk.exe` and `DOOMx64.exe`
+started. `--direct` runs the resolved exe. That applies to any title shipping
+more than one executable.
 
 Skip for Wine: No Man's Sky (native Mac build; profile says DEFER). EVE
 Online and LEGO DC Super-Villains have no Windows EXE on this disk.
