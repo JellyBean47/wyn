@@ -44,7 +44,11 @@ Installed catalog titles, verification order:
    verified without a loaded-world measurement on GPTK D3DMetal.
 2. STAR WARS Jedi: Fallen Order (`jedi-fallen-order`) — UE4, `guessed`.
 3. Fallout 4 (`fallout-4`) — same DX11 family as launched Skyrim SE.
-4. Cyberpunk 2077 (`cyberpunk-2077`) / Witcher 3 (`witcher-3`) — heavier DX12.
+4. Cyberpunk 2077 (`cyberpunk-2077`) — heavier DX12, and now the one to try:
+   Witcher 3 (`witcher-3`) is the same REDengine DX12 family and was played on
+   D3DMetal 11 Sep 2026 (`launched`; see its notes). Neither can reach §5 —
+   REDengine writes no log — so the bar for this family is the lsof + D3DMetal
+   shader-cache evidence Witcher 3 now carries.
 5. Fallout: New Vegas (`fallout-new-vegas`) — `guessed`, and **measured**
    11 Sep 2026: `lsof` on the live `FalloutNV.exe` shows builtin `d3d9` +
    `wined3d` + `opengl32` from the running tree and nothing from the DXVK
@@ -62,6 +66,13 @@ Installed catalog titles, verification order:
 8. **Wolfenstein: Youngblood** (appid 1056960, 43 GB) — no profile yet,
    `Youngblood_x64vk.exe` only, so **Vulkan-only**. Same class as DOOM; there is
    no D3D path to fall back to if MoltenVK will not do it.
+
+`witcher-3` also ran that day on GPTK D3DMetal from `bin/x64_dx12`, played
+in-world and quit cleanly — `launched`, and stuck there because REDengine keeps
+no log. Its notes hold the evidence that was available: D3DMetal.framework and
+libd3dshared open on the live process, `d3d12`/`dxgi` served as builtins from
+the tree while another game's DXMT natives sat unused in system32, and a
+populated per-exe D3DMetal shader cache.
 
 `rv-there-yet` was the 11 Sep 2026 run: DXMT, loaded map, 1514 frames, clean
 exit, and the first bundled title measured to actually load a translation layer

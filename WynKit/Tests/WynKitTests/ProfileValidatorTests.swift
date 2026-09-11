@@ -109,6 +109,10 @@ struct ProfileValidatorTests {
             "assetto-corsa",
             "cities-skylines",
             "skyrim-se",
+            // Played on D3DMetal 11 Sep 2026 and cannot go further: REDengine
+            // writes no log, so there is no LoadMap line or frame count to
+            // meet §5 with. Its notes carry the lsof evidence instead.
+            "witcher-3",
         ]
         let userAdded = ProfileStore.userProfileIDs()
         let launched = ProfileStore.loadAll()
