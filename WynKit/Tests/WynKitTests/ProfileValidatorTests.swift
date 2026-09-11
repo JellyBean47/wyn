@@ -96,12 +96,14 @@ struct ProfileValidatorTests {
     /// needs Steam `-applaunch` (XAudio2 COM apartment) and the Vulkan exe
     /// copied over Steam's OpenGL default. Notes say so.
     @Test func onlyMeasuredProfilesClaimVerified() {
-        let userAdded = ProfileStore.userProfileIDs()
-        let verified = ProfileStore.loadAll()
-            .filter { $0.status == .verified && !userAdded.contains($0.id) }
+        // Bundled profiles only. `loadAll()` minus `userProfileIDs()` looks
+        // equivalent but is not: a user file sharing a bundled id exempted the
+        // shipped claim, so a verified `solarpunk-dxmt` passed on this Mac and
+        // failed the first time CI ever ran this test.
+        let verified = ProfileStore.loadBundledProfiles().filter { $0.status == .verified }
         #expect(verified.map(\.id).sorted() == [
             "ac-odyssey", "doom-2016", "ready-or-not", "rv-there-yet", "satisfactory",
-            "solarpunk", "witcher-3", "wolfenstein-youngblood",
+            "solarpunk", "solarpunk-dxmt", "witcher-3", "wolfenstein-youngblood",
         ])
     }
 
@@ -119,12 +121,12 @@ struct ProfileValidatorTests {
             "cities-skylines",
             "skyrim-se",
         ]
-        let userAdded = ProfileStore.userProfileIDs()
-        let launched = ProfileStore.loadAll()
-            .filter { $0.status == .launched && !userAdded.contains($0.id) }
-            .map(\.id)
+        // Bundled only, for the same reason as the verified ladder above: a
+        // user profile must not be able to exempt a shipped claim.
+        let bundled = ProfileStore.loadBundledProfiles()
+        let launched = bundled.filter { $0.status == .launched }.map(\.id)
         for id in expected {
-            #expect(ProfileStore.profile(id: id)?.status == .launched, "\(id) should be launched")
+            #expect(bundled.first { $0.id == id }?.status == .launched, "\(id) should be launched")
         }
         #expect(Set(launched).subtracting(expected).isEmpty)
     }

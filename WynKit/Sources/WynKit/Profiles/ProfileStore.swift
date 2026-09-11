@@ -65,7 +65,12 @@ public enum ProfileStore {
             .appending(path: "Profiles")
     }
 
-    private static func loadBundledProfiles() -> [GameProfile] {
+    /// Internal rather than private so the status-ladder guardrails can assert
+    /// on what Wyn *ships*. Reading `loadAll()` and subtracting
+    /// `userProfileIDs()` is not the same set: a user file sharing a bundled id
+    /// exempts the bundled claim from the check, which is how a verified
+    /// `solarpunk-dxmt` stayed invisible to CI.
+    static func loadBundledProfiles() -> [GameProfile] {
         var profiles: [GameProfile] = []
         let decoder = JSONDecoder()
 
