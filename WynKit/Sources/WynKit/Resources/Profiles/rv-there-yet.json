@@ -21,6 +21,6 @@
   ],
   "launchArgs": "-dx11",
   "unrealProject": "Ride",
-  "notes": "~3.2 GB — ideal first test. DXMT + -dx11. wyn play uses steam.exe -applaunch (not --direct). Also pins DefaultGraphicsRHI=DX11 in AppData Local/Ride Engine.ini so Steam relaunches survive without CLI -dx11.",
-  "status": "guessed"
+  "notes": "VERIFIED 11 Sep 2026, Apple M4, macOS 26.5.1, DXMT. Measured, not inferred: `lsof` on the live Ride-Win64-Shipping.exe has system32\\d3d11.dll and system32\\dxgi.dll open, byte-identical to Libraries.steam/DXMT/x64 (d3d11 5,350,886 / dxgi 1,890,058), with winemetal.dll+winemetal.so from the running tree — the first bundled title measured to load a translation layer at all rather than falling back to wined3d. UE log: 'Using Forced RHI: D3D11', Feature Level 11_1 SM5, adapter 'Apple M4' (VendorId 0x106b, 6062 MB), LoadMap(/Game/Ride/Maps/RideMap) in 2.16 s, 1514 frames over 3.2 min, 0 hitches, LogExit: Exiting., no Crashes directory. Internal render res 1280x720 on a 1920x1080 window. Play: wyn play rv-there-yet (steam.exe -applaunch, not --direct). DXMT + -dx11; DefaultGraphicsRHI=DX11 is also pinned in AppData Local/Ride Engine.ini so Steam relaunches survive without the CLI flag. ~3.2 GB. Benign log errors, not graphics: DirectML.dll missing (optional NNE/ORT runtime), EOS online services absent, one UE widget double-bind warning.",
+  "status": "verified"
 }
