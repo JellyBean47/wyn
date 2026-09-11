@@ -89,15 +89,18 @@ struct ProfileValidatorTests {
     /// `witcher-3` and `ready-or-not` are the no-engine-log pair. REDengine /
     /// shipping RoN write nothing Wyn can parse, so the evidence is in-world
     /// play plus lsof (Witcher 3: D3DMetal.framework on live witcher3.exe,
-    /// dx12user.settings 1920x1080 VSync). If the bar is tightened to "a UE
-    /// log with LoadMap and a frame count", those two come out first.
+    /// dx12user.settings 1920x1080 VSync).
+    ///
+    /// `wolfenstein-youngblood` (11 Sep 2026) is Vulkan, not D3D: a person
+    /// played it and it wrote progression.bin. id Tech keeps no UE log. It
+    /// needs the unshipped fly-mvkshim in front of MoltenVK; notes say so.
     @Test func onlyMeasuredProfilesClaimVerified() {
         let userAdded = ProfileStore.userProfileIDs()
         let verified = ProfileStore.loadAll()
             .filter { $0.status == .verified && !userAdded.contains($0.id) }
         #expect(verified.map(\.id).sorted() == [
             "ac-odyssey", "ready-or-not", "rv-there-yet", "satisfactory", "solarpunk",
-            "witcher-3",
+            "witcher-3", "wolfenstein-youngblood",
         ])
     }
 

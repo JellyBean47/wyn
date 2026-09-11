@@ -317,7 +317,8 @@ struct GameCatalogTests {
         // guesses written so a title can be installed and launched.
         #expect(Set(catalog.games.filter { $0.batch == 11 }.map(\.slug)) == ["solarpunk"])
         #expect(Set(catalog.games.filter { $0.batch == 12 }.map(\.slug)) == ["assetto-corsa"])
-        #expect(catalog.games.count == 116)
+        #expect(Set(catalog.games.filter { $0.batch == 13 }.map(\.slug)) == ["wolfenstein-youngblood"])
+        #expect(catalog.games.count == 117)
     }
 
     /// 6 Sep 19:20: D3DMetal created the swapchain, then Wine's builtin
