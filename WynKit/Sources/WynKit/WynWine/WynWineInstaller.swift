@@ -198,6 +198,98 @@ public class WynWineInstaller {
         return fixed
     }
 
+    /// The smallest stock MoltenVK seen is ~5.5 MB; every build of the shim is
+    /// under 200 KB. Used only to refuse to preserve a shim *as* the stock
+    /// library — see `ensureVulkanFeatureShim`.
+    private static let minimumRealMoltenVKBytes = 1_000_000
+
+    /// Install `fly-mvkshim` in front of MoltenVK for a Wine tree.
+    ///
+    /// id Tech titles (Youngblood, DOOM 2016) request `shaderCullDistance` and
+    /// `depthBounds`. Metal has neither, so MoltenVK correctly fails
+    /// `vkCreateDevice` with VK_ERROR_FEATURE_NOT_PRESENT and the game reports
+    /// "Startup failure: error while initializing the graphics driver". The shim
+    /// is installed *as* `libMoltenVK.dylib` — which is the name winevulkan
+    /// dlopens — with the stock library kept beside it as
+    /// `libMoltenVK.real.dylib`, which is where the shim looks for it.
+    ///
+    /// Returns true when it changed something. Idempotent: a tree that already
+    /// has this exact shim is left alone, and the stock library is preserved
+    /// once and only once, so a second call cannot make a shim its own "real"
+    /// library.
+    /// `shimSource` defaults to the built helper; tests pass their own so the
+    /// behaviour can be covered without a gitignored binary on disk.
+    @discardableResult
+    public static func ensureVulkanFeatureShim(
+        in libraryRoot: URL? = nil,
+        shimSource: URL? = nil
+    ) throws -> Bool {
+        let fm = FileManager.default
+        let root = libraryRoot ?? steamLibraryFolder
+        let destLib = root.appending(path: "Wine").appending(path: "lib")
+        guard fm.fileExists(atPath: destLib.path(percentEncoded: false)),
+              let source = shimSource ?? PlatformCatalog.vulkanFeatureShimDylib()
+        else { return false }
+
+        let installed = destLib.appending(path: "libMoltenVK.dylib")
+        let stock = destLib.appending(path: "libMoltenVK.real.dylib")
+        guard fm.fileExists(atPath: installed.path(percentEncoded: false)) else { return false }
+
+        let shim = try Data(contentsOf: source)
+        let current = try? Data(contentsOf: installed)
+        if current == shim { return false }
+
+        if !fm.fileExists(atPath: stock.path(percentEncoded: false)) {
+            // Refuse to enshrine a shim as the real library: that would make the
+            // shim forward to itself, and no amount of reinstalling would undo
+            // it because the stock copy would be gone for good.
+            guard (current?.count ?? 0) >= minimumRealMoltenVKBytes else { return false }
+            try fm.copyItem(at: installed, to: stock)
+        }
+
+        try shim.write(to: installed, options: .atomic)
+        // An atomic write creates a fresh file at the default 0644; dylibs in
+        // the tree are 0755 and the stock one it replaces was too.
+        try fm.setAttributes(
+            [.posixPermissions: 0o755], ofItemAtPath: installed.path(percentEncoded: false)
+        )
+        return true
+    }
+
+    /// Put the stock MoltenVK back, undoing `ensureVulkanFeatureShim`.
+    @discardableResult
+    public static func removeVulkanFeatureShim(in libraryRoot: URL? = nil) throws -> Bool {
+        let fm = FileManager.default
+        let root = libraryRoot ?? steamLibraryFolder
+        let destLib = root.appending(path: "Wine").appending(path: "lib")
+        let installed = destLib.appending(path: "libMoltenVK.dylib")
+        let stock = destLib.appending(path: "libMoltenVK.real.dylib")
+        guard fm.fileExists(atPath: stock.path(percentEncoded: false)) else { return false }
+
+        if fm.fileExists(atPath: installed.path(percentEncoded: false)) {
+            try fm.removeItem(at: installed)
+        }
+        try fm.moveItem(at: stock, to: installed)
+        return true
+    }
+
+    /// Whether this tree currently has the shim in front of MoltenVK.
+    public static func vulkanFeatureShimIsInstalled(
+        in libraryRoot: URL? = nil,
+        shimSource: URL? = nil
+    ) -> Bool {
+        let fm = FileManager.default
+        let root = libraryRoot ?? steamLibraryFolder
+        let destLib = root.appending(path: "Wine").appending(path: "lib")
+        let stock = destLib.appending(path: "libMoltenVK.real.dylib")
+        guard fm.fileExists(atPath: stock.path(percentEncoded: false)),
+              let source = shimSource ?? PlatformCatalog.vulkanFeatureShimDylib(),
+              let shim = try? Data(contentsOf: source),
+              let current = try? Data(contentsOf: destLib.appending(path: "libMoltenVK.dylib"))
+        else { return false }
+        return current == shim
+    }
+
     public static func libraryFolder(for tree: WineTree) -> URL {
         switch tree {
         case .game: return libraryFolder

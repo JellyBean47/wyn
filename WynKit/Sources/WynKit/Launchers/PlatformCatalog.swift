@@ -654,6 +654,22 @@ public enum PlatformCatalog {
         return url
     }
 
+    /// `fly-mvkshim`: the Vulkan feature interposer that goes in front of
+    /// MoltenVK for id Tech titles. Built by `scripts/build-mvkshim.sh`.
+    ///
+    /// Searched directly rather than through `toolsBinURL()`, which counts a
+    /// directory only when it holds `winemac_rtld_global.dylib`:
+    /// build-mvkshim.sh can be run on its own — it needs no mingw-w64 — and
+    /// then the shim is the only helper on disk.
+    static func vulkanFeatureShimDylib() -> URL? {
+        let fm = FileManager.default
+        for dir in toolsBinSearchPaths() {
+            let url = dir.appending(path: "fly_mvkshim.dylib")
+            if fm.fileExists(atPath: url.path(percentEncoded: false)) { return url }
+        }
+        return nil
+    }
+
     static func captureProcessOutput(executable: String, arguments: [String]) -> String {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: executable)

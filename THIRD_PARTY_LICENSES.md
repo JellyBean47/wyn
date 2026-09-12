@@ -44,6 +44,7 @@ must not, without a corresponding-source offer).
 | --- | --- | --- |
 | Apple Game Porting Toolkit, D3DMetal, libd3dshared, metalirconverter | Apple GPTK Software License Agreement (evaluation / non-commercial redistribution; no reverse engineering) | https://developer.apple.com/download/all/?q=game%20porting%20toolkit |
 | Proprietary Wine.app products | vendor EULA | Do not copy into Wyn; game-host is self-built winecx |
+| CrossOver.app / CodeWeavers binaries | vendor EULA | Never copied into Wyn. `fly-mvkshim` was *found* in a CrossOver 26.2.0 tree in Aug 2026 and is **not** CodeWeavers' code — it is first-party, now shipped as `Tools/fly_mvkshim.c`. CodeWeavers' own MoltenVK is a 556-export patched build; the shim exports nine. Wyn's only CodeWeavers-lineage component is LGPL winecx source, built locally and never redistributed. |
 | Steam, Battle.net, EA App, Epic, GOG, Ubisoft clients | Vendor ToS | Official vendor URLs on explicit user action |
 | Microsoft `d3dcompiler_47`, corefonts | Microsoft redistributable / core fonts EULAs | winetricks or user; do not commit |
 | macOS SDK, Xcode, Rosetta 2 | Apple | User installs |

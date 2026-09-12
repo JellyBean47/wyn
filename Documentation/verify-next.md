@@ -90,18 +90,31 @@ device-create request — clears it, in front of stock MoltenVK 1.4.1.
   a person and it wrote `progression.bin` (23:19). Two fragment pipelines fail
   to compile, probably the price of dropping cull distance; it did not stop
   play. Bundled profile `wolfenstein-youngblood` — notes say the shim is
-  required and Wyn does not ship it.
+  required and where it now comes from.
 - **DOOM (2016)** (379720) — **verified** 12 Sep 2026. Same shim, plus: launch
   through Steam (`wyn play doom-2016`, no `--direct`) so XAudio2 gets a COM
   apartment, and copy `DOOMx64vk.exe` over `DOOMx64.exe` because `-applaunch`
   runs the OpenGL default. Wrote `DOOMConfig.local` (`r_renderAPI 1`) and
   `profile.bin`. Bundled profile `doom-2016`.
 
-The shim is still an unshipped recovered Aug 2026 binary. Youngblood and DOOM
-catalog claims are "it played on this Mac with that shim", not "Wyn installs
-Vulkan titles for you". Shipping the shim via `WynWineInstaller` is the
-remaining feature. DOOM's extra trap is the opposite of Youngblood: do **not**
-`--direct` — Steam's overlay is what creates the COM MTA XAudio2 needs.
+**The shim is shipped, and is Wyn's own source** — `Tools/fly_mvkshim.c`, built
+by `scripts/build-mvkshim.sh` and installed into the launching tree by
+`WynWineInstaller.ensureVulkanFeatureShim`, called from
+`SteamLauncher.launchGame` for any `isVulkanNative` profile. It replaces the
+recovered Aug 2026 binary that had no source. These two are therefore ordinary
+catalog claims now, not "it played on this Mac with a dylib you must find
+yourself": CLAUDE.md forbids a catalog claim that depends on a hand-installed
+binary, and until the rewrite both of these were exactly that.
+
+What is still honest to say: the in-game runs above were measured with the
+recovered binary, not the rewrite. The rewrite is verified to the same contract
+by `Tools/fly_mvkshim_probe.c` (stock 1.4.1 →
+`VK_ERROR_FEATURE_NOT_PRESENT`, shim → `VK_SUCCESS`, Apple M4) and produces
+byte-identical log lines, but a §5 play-through on it has not been done. Doing
+one on either title is the cheapest way to close that gap.
+
+DOOM's extra trap is the opposite of Youngblood: do **not** `--direct` —
+Steam's overlay is what creates the COM MTA XAudio2 needs.
 
 While measuring those: `wyn play` on a dxmt/dxvk profile goes through
 `steam.exe -applaunch`, and **Steam runs the app's default launch option, not

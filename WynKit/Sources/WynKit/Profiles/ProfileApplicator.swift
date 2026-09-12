@@ -110,6 +110,36 @@ public enum ProfileApplicator {
         return env
     }
 
+    /// Put `fly-mvkshim` in front of MoltenVK in the trees a Vulkan-native
+    /// title might launch on.
+    ///
+    /// id Tech asks Vulkan for `shaderCullDistance` and `depthBounds`; Metal has
+    /// neither, so without the shim `vkCreateDevice` fails
+    /// VK_ERROR_FEATURE_NOT_PRESENT and the game dies on "Startup failure: error
+    /// while initializing the graphics driver" before a window appears.
+    ///
+    /// Keyed on `ProfileValidator.isVulkanNative`, so a profile asks for this by
+    /// naming `vulkan-1` in `WINEDLLOVERRIDES` or setting an `MVK_` knob — no new
+    /// schema field, and `doom-2016` / `wolfenstein-youngblood` already qualify.
+    ///
+    /// Both trees, because the launch path picks one later and the two titles
+    /// disagree about which: DOOM must go through Steam `-applaunch` for its COM
+    /// apartment while Youngblood runs `--direct`. Installing is idempotent and
+    /// a tree that has no MoltenVK is skipped, so doing both is cheap.
+    ///
+    /// Never throws: a tree that will not take the shim should still launch and
+    /// fail with the game's own diagnostics rather than one of ours.
+    @discardableResult
+    public static func prepareVulkanShim(profile: GameProfile?) -> Int {
+        guard let profile, ProfileValidator.isVulkanNative(profile) else { return 0 }
+        var installed = 0
+        for tree in [WineTree.game, .steam] {
+            let root = WynWineInstaller.libraryFolder(for: tree)
+            if (try? WynWineInstaller.ensureVulkanFeatureShim(in: root)) == true { installed += 1 }
+        }
+        return installed
+    }
+
     /// Resolve launch arguments from profile + program settings.
     /// Supports simple double-quoted tokens (e.g. `-ExecCmds="stat unit,stat fps"`).
     public static func launchArguments(profile: GameProfile?, program: Program) -> [String] {
