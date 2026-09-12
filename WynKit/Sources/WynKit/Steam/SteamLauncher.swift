@@ -2329,6 +2329,35 @@ public enum SteamLauncher {
             : nil
         defer { sampler?.cancel() }
 
+        // Phase 0 — a client that is already up has whatever environment it was
+        // started with, and the game will inherit *that*, not `clientEnvironment`.
+        // Reusing a mismatched client is how satisfactory got
+        // `D3DM_ENABLE_METALFX=1` (the `gameHostSteamEnvironment` default) over
+        // its own "0", crawled, and SIGILL'd in the menu. See
+        // SteamLauncher+SessionEnv.swift.
+        if isSteamClientRunning(in: bottle) {
+            let mismatch = steamSessionEnvMismatch(
+                wanted: clientEnvironment, profile: profile, in: bottle
+            )
+            if !mismatch.isEmpty {
+                progress("""
+                Steam is running with a different environment \
+                (\(mismatch.joined(separator: ", "))) — restarting it so \
+                \(profile.id) gets its own
+                """)
+                if try await quitSteam(in: bottle, options: playOptions) {
+                    forgetSteamSessionEnv(in: bottle)
+                } else {
+                    // Do not launch into a client known to have the wrong
+                    // environment: that is the silent crash this check exists
+                    // to stop. Say what to do instead.
+                    throw SteamError.steamStillRunningWithForeignEnvironment(
+                        profileId: profile.id, keys: mismatch
+                    )
+                }
+            }
+        }
+
         // Phase 1 — start the client, the way `wyn steam launch` starts one.
         var clientOptions = playOptions
         clientOptions.preferFrankeaSteam = true
@@ -2341,6 +2370,9 @@ public enum SteamLauncher {
             gameExeNames: profile.exePatterns,
             extraEnvironment: clientEnvironment
         )
+        // Record only after the client is actually up, so a failed start does
+        // not leave a record claiming an environment nothing is running with.
+        recordSteamSessionEnv(clientEnvironment, profileId: profile.id, in: bottle)
         try await waitForSteamClient(in: bottle, seconds: 120)
         try await waitForSteamLoggedOn(in: bottle, seconds: 180)
 
@@ -2593,6 +2625,7 @@ public enum SteamError: LocalizedError {
     case missingSteamAppId(profileId: String)
     case d3dMetalRequiresDirectLaunch
     case previousSessionStillRunning(summary: String)
+    case steamStillRunningWithForeignEnvironment(profileId: String, keys: [String])
 
     public var errorDescription: String? {
         switch self {
@@ -2625,6 +2658,15 @@ public enum SteamError: LocalizedError {
             return """
             Previous session still running (\(summary)). Quit the game from its window \
             (never wineserver -k), then: wyn play
+            """
+        case .steamStillRunningWithForeignEnvironment(let profileId, let keys):
+            return """
+            Steam is running with an environment \(profileId) cannot use \
+            (\(keys.joined(separator: ", "))) and did not exit when asked. A game \
+            inherits the client's environment, so launching now would run \(profileId) \
+            on another profile's settings — which is how a MetalFX-on launch crawls \
+            and then SIGILLs. Use Steam → Exit (never wineserver -k), then: \
+            wyn play \(profileId)
             """
         }
     }
@@ -2661,6 +2703,12 @@ public enum SteamError: LocalizedError {
             return "Open Steam and sign in first, then leave it running and press Play."
         case .previousSessionStillRunning:
             return "Quit the game from its own window, then try again."
+        case .steamStillRunningWithForeignEnvironment:
+            return """
+            Steam is set up for a different game. Use Steam → Exit from Steam's \
+            own window, then press Play again — Wyn will start Steam with this \
+            game's settings.
+            """
         }
     }
 }
