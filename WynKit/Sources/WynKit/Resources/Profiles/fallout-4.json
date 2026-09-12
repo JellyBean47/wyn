@@ -27,6 +27,6 @@
     "vcrun2022"
   ],
   "launchArgs": "",
-  "notes": "Creation Engine DX11 → D3DMetal, same family as Skyrim SE. Steam launches Fallout4Launcher.exe; launch Fallout4.exe directly with SteamAppId=377160. Pin CX_GRAPHICS_BACKEND=d3dmetal (winecx) so DX11 does not fall onto DXMT. Prefs live in Documents\\My Games\\Fallout4. Keep iPresentInterval=1 — FO4 physics breaks above ~60 fps. Do not use Libraries.rgl or Libraries.vk.",
-  "status": "guessed"
+  "notes": "VERIFIED 10 Sep 2026 on this Mac: Apple M4 16GB, macOS 26.5.1 (25F80). Played from the Wyn tile on the GPTK D3DMetal launch path (per-exe AppDefaults d3d11,dxgi,d3d12,d3d10=b). Creation Engine has no Unreal SessionPerformance log (Papyrus bEnableLogging=0); the loaded world is the save name. Commonwealth exitsaves under Documents\\My Games\\Fallout4\\Saves: Exitsave0_…_Commonwealth_010542_20260910200525 (Johnny Bravo, level 20) after the 190s tile; later the same night 227s / 121s / 397s tiles wrote Commonwealth_010545 (00:01) and Commonwealth_010550 (01:05). BNet.3.log login success then Log closed on the first tile; BNet.0.log login then logout at 01:05. Fallout4Prefs.ini: 1920x1080 borderless fullscreen, iPresentInterval=1, sD3DDevice=\"NVIDIA GeForce 8800 GTX\" (Wine's D3D11 enumerator — not DXVK's GeForce 6800; no dxvk log in the install; this title was not lsof'd live). LaunchRecord.layer is not a load measurement. Steam launches Fallout4Launcher.exe; prefer Fallout4.exe with SteamAppId=377160. Keep iPresentInterval=1 — FO4 physics breaks above ~60 fps. MetalFX/HUD stay off. Do not use Libraries.rgl or Libraries.vk.",
+  "status": "verified"
 }

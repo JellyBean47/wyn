@@ -14,9 +14,9 @@ test('launched titles are the ones with Mac evidence, not theoretical ports', ()
   // frames, LogExit: Exiting., adapter Apple M4 through DXMT.
   // witcher-3 graduated the same night on the Ready or Not bar (in-world play,
   // D3DMetal lsof, no REDengine log).
-  assert.deepEqual(launched, ['army-men-rts', 'assetto-corsa', 'cities-skylines', 'skyrim-se']);
-  assert.deepEqual(verified, ['ac-odyssey', 'doom-2016', 'ready-or-not', 'rv-there-yet', 'satisfactory', 'solarpunk', 'witcher-3', 'wolfenstein-youngblood']);
-  assert.equal(data.counts.verified, 8);
+  assert.deepEqual(launched, ['assetto-corsa', 'cities-skylines', 'skyrim-se']);
+  assert.deepEqual(verified, ['ac-odyssey', 'army-men-rts', 'doom-2016', 'fallout-4', 'fallout-new-vegas', 'ready-or-not', 'rv-there-yet', 'satisfactory', 'solarpunk', 'witcher-3', 'wolfenstein-youngblood']);
+  assert.equal(data.counts.verified, 11);
 });
 test('home lists verified and launched titles', () => {
   const html = homePage(data);
@@ -32,8 +32,23 @@ test('home lists verified and launched titles', () => {
   assert.ok(html.includes('Wolfenstein: Youngblood'));
   assert.ok(html.includes('/games/doom-2016'));
   assert.ok(html.includes('DOOM (2016)'));
+  assert.ok(html.includes('/games/fallout-4'));
+  assert.ok(html.includes('Fallout 4'));
+  assert.ok(html.includes('/games/fallout-new-vegas'));
+  assert.ok(html.includes('Fallout: New Vegas'));
+  assert.ok(html.includes('/games/army-men-rts'));
+  assert.ok(html.includes('Army Men RTS'));
   assert.ok(html.includes('badge launched'));
   assert.ok(html.includes('badge verified'));
+});
+test('army men verified notes require the 1024x768 window', () => {
+  const game = data.bySlug.get('army-men-rts');
+  assert.equal(game.status, 'verified');
+  assert.equal(game.profiles[0].launchArgs, '-vidmode:1024x768 -h');
+  const html = gamePage(game);
+  assert.ok(html.includes('badge verified'));
+  assert.ok(html.includes('1024x768'));
+  assert.ok(html.includes('small 1024x768 window'));
 });
 test('search supports variant ids and layers', () => {
   const variant = data.games.find(game => game.profiles.some(p => p.id === 'satisfactory-dxmt'));
