@@ -92,7 +92,9 @@ struct ProfileValidatorTests {
     /// dx12user.settings 1920x1080 VSync).
     ///
     /// `wolfenstein-youngblood` (11 Sep 2026) and `doom-2016` (12 Sep 2026)
-    /// are Vulkan, not D3D. Both need the unshipped fly-mvkshim. DOOM also
+    /// are Vulkan, not D3D. Both need fly-mvkshim, which Wyn builds from its
+    /// own source (`Tools/fly_mvkshim.c`) and installs into the launching tree
+    /// — it is no longer a binary you must find. DOOM also
     /// needs Steam `-applaunch` (XAudio2 COM apartment) and the Vulkan exe
     /// copied over Steam's OpenGL default. Notes say so.
     @Test func onlyMeasuredProfilesClaimVerified() {
