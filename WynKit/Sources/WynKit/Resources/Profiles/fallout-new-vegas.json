@@ -9,15 +9,16 @@
   ],
   "bottle": {
     "windowsVersion": "win10",
-    "translationLayer": "dxvk",
+    "dxvk": false,
+    "dxvkAsync": false,
     "enhancedSync": "msync",
-    "dxvk": true,
-    "dxvkAsync": true
+    "avxEnabled": false,
+    "metalHud": false
   },
   "environment": {},
   "winetricks": [
     "vcrun2019"
   ],
-  "notes": "Gamebryo DX9. The path that actually ran on this Mac was Wine builtin ddraw/d3d9 → wined3d → OpenGL (same class as Army Men RTS), not this JSON's DXVK layer. MEASURED 2026-09-11 with lsof on the live FalloutNV.exe: it loads d3d9.dll, wined3d.dll and opengl32.dll from the running Wine tree's i386-windows and renders through AppleMetalOpenGLRenderer — no dxgi, no d3d11, nothing from the DXVK payload, which is deployed on every launch and never opened (DXVK ships no d3d9). Identical module set whether it runs alone or straight after another game. The declared dxvk layer therefore buys nothing here; changing it is a separate question because the layer also decides the launch path (dxvk/dxmt → steam -applaunch on the frankea tree, d3dmetal → direct EXE on the game tree), and that has not been measured for this title. See wyn-handovers/FINDING-20260911-taskb-legs.md. Status stays guessed. Steam launches FalloutNVLauncher.exe; prefer FalloutNV.exe with SteamAppId=22380. Keep vsync on — Gamebryo physics breaks at high FPS. This is New Vegas, not Fallout 4. Prefs live in Documents\\My Games\\FalloutNV.",
-  "status": "guessed"
+  "notes": "VERIFIED 10 Sep 2026 on this Mac: Apple M4 16GB, macOS 26.5.1 (25F80). Played from the Wyn tile: LaunchRecords 174s and 274s. Those records say layer=dxvk only because LaunchRecordStore.makeRecord copies profile.bottle.translationLayer — they are not a measurement of what rendered. The game ran Wine builtin d3d9 → wined3d → OpenGL on the frankea tree (users/ebenoelofse). 11 Sep 2026 lsof on the live FalloutNV.exe (wyn-handovers/FINDING-20260911-taskb-legs.md) loaded d3d9.dll, wined3d.dll and opengl32.dll from the frankea tree's i386-windows and rendered through AppleMetalOpenGLRenderer — DXVK was deployed and never opened. Wyn Libraries/DXVK/{x64,x32} ship only d3d11.dll and d3d10core.dll — no d3d9.dll on this machine; no DXVK log (DXVK always writes one on init). RendererInfo.txt (rewritten 11 Sep 16:48): NVIDIA GeForce 6800 / nvd3dum.dll, vs_2_0 / ps_2_a / BSSM_SV_2_A (Shader Model 2). That adapter is wined3d's D3D9 table entry, not DXVK — through MoltenVK it would report Apple M4. Army Men on the same wined3d layer via ddraw reported GeForce 8800 GTX; both are fake NVIDIA, different feature-level rows. FalloutPrefs.ini at the 274s exit: 1280x720 fullscreen, iPresentInterval=1, sD3DDevice=\"NVIDIA GeForce 6800\". Gamebryo has no Unreal SessionPerformance log (iFileLogging=0). No new .fos this session (autosave.fos still 13 Aug; bAllowScriptedAutosave=0). Do NOT pin translationLayer to d3dmetal, dxmt, or dxvk — D3DMetal translates D3D11/12/10, this DXVK package has no d3d9, and pinning injects d3d9=n,b / d3d11 overrides that rewrite the bottle. Leave this profile's layer unset so Play does not merge those overrides (same class as army-men-rts). Steam launches FalloutNVLauncher.exe; prefer FalloutNV.exe with SteamAppId=22380. Keep iPresentInterval=1 — Gamebryo physics breaks at high FPS. This is New Vegas, not Fallout 4. Prefs live in Documents\\My Games\\FalloutNV. Do not use Libraries.rgl or Libraries.vk.",
+  "status": "verified"
 }

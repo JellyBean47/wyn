@@ -97,6 +97,15 @@ struct ProfileValidatorTests {
     /// — it is no longer a binary you must find. DOOM also
     /// needs Steam `-applaunch` (XAudio2 COM apartment) and the Vulkan exe
     /// copied over Steam's OpenGL default. Notes say so.
+    ///
+    /// `fallout-4` (10 Sep 2026) is Creation Engine: Commonwealth exitsaves
+    /// (Johnny Bravo, level 20) and BNet login, no Papyrus frame count.
+    /// `fallout-new-vegas` is Gamebryo on builtin d3d9 → wined3d, confirmed
+    /// by lsof 11 Sep; LaunchRecord.layer said dxvk and was wrong.
+    ///
+    /// `army-men-rts` (10 Sep 2026) is DirectDraw/D3D7 on the same wined3d
+    /// path. It only presents in the 1024x768 window (`-vidmode:1024x768 -h`);
+    /// 1080p is black. Layer stays unset.
     @Test func onlyMeasuredProfilesClaimVerified() {
         // Bundled profiles only. `loadAll()` minus `userProfileIDs()` looks
         // equivalent but is not: a user file sharing a bundled id exempted the
@@ -104,7 +113,8 @@ struct ProfileValidatorTests {
         // failed the first time CI ever ran this test.
         let verified = ProfileStore.loadBundledProfiles().filter { $0.status == .verified }
         #expect(verified.map(\.id).sorted() == [
-            "ac-odyssey", "doom-2016", "ready-or-not", "rv-there-yet", "satisfactory",
+            "ac-odyssey", "army-men-rts", "doom-2016", "fallout-4", "fallout-new-vegas",
+            "ready-or-not", "rv-there-yet", "satisfactory",
             "solarpunk", "solarpunk-dxmt", "witcher-3", "wolfenstein-youngblood",
         ])
     }
@@ -118,7 +128,8 @@ struct ProfileValidatorTests {
             // ac-odyssey graduated to `verified` on 10 Sep 2026.
             // witcher-3 graduated to `verified` on 11 Sep 2026 (Ready or Not
             // bar: in-world play, no engine log, lsof on D3DMetal).
-            "army-men-rts",
+            // army-men-rts graduated to `verified` on 10 Sep 2026 (bathroom
+            // Sim at 1024x768, wined3d, layer unset).
             "assetto-corsa",
             "cities-skylines",
             "skyrim-se",

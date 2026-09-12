@@ -5,8 +5,10 @@ Do not add guessed catalog entries. Do not set `"status": "verified"` unless
 
 Verified today (bundled): `satisfactory`, `solarpunk` (and `solarpunk-dxmt`
 as a measured layer variant), `ready-or-not`, `ac-odyssey`, `rv-there-yet`,
-`witcher-3`, `wolfenstein-youngblood`, `doom-2016`.
-Target **5–10 verified titles**, not 75 — eight of them now exist.
+`witcher-3`, `wolfenstein-youngblood`, `doom-2016`, `fallout-4`,
+`fallout-new-vegas`, `army-men-rts`.
+Target **5–10 verified titles**, not 75 — eleven of them now exist
+(Army Men is the extra: 1024x768 only).
 
 ## The bar (copy from adding-a-game.md §5)
 
@@ -24,8 +26,8 @@ one without measuring fails CI. `onlyDocumentedProfilesClaimLaunched` lists
 the launched ids.
 
 Launched (bundled, not the §5 bar): `assetto-corsa`, `ac-odyssey`,
-`skyrim-se`, `cities-skylines`, `army-men-rts`. Do not promote those to
-verified without a new measurement on this Mac.
+`skyrim-se`, `cities-skylines`. Do not promote those to verified without
+a new measurement on this Mac.
 
 ## Queue (play what is already installed)
 
@@ -44,19 +46,11 @@ Installed catalog titles, verification order:
    `--frankea-steam` (DXVK DEVICE_LOST freeze 9 Sep 19:46). Do not mark
    verified without a loaded-world measurement on GPTK D3DMetal.
 2. STAR WARS Jedi: Fallen Order (`jedi-fallen-order`) — UE4, `guessed`.
-3. Fallout 4 (`fallout-4`) — same DX11 family as launched Skyrim SE.
-4. Cyberpunk 2077 (`cyberpunk-2077`) — heavier DX12, same REDengine family as
+3. Cyberpunk 2077 (`cyberpunk-2077`) — heavier DX12, same REDengine family as
    verified `witcher-3`. There is no UE log; use the Witcher 3 notes as the
    bar (in-world play + lsof on D3DMetal + per-exe shader cache). Do not
    `--frankea-steam` for this DX12 title.
-5. Fallout: New Vegas (`fallout-new-vegas`) — `guessed`, and **measured**
-   11 Sep 2026: `lsof` on the live `FalloutNV.exe` shows builtin `d3d9` +
-   `wined3d` + `opengl32` from the running tree and nothing from the DXVK
-   payload it declares. Same module set alone or straight after another game.
-   What is left is a §5 run (loaded map, frames, clean exit) — the render path
-   is no longer the question. See
-   `wyn-handovers/FINDING-20260911-taskb-legs.md`.
-6. Assetto Corsa (`assetto-corsa`) — Magione/Monza loaded, still `launched`.
+4. Assetto Corsa (`assetto-corsa`) — Magione/Monza loaded, still `launched`.
    Finish the bar or leave it launched.
 
 `witcher-3` ran that day on GPTK D3DMetal from `bin/x64_dx12`, played
@@ -70,11 +64,14 @@ exit, and the first bundled title measured to actually load a translation layer
 instead of falling through to wined3d.
 
 Already verified: `satisfactory`, `solarpunk`, `ready-or-not`, `ac-odyssey`,
-`rv-there-yet`, `witcher-3`, `wolfenstein-youngblood`, `doom-2016`. Already
-launched (do not promote without a new measurement): `skyrim-se`,
-`cities-skylines`, `army-men-rts`. Ready or Not shipping did not write
-`ReadyOrNot.log`; the verified notes say the layer is the GPTK D3DMetal
-launch path.
+`rv-there-yet`, `witcher-3`, `wolfenstein-youngblood`, `doom-2016`,
+`fallout-4`, `fallout-new-vegas`, `army-men-rts`. Already launched (do
+not promote without a new measurement): `skyrim-se`, `cities-skylines`.
+Ready or Not shipping did not write `ReadyOrNot.log`; the verified notes
+say the layer is the GPTK D3DMetal launch path. `fallout-4` is Creation
+Engine (Commonwealth exitsave, no Papyrus frames). `fallout-new-vegas` is
+builtin d3d9 → wined3d; do not re-pin it to DXVK. `army-men-rts` is
+DirectDraw/D3D7 on wined3d and only in the 1024x768 window.
 
 ## Vulkan titles: the MoltenVK feature wall, and the shim that clears it
 

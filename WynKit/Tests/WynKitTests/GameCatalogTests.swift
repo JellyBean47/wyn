@@ -345,6 +345,16 @@ struct GameCatalogTests {
         #expect(session.aiCount == 7)
     }
 
+    /// DirectDraw/D3D7 on wined3d. Pinning d3dmetal/dxvk/dxmt replaces the
+    /// working builtin. The measured session is the 1024x768 window, not 1080p.
+    @Test func armyMenLeavesTranslationLayerUnsetAndStaysInTheSmallWindow() throws {
+        let profile = try #require(ProfileStore.profile(id: "army-men-rts"))
+        #expect(profile.bottle?.translationLayer == nil)
+        #expect(profile.environment["WINEDLLOVERRIDES"] == nil)
+        #expect(profile.launchArgs == "-vidmode:1024x768 -h")
+        #expect(profile.status == .verified)
+    }
+
     @Test func newBatchProfilesLoad() {
         for slug in laterBatchSlugs {
             #expect(ProfileStore.profile(id: slug) != nil, "missing bundled profile \(slug)")
