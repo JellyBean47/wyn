@@ -312,9 +312,23 @@ final class LibraryVM: ObservableObject {
     /// Off by default because it costs exclusive fullscreen. Size is left empty
     /// so the launch asks the main display.
     func setVirtualDesktop(_ enabled: Bool, for item: BottleRowItem) {
-        let bottle = Bottle(bottleUrl: item.url)
-        guard bottle.settings.virtualDesktop != enabled else { return }
-        bottle.settings.virtualDesktop = enabled
+        let target = Bottle(bottleUrl: item.url)
+        guard target.settings.virtualDesktop != enabled else { return }
+        target.settings.virtualDesktop = enabled
+
+        // The launcher launches with `self.bottle`, the instance loaded when the
+        // app opened — not with the one just written above. Writing the plist
+        // through a second `Bottle` left that copy stale, so the toggle only
+        // took effect after restarting Wyn.app.
+        //
+        // Measured 12 Sep 2026: the setting was written at 16:14:51, a Steam
+        // launch followed at 16:15:03, and the launch still came out as plain
+        // `start /d … /unix …` with no `explorer /desktop=`. Twelve seconds
+        // apart, and the wrapper was missing because the in-memory copy still
+        // said false. Keep the cached instance in step.
+        if bottle?.url == item.url {
+            bottle?.settings.virtualDesktop = enabled
+        }
         refreshBottles()
     }
 
