@@ -144,6 +144,12 @@ public struct ProfileBottleOverrides: Codable, Sendable {
     public var dxrEnabled: Bool?
     public var avxEnabled: Bool?
     public var metalHud: Bool?
+    /// Run inside Wine's own desktop instead of a native macOS window. A title
+    /// that dies or goes black on alt-tab wants this — see
+    /// `BottleWineConfig.virtualDesktop`.
+    public var virtualDesktop: Bool?
+    /// `WxH` for that desktop; nil or empty asks the main display.
+    public var virtualDesktopSize: String?
 
     public init(
         windowsVersion: WinVersion? = nil,
@@ -153,7 +159,9 @@ public struct ProfileBottleOverrides: Codable, Sendable {
         dxvkAsync: Bool? = nil,
         dxrEnabled: Bool? = nil,
         avxEnabled: Bool? = nil,
-        metalHud: Bool? = nil
+        metalHud: Bool? = nil,
+        virtualDesktop: Bool? = nil,
+        virtualDesktopSize: String? = nil
     ) {
         self.windowsVersion = windowsVersion
         self.translationLayer = translationLayer
@@ -163,5 +171,7 @@ public struct ProfileBottleOverrides: Codable, Sendable {
         self.dxrEnabled = dxrEnabled
         self.avxEnabled = avxEnabled
         self.metalHud = metalHud
+        self.virtualDesktop = virtualDesktop
+        self.virtualDesktopSize = virtualDesktopSize
     }
 }

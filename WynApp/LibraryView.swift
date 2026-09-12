@@ -301,6 +301,15 @@ struct LibraryView: View {
                                 Text(layer.displayName).tag(layer)
                             }
                         }
+                        Divider()
+                        // For a game that goes black or quits when you alt-tab.
+                        // Trades exclusive fullscreen for a surface that a focus
+                        // change cannot take away.
+                        Toggle("Run in a Wine desktop", isOn: Binding(
+                            get: { item.virtualDesktop },
+                            set: { vm.setVirtualDesktop($0, for: item) }
+                        ))
+                        .help("Survives alt-tab. Full-screen size, but not exclusive fullscreen.")
                     }
                 }
 
