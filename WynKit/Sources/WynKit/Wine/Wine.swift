@@ -167,6 +167,11 @@ public class Wine {
         /// The library overlay uses this so Play / the Steam tile are not stuck until
         /// the process quits.
         public var detachAfterStart: Bool
+        /// Run inside Wine's own desktop for this launch, overriding the
+        /// bottle's `virtualDesktop` toggle. Launch-scoped on purpose: a profile
+        /// that needs a desktop must not leave one switched on for the next game
+        /// in the same bottle.
+        public var virtualDesktopOverride: VirtualDesktop?
 
         public init(
             debug: Bool = false,
@@ -177,7 +182,8 @@ public class Wine {
             preferD3DMetalAuth: Bool = false,
             preferFrankeaSteam: Bool = false,
             preferGPTKSteam: Bool = false,
-            detachAfterStart: Bool = false
+            detachAfterStart: Bool = false,
+            virtualDesktopOverride: VirtualDesktop? = nil
         ) {
             self.debug = debug
             self.echoOutput = echoOutput
@@ -188,6 +194,7 @@ public class Wine {
             self.preferFrankeaSteam = preferFrankeaSteam
             self.preferGPTKSteam = preferGPTKSteam
             self.detachAfterStart = detachAfterStart
+            self.virtualDesktopOverride = virtualDesktopOverride
         }
     }
 
@@ -306,10 +313,21 @@ public class Wine {
         // `wine start /unix` alone leaves CWD as Wine's bin dir → missing .uproject.
         let workDir = url.deletingLastPathComponent()
         let workDirWin = windowsPath(for: workDir, in: bottle)
-        var startArgs = ["start", "/d", workDirWin, "/unix", url.path(percentEncoded: false)]
-        startArgs.append(contentsOf: args)
+        // A game that goes black or dies on alt-tab can be put inside Wine's own
+        // desktop, where there is no native surface for a focus change to
+        // destroy. Launch-scoped like every other profile knob, and the `start
+        // /d` above stays inside it so CWD survives.
+        let desktop = options.virtualDesktopOverride
+            ?? virtualDesktop(for: bottle.settings, exe: url)
+        let startArgs = launchArgumentVector(
+            exe: url, args: args, workDirWin: workDirWin, virtualDesktop: desktop
+        )
 
         if options.debug {
+            if let desktop {
+                print("[wyn:debug] Wine virtual desktop: \(desktop.name),\(desktop.size)")
+                print("[wyn:debug] no exclusive fullscreen — that is the point; alt-tab is survivable")
+            }
             print("[wyn:debug] wine start /d \(workDirWin)")
             print("[wyn:debug] exe: \(url.path(percentEncoded: false))")
         }
