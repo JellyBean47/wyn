@@ -27,6 +27,12 @@ jobs:
       - name: Test WynKit
         working-directory: WynKit
         run: swift test
+      # Compiles fly-mvkshim and asserts its export list is exactly the nine
+      # Vulkan entry points it interposes — an extra export would shadow a real
+      # MoltenVK function with one that forwards nowhere. Needs only clang, so
+      # it is not gated on the mingw-w64 that build-helpers.sh wants.
+      - name: Build fly-mvkshim
+        run: ./scripts/build-mvkshim.sh
       # Do not download Wine or GPTK on CI. Do not upload Libraries.tar.gz.
 
   website:

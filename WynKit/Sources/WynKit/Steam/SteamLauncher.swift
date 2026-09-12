@@ -1057,6 +1057,12 @@ public enum SteamLauncher {
 
         try await waitOutPreviousD3DMetalSession(profile: profile, bottle: bottle)
 
+        // Vulkan-native titles need the MoltenVK feature shim in place before
+        // the process starts; there is no recovering from
+        // VK_ERROR_FEATURE_NOT_PRESENT once the game has given up. A no-op for
+        // every D3D title, and idempotent when it is already installed.
+        ProfileApplicator.prepareVulkanShim(profile: profile)
+
         var options = options
         if profile.needsUbisoftConnectPlay,
            ubisoftConnectForcesFrankea(options: options) {

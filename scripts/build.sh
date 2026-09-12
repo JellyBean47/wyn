@@ -27,6 +27,9 @@ swift build -c release
 # checkout — which an installed app must not rely on.
 echo "==> native helpers (Tools/bin, not committed)"
 "$ROOT/scripts/build-helpers.sh"
+# Separate script: this one needs no mingw-w64, and a Vulkan title should not
+# be gated on a Windows cross-compiler being installed.
+"$ROOT/scripts/build-mvkshim.sh"
 
 echo "==> xcodebuild Wyn.app (ad-hoc sign)"
 xcodebuild -project Wyn.xcodeproj -scheme Wyn -configuration Release \
@@ -50,6 +53,7 @@ HELPERS=(
   fly_stretch_epi_bridge.fast.dylib
   present_force_inject.dylib
   winemac_rtld_global.dylib
+  fly_mvkshim.dylib
 )
 copied=0
 for helper in "${HELPERS[@]}"; do

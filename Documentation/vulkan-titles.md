@@ -62,9 +62,44 @@ fly-mvkshim: active; real library …/Wine/lib/libMoltenVK.real.dylib
 fly-mvkshim: vkCreateDevice: dropped forced features from the request -> VK_SUCCESS
 ```
 
-**Wyn does not ship this.** The only copy on this machine is an Aug 2026 binary
-(135,200 bytes, md5 `e8e03ea1b3976f1db16580f5dc3e0bcd`, universal) recovered
-from a parked `Libraries.vk` tree; no source exists on disk. Youngblood and
+**Wyn ships this, as source.** `Tools/fly_mvkshim.c`, built by
+`scripts/build-mvkshim.sh` into `Tools/bin/fly_mvkshim.dylib` (universal,
+`@rpath/libMoltenVK.dylib` install name, exactly nine exports — CI checks the
+list), bundled into `Wyn.app/Contents/Resources` by `scripts/build.sh`, and
+installed into the launching tree by
+`WynWineInstaller.ensureVulkanFeatureShim`. `ProfileApplicator.prepareVulkanShim`
+calls it from `SteamLauncher.launchGame` for any profile
+`ProfileValidator.isVulkanNative` recognises, so a Vulkan title no longer needs a
+hand-copied dylib and the catalog claim no longer depends on one.
+
+It was written from scratch against the published Vulkan specification, and it
+replaces an Aug 2026 binary (135,200 bytes, md5
+`e8e03ea1b3976f1db16580f5dc3e0bcd`, universal) recovered from a parked
+`Libraries.vk` tree for which **no source ever existed on disk**. That binary
+was found inside a CrossOver 26.2.0 tree, which is worth stating plainly since
+the location invites the wrong conclusion: it carried this project's own
+`FLY_MVKSHIM_*` namespace, exported nine symbols against CrossOver's
+556-export patched MoltenVK, contained no CodeWeavers strings, and
+`FLY_MVKSHIM` appears nowhere in CodeWeavers' published source dump. The tree
+was where it was stored, not where it came from. Nothing CodeWeavers wrote is
+in Wyn.
+
+`Tools/fly_mvkshim_probe.c` re-runs the proof rather than asking you to trust
+it: it does what id Tech does at startup — create an instance, take the first
+device, ask for `depthBounds` and `shaderCullDistance`, then request them in
+`vkCreateDevice`. Against stock MoltenVK 1.4.1 on an Apple M4 it prints
+`VK_ERROR_FEATURE_NOT_PRESENT` (exit 1); through the shim, `VK_SUCCESS`
+(exit 0).
+
+```sh
+clang -arch x86_64 -O2 -o /tmp/probe Tools/fly_mvkshim_probe.c
+arch -x86_64 /tmp/probe "<tree>/Wine/lib/libMoltenVK.real.dylib"   # expect exit 1
+FLY_MVKSHIM_REAL="<tree>/Wine/lib/libMoltenVK.real.dylib" \
+  arch -x86_64 /tmp/probe Tools/bin/fly_mvkshim.dylib              # expect exit 0
+```
+
+x86_64 because the MoltenVK in both live Wine trees is x86_64-only — Wine runs
+that side. Youngblood and
 DOOM (2016) are bundled as verified with notes that name the shim. Shipping
 the shim (installed by `WynWineInstaller`, selected per profile) is the
 remaining feature. See
