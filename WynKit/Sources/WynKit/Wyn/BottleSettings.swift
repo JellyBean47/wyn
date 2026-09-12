@@ -98,25 +98,6 @@ public struct BottleWineConfig: Codable, Equatable {
     var enhancedSync: EnhancedSync = .msync
     var avxEnabled: Bool = false
 
-    /// Run the game inside Wine's own desktop window instead of letting it own
-    /// a native macOS window.
-    ///
-    /// Why this exists: a title in exclusive fullscreen tears its surface down
-    /// when macOS focus changes, and winemac hands the rebuilt surface a *new*
-    /// `WineMetalView`. Measured on DOOM (2016), 12 Sep 2026: alt-tab produced a
-    /// second `Created 2 swapchain images … WineMetalView (0x60000388aac0)` next
-    /// to the startup view `(0x600003891f20)`, no errors anywhere, and the game
-    /// went on rendering at 206% CPU into the view that was no longer on screen
-    /// — black screen, window gone. Inside a Wine desktop there is no native
-    /// surface to lose, so a focus change is a non-event.
-    ///
-    /// Off by default: it costs exclusive fullscreen (no display mode switch),
-    /// so it is a fix to reach for, not a default to impose.
-    var virtualDesktop: Bool = false
-
-    /// `WxH` for the desktop window. Empty means "ask the main display".
-    var virtualDesktopSize: String = ""
-
     public init() {}
 
     // swiftlint:disable line_length
@@ -126,8 +107,6 @@ public struct BottleWineConfig: Codable, Equatable {
         self.windowsVersion = try container.decodeIfPresent(WinVersion.self, forKey: .windowsVersion) ?? .win10
         self.enhancedSync = try container.decodeIfPresent(EnhancedSync.self, forKey: .enhancedSync) ?? .msync
         self.avxEnabled = try container.decodeIfPresent(Bool.self, forKey: .avxEnabled) ?? false
-        self.virtualDesktop = try container.decodeIfPresent(Bool.self, forKey: .virtualDesktop) ?? false
-        self.virtualDesktopSize = try container.decodeIfPresent(String.self, forKey: .virtualDesktopSize) ?? ""
     }
     // swiftlint:enable line_length
 }
@@ -227,18 +206,6 @@ public struct BottleSettings: Codable, Equatable {
     public var avxEnabled: Bool {
         get { return wineConfig.avxEnabled }
         set { wineConfig.avxEnabled = newValue }
-    }
-
-    /// Run inside Wine's own desktop window — see `BottleWineConfig.virtualDesktop`.
-    public var virtualDesktop: Bool {
-        get { return wineConfig.virtualDesktop }
-        set { wineConfig.virtualDesktop = newValue }
-    }
-
-    /// `WxH` for that desktop. Empty asks the main display.
-    public var virtualDesktopSize: String {
-        get { return wineConfig.virtualDesktopSize }
-        set { wineConfig.virtualDesktopSize = newValue }
     }
 
     /// The pinned programs on this bottle

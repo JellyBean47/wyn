@@ -58,12 +58,6 @@ public enum ProfileApplicator {
         if let hud = overrides.metalHud {
             settings.metalHud = hud
         }
-        if let desktop = overrides.virtualDesktop {
-            settings.virtualDesktop = desktop
-        }
-        if let size = overrides.virtualDesktopSize, !size.isEmpty {
-            settings.virtualDesktopSize = size
-        }
         return settings
     }
 

@@ -303,21 +303,6 @@ final class LibraryVM: ObservableObject {
         refreshBottles()
     }
 
-    /// A game in exclusive fullscreen loses its native surface when macOS
-    /// focus changes, and winemac hands the rebuilt one a different
-    /// WineMetalView — the game then renders into a view that is not on screen
-    /// (measured on DOOM, 12 Sep 2026: black screen at 206% CPU). Inside Wine's
-    /// own desktop there is no native surface to lose.
-    ///
-    /// Off by default because it costs exclusive fullscreen. Size is left empty
-    /// so the launch asks the main display.
-    func setVirtualDesktop(_ enabled: Bool, for item: BottleRowItem) {
-        let bottle = Bottle(bottleUrl: item.url)
-        guard bottle.settings.virtualDesktop != enabled else { return }
-        bottle.settings.virtualDesktop = enabled
-        refreshBottles()
-    }
-
     func openCDrive(for item: BottleRowItem) {
         let drive = item.url.appending(path: "drive_c")
         guard FileManager.default.fileExists(atPath: drive.path(percentEncoded: false)) else {
