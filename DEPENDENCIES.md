@@ -37,6 +37,45 @@ binaries. See [Documentation/user/game-host.md](Documentation/user/game-host.md)
 
 - **Source:** https://github.com/dappermint/winecx (`wine1115`)
 - **Pins:** `WINECX_COMMIT` / `NIXPKGS_REV` in `scripts/runtime-pins.env`
+- **What that repo actually is** (checked 12 Sep 2026 — it is *not* a mirror of
+  CodeWeavers' published source, and this file used to imply that it was). It is
+  a third-party forward-port, and its own commit messages say so:
+
+  ```
+  synthetic base: wine 11.0
+  wine 11.15
+  crossover 26.3 on wine 11.0
+  merge wine 11.15 into crossover 26.3
+  apply the winecx-gptk patch set
+  + 13 fix-up commits for the 11.15 port
+  ```
+
+  So: CrossOver **26.3**'s Wine tree merged forward onto upstream Wine 11.15.
+  `VERSION` says `Wine version 11.15`; CodeWeavers' 26.2.0 dump says
+  `Wine version 11.0`. The history is synthetic — 18 commits, all one day —
+  so git history cannot be used to audit it. Only a tree diff can.
+
+  **Licensing.** Upstream Wine is LGPL-2.1-or-later and CodeWeavers publishes
+  CrossOver's Wine source under LGPL-2.1 (that publication *is* their compliance
+  channel: https://www.codeweavers.com/crossover/source). A forward-port of LGPL
+  onto LGPL is LGPL-2.1, and the repo ships `COPYING.LIB`. No proprietary or
+  "not for redistribution" notices are in it beyond the usual Wine SDK headers.
+
+  **Verified locally** against `crossover-sources-26.2.0.tar.gz`: the
+  `CX_APPLEGPTK_LIBD3DSHARED_PATH` hook is in `dlls/ntdll/unix/loader.c` in both
+  and the `init_non_native_support` block is byte-identical; and every
+  `CX_*` / `CROSSOVER*` identifier in `dlls/ntdll`, `dlls/winemac.drv` and
+  `server` — 13 of them — appears in both trees, with **none unique to the
+  mirror**. The CrossOver code in it is CodeWeavers' published LGPL code.
+
+  **Not verified, and the one check left:** that the `crossover 26.3 on wine
+  11.0` commit's full tree matches CodeWeavers' published **26.3** dump. The
+  mirror is based on 26.3 and only 26.1.0 / 26.2.0 are on this machine. Fetch
+  the official 26.3 source tarball and diff it against that commit to close it.
+
+  Exposure is bounded either way: Wyn never redistributes this build.
+  `build-foss-game-host.sh` compiles it on the user's own machine, so Wyn is not
+  a distributor of it and LGPL-2.1's source-offer obligation does not attach.
 - **Build:** `./scripts/build-foss-game-host.sh` (mingw-w64 gcc, not llvm-mingw)
 - **Install:** `wyn runtime install --gptk-aware --directory <wine-root>`
   or `./scripts/install-foss-game-host.sh --directory …`
