@@ -305,11 +305,19 @@ struct LibraryView: View {
                         // For a game that goes black or quits when you alt-tab.
                         // Trades exclusive fullscreen for a surface that a focus
                         // change cannot take away.
-                        Toggle("Run in a Wine desktop", isOn: Binding(
-                            get: { item.virtualDesktop },
+                        Picker("Wine desktop", selection: Binding(
+                            get: { item.virtualDesktopMode },
                             set: { vm.setVirtualDesktop($0, for: item) }
-                        ))
-                        .help("Survives alt-tab. Full-screen size, but not exclusive fullscreen.")
+                        )) {
+                            ForEach(VirtualDesktopMode.allCases, id: \.self) { mode in
+                                Text(mode.displayName).tag(mode)
+                            }
+                        }
+                        .help("""
+                        For a game that goes black or quits when you alt-tab. \
+                        Full-screen size, but not exclusive fullscreen. \
+                        A game Steam launches needs "Whole bottle".
+                        """)
                     }
                 }
 

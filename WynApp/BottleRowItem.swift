@@ -37,9 +37,9 @@ struct BottleRowItem: Identifiable, Hashable {
     /// False until something has run in the bottle and Wine has built the
     /// prefix. Worth showing, so an empty new bottle does not look broken.
     let isInitialised: Bool
-    /// Whether launches in this bottle run inside Wine's own desktop — the
-    /// answer to a game that goes black or dies on alt-tab.
-    let virtualDesktop: Bool
+    /// Where launches in this bottle put their windows — the answer to a game
+    /// that goes black or dies on alt-tab.
+    let virtualDesktopMode: VirtualDesktopMode
 
     init(_ bottle: Bottle) {
         self.id = bottle.url
@@ -51,7 +51,7 @@ struct BottleRowItem: Identifiable, Hashable {
         self.isInitialised = FileManager.default.fileExists(
             atPath: bottle.url.appending(path: "drive_c").path(percentEncoded: false)
         )
-        self.virtualDesktop = bottle.settings.virtualDesktop
+        self.virtualDesktopMode = bottle.settings.virtualDesktopMode
     }
 
     var subtitle: String {

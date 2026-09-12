@@ -107,23 +107,51 @@ struct VirtualDesktopTests {
 
     @Test func offByDefaultSoNobodyLosesExclusiveFullscreen() {
         let settings = BottleSettings()
-        #expect(settings.virtualDesktop == false)
+        #expect(settings.virtualDesktopMode == .off)
         #expect(Wine.virtualDesktop(for: settings, exe: exe) == nil)
+        #expect(Wine.bottleVirtualDesktop(for: settings) == nil)
     }
 
-    @Test func enablingItUsesTheConfiguredSize() {
+    @Test func launchModeWrapsThisLaunchWithTheConfiguredSize() {
         var settings = BottleSettings()
-        settings.virtualDesktop = true
+        settings.virtualDesktopMode = .launch
         settings.virtualDesktopSize = "1024x768"
         #expect(Wine.virtualDesktop(for: settings, exe: exe)
                 == Wine.VirtualDesktop(name: "doomx64", size: "1024x768"))
+        // Prefix-wide is a different mechanism and must stay out of it.
+        #expect(Wine.bottleVirtualDesktop(for: settings) == nil)
+    }
+
+    /// `.bottle` is the mode for a game Steam spawns: Wyn never runs that
+    /// process, so there is nothing to wrap and the registry has to carry it.
+    /// The wrapper must *not* also apply, or the game lands in a desktop inside
+    /// a desktop.
+    @Test func bottleModeUsesTheRegistryAndNotTheWrapper() {
+        var settings = BottleSettings()
+        settings.virtualDesktopMode = .bottle
+        settings.virtualDesktopSize = "1920x1080"
+        #expect(Wine.virtualDesktop(for: settings, exe: exe) == nil)
+        #expect(Wine.bottleVirtualDesktop(for: settings)
+                == Wine.VirtualDesktop(name: "wyn", size: "1920x1080"))
+    }
+
+    /// One name per bottle, not per executable: the registry value is shared by
+    /// every process in the prefix, so a per-exe name would be a lie.
+    @Test func theBottleWideDesktopHasOneStableName() {
+        var settings = BottleSettings()
+        settings.virtualDesktopMode = .bottle
+        let a = Wine.bottleVirtualDesktop(for: settings)
+        settings.virtualDesktopSize = "1280x720"
+        let b = Wine.bottleVirtualDesktop(for: settings)
+        #expect(a?.name == b?.name)
+        #expect(b?.size == "1280x720")
     }
 
     /// An unparseable or empty size must not disable the setting the person
     /// asked for — fall back to the display and still give them a desktop.
     @Test func abadSizeFallsBackToTheDisplayRatherThanOff() {
         var settings = BottleSettings()
-        settings.virtualDesktop = true
+        settings.virtualDesktopMode = .launch
         for size in ["", "garbage", "0x0"] {
             settings.virtualDesktopSize = size
             let resolved = Wine.virtualDesktop(for: settings, exe: exe)
@@ -139,17 +167,17 @@ struct VirtualDesktopTests {
         let profile = GameProfile(
             id: "doom-2016", name: "DOOM", steamAppId: 379_720,
             exePatterns: ["doomx64.exe"],
-            bottle: ProfileBottleOverrides(virtualDesktop: true, virtualDesktopSize: "1920x1080"),
+            bottle: ProfileBottleOverrides(virtualDesktopMode: .bottle, virtualDesktopSize: "1920x1080"),
             environment: [:], launchArgs: nil, notes: "note", status: .verified
         )
         let settings = ProfileApplicator.launchSettings(profile: profile, bottle: bottle)
-        #expect(settings.virtualDesktop)
+        #expect(settings.virtualDesktopMode == .bottle)
         #expect(settings.virtualDesktopSize == "1920x1080")
     }
 
     @Test func aProfileThatSaysNothingLeavesTheBottleAlone() {
         let bottle = Bottle(bottleUrl: URL(fileURLWithPath: "/tmp/vd-\(UUID().uuidString)"))
-        bottle.settings.virtualDesktop = true
+        bottle.settings.virtualDesktopMode = .launch
         bottle.settings.virtualDesktopSize = "1280x720"
         let profile = GameProfile(
             id: "x", name: "X", steamAppId: 1, exePatterns: ["x.exe"],
@@ -157,7 +185,7 @@ struct VirtualDesktopTests {
             environment: [:], launchArgs: nil, notes: "note", status: .guessed
         )
         let settings = ProfileApplicator.launchSettings(profile: profile, bottle: bottle)
-        #expect(settings.virtualDesktop)
+        #expect(settings.virtualDesktopMode == .launch)
         #expect(settings.virtualDesktopSize == "1280x720")
     }
 
@@ -166,7 +194,35 @@ struct VirtualDesktopTests {
     @Test func olderBottleJSONDecodesWithItOff() throws {
         let json = #"{"windowsVersion":"win10","enhancedSync":"msync"}"#
         let config = try JSONDecoder().decode(BottleWineConfig.self, from: Data(json.utf8))
-        #expect(config.virtualDesktop == false)
+        #expect(config.virtualDesktopMode == .off)
         #expect(config.virtualDesktopSize.isEmpty)
+    }
+
+    /// The first build shipped `virtualDesktop: Bool`. Someone who had turned
+    /// that on meant "wrap the launch", so it migrates to `.launch` rather than
+    /// silently switching itself off under them.
+    @Test func theLegacyBooleanMigratesToLaunchMode() throws {
+        let on = #"{"windowsVersion":"win10","virtualDesktop":true}"#
+        #expect(try JSONDecoder().decode(BottleWineConfig.self, from: Data(on.utf8))
+                .virtualDesktopMode == .launch)
+
+        let off = #"{"windowsVersion":"win10","virtualDesktop":false}"#
+        #expect(try JSONDecoder().decode(BottleWineConfig.self, from: Data(off.utf8))
+                .virtualDesktopMode == .off)
+
+        // An explicit mode wins over the legacy boolean.
+        let both = #"{"virtualDesktop":true,"virtualDesktopMode":"bottle"}"#
+        #expect(try JSONDecoder().decode(BottleWineConfig.self, from: Data(both.utf8))
+                .virtualDesktopMode == .bottle)
+    }
+
+    /// The old boolean is not written back, so a reader never gets two answers.
+    @Test func encodingWritesTheModeAndNotTheLegacyBoolean() throws {
+        var config = BottleWineConfig()
+        config.virtualDesktopMode = .bottle
+        let json = String(data: try JSONEncoder().encode(config), encoding: .utf8) ?? ""
+        #expect(json.contains("virtualDesktopMode"))
+        #expect(json.contains("\"bottle\""))
+        #expect(!json.contains("\"virtualDesktop\":"))
     }
 }

@@ -317,6 +317,14 @@ public class Wine {
         // desktop, where there is no native surface for a focus change to
         // destroy. Launch-scoped like every other profile knob, and the `start
         // /d` above stays inside it so CWD survives.
+        // Prefix-wide mode works through the registry, not the argument vector,
+        // because that is the only thing a game Steam spawns will read.
+        // Reconciled in both directions on every launch: turning the setting
+        // back Off has to remove the value, or a desktop nobody asked for
+        // outlives the setting.
+        await reconcileBottleVirtualDesktop(
+            bottleVirtualDesktop(for: bottle.settings), bottle: bottle
+        )
         let desktop = options.virtualDesktopOverride
             ?? virtualDesktop(for: bottle.settings, exe: url)
         let startArgs = launchArgumentVector(

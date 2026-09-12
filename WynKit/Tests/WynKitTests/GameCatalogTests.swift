@@ -216,10 +216,13 @@ struct GameCatalogTests {
     @Test func everyBundledGameProfileIsTracked() {
         let catalog = GameCatalog.load()
         let listed = Set(catalog.games.flatMap(\.profiles))
-        let userAdded = ProfileStore.userProfileIDs()
-        let bundled = ProfileStore.loadAll().filter {
-            $0.id != "steam" && !userAdded.contains($0.id)
-        }
+        // Read the bundled profiles once, rather than reading `loadAll()` and
+        // subtracting a separately-read `userProfileIDs()`. Those are two reads
+        // of the real user Profiles directory, and a test writing a
+        // `user-added-*.json` in between lands in the second and not the first —
+        // so it arrives here looking like a shipped profile with no catalog
+        // entry. Reproduced ~1 run in 4 on 12 Sep 2026.
+        let bundled = ProfileStore.loadBundledProfiles().filter { $0.id != "steam" }
 
         for profile in bundled {
             let filename = "\(profile.id).json"

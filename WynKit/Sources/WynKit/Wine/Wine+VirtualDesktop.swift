@@ -20,6 +20,7 @@
 //
 
 import Foundation
+import os.log
 #if canImport(AppKit)
 import AppKit
 #endif
@@ -94,11 +95,69 @@ extension Wine {
         return name.isEmpty ? "wyn" : String(name.prefix(24))
     }
 
-    /// Resolve the setting into a desktop to use, or nil for "native window".
+    /// The desktop to wrap *this* launch in — `.launch` mode only.
+    ///
+    /// `.bottle` deliberately returns nil here: that mode works through the
+    /// prefix registry instead, so the wrapper must not also be applied or the
+    /// game ends up in a desktop inside a desktop.
     static func virtualDesktop(for settings: BottleSettings, exe: URL) -> VirtualDesktop? {
-        guard settings.virtualDesktop else { return nil }
+        guard settings.virtualDesktopMode == .launch else { return nil }
         let size = parseVirtualDesktopSize(settings.virtualDesktopSize) ?? mainDisplaySize()
         return VirtualDesktop(name: virtualDesktopName(for: exe), size: size)
+    }
+
+    /// The prefix-wide desktop for `.bottle` mode, or nil when that is not the
+    /// mode. One stable name per bottle, not per executable: the registry value
+    /// is shared by every process in the prefix.
+    static func bottleVirtualDesktop(for settings: BottleSettings) -> VirtualDesktop? {
+        guard settings.virtualDesktopMode == .bottle else { return nil }
+        let size = parseVirtualDesktopSize(settings.virtualDesktopSize) ?? mainDisplaySize()
+        return VirtualDesktop(name: "wyn", size: size)
+    }
+
+    /// Bring `HKCU\Software\Wine\Explorer` in line with the bottle's mode.
+    ///
+    /// Done with a live `reg add` rather than by patching `user.reg`, because
+    /// Steam is usually already running and a file patch under a live wineserver
+    /// is lost when it flushes.
+    ///
+    /// This is what reaches a Steam-launched game. Each Windows process reads
+    /// that key at startup, so writing it before `steam.exe -applaunch` is
+    /// enough — Steam does not need restarting, even though its own window
+    /// stays where it already was.
+    ///
+    /// Reconciled on every launch, in both directions: switching back to Off
+    /// has to *remove* the value, or a desktop nobody asked for outlives the
+    /// setting.
+    static func reconcileBottleVirtualDesktop(
+        _ desktop: VirtualDesktop?, bottle: Bottle
+    ) async {
+        let explorer = #"HKCU\Software\Wine\Explorer"#
+        do {
+            if let desktop {
+                try await runWine(
+                    ["reg", "add", #"HKCU\Software\Wine\Explorer\Desktops"#,
+                     "-v", desktop.name, "-t", "REG_SZ", "-d", desktop.size, "-f"],
+                    bottle: bottle
+                )
+                try await runWine(
+                    ["reg", "add", explorer,
+                     "-v", "Desktop", "-t", "REG_SZ", "-d", desktop.name, "-f"],
+                    bottle: bottle
+                )
+            } else {
+                // Absent is the goal, so a failure here usually means it was
+                // already absent. Never fail a launch over it.
+                try? await runWine(
+                    ["reg", "delete", explorer, "-v", "Desktop", "-f"],
+                    bottle: bottle
+                )
+            }
+        } catch {
+            Logger.wynKit.warning(
+                "virtual desktop registry reconcile failed: \(error.localizedDescription)"
+            )
+        }
     }
 
     /// The `wine` argument vector for a launch.

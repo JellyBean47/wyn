@@ -311,10 +311,10 @@ final class LibraryVM: ObservableObject {
     ///
     /// Off by default because it costs exclusive fullscreen. Size is left empty
     /// so the launch asks the main display.
-    func setVirtualDesktop(_ enabled: Bool, for item: BottleRowItem) {
+    func setVirtualDesktop(_ mode: VirtualDesktopMode, for item: BottleRowItem) {
         let target = Bottle(bottleUrl: item.url)
-        guard target.settings.virtualDesktop != enabled else { return }
-        target.settings.virtualDesktop = enabled
+        guard target.settings.virtualDesktopMode != mode else { return }
+        target.settings.virtualDesktopMode = mode
 
         // The launcher launches with `self.bottle`, the instance loaded when the
         // app opened — not with the one just written above. Writing the plist
@@ -327,7 +327,7 @@ final class LibraryVM: ObservableObject {
         // apart, and the wrapper was missing because the in-memory copy still
         // said false. Keep the cached instance in step.
         if bottle?.url == item.url {
-            bottle?.settings.virtualDesktop = enabled
+            bottle?.settings.virtualDesktopMode = mode
         }
         refreshBottles()
     }

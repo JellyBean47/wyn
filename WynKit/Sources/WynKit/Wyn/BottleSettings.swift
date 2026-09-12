@@ -91,6 +91,36 @@ public enum EnhancedSync: String, Codable, Equatable, Sendable {
     case msync
 }
 
+/// Where a launch's windows live.
+///
+/// A game in exclusive fullscreen loses its native surface when macOS focus
+/// changes, and winemac hands the rebuilt one a different `WineMetalView` — the
+/// game then renders into a view that is no longer on screen. Measured on DOOM
+/// (2016) 12 Sep 2026: black screen at 206% CPU, window gone, no errors logged.
+/// Inside a Wine desktop there is no native surface to lose.
+public enum VirtualDesktopMode: String, Codable, Equatable, Sendable, CaseIterable {
+    /// Native macOS windows. Exclusive fullscreen works; alt-tab may not.
+    case off
+    /// Wrap what Wyn launches in `explorer /desktop=`. Covers titles Wyn starts
+    /// directly — but **not** a game Steam spawns from `-applaunch`, because Wyn
+    /// never runs that process.
+    case launch
+    /// Set the desktop in the prefix registry, so *every* process in the bottle
+    /// gets one — including a game Steam launches. Each process reads
+    /// `HKCU\Software\Wine\Explorer` at startup, so this reaches
+    /// Steam-spawned titles without restarting Steam. The cost is that Steam's
+    /// own window lands in a desktop too.
+    case bottle
+
+    public var displayName: String {
+        switch self {
+        case .off: return "Off (native windows)"
+        case .launch: return "This launch only"
+        case .bottle: return "Whole bottle (needed for Steam-launched games)"
+        }
+    }
+}
+
 public struct BottleWineConfig: Codable, Equatable {
     static let defaultWineVersion = SemanticVersion(7, 7, 0)
     var wineVersion: SemanticVersion = Self.defaultWineVersion
@@ -98,24 +128,19 @@ public struct BottleWineConfig: Codable, Equatable {
     var enhancedSync: EnhancedSync = .msync
     var avxEnabled: Bool = false
 
-    /// Run the game inside Wine's own desktop window instead of letting it own
-    /// a native macOS window.
-    ///
-    /// Why this exists: a title in exclusive fullscreen tears its surface down
-    /// when macOS focus changes, and winemac hands the rebuilt surface a *new*
-    /// `WineMetalView`. Measured on DOOM (2016), 12 Sep 2026: alt-tab produced a
-    /// second `Created 2 swapchain images … WineMetalView (0x60000388aac0)` next
-    /// to the startup view `(0x600003891f20)`, no errors anywhere, and the game
-    /// went on rendering at 206% CPU into the view that was no longer on screen
-    /// — black screen, window gone. Inside a Wine desktop there is no native
-    /// surface to lose, so a focus change is a non-event.
-    ///
-    /// Off by default: it costs exclusive fullscreen (no display mode switch),
-    /// so it is a fix to reach for, not a default to impose.
-    var virtualDesktop: Bool = false
+    /// Where this bottle's launches put their windows. See `VirtualDesktopMode`.
+    var virtualDesktopMode: VirtualDesktopMode = .off
 
     /// `WxH` for the desktop window. Empty means "ask the main display".
     var virtualDesktopSize: String = ""
+
+    /// Spelled out because `virtualDesktop` is decode-only legacy — it has no
+    /// property any more, and synthesis cannot know about it.
+    enum CodingKeys: String, CodingKey {
+        case wineVersion, windowsVersion, enhancedSync, avxEnabled
+        case virtualDesktopMode, virtualDesktopSize
+        case virtualDesktop
+    }
 
     public init() {}
 
@@ -126,8 +151,32 @@ public struct BottleWineConfig: Codable, Equatable {
         self.windowsVersion = try container.decodeIfPresent(WinVersion.self, forKey: .windowsVersion) ?? .win10
         self.enhancedSync = try container.decodeIfPresent(EnhancedSync.self, forKey: .enhancedSync) ?? .msync
         self.avxEnabled = try container.decodeIfPresent(Bool.self, forKey: .avxEnabled) ?? false
-        self.virtualDesktop = try container.decodeIfPresent(Bool.self, forKey: .virtualDesktop) ?? false
+        // `virtualDesktop: Bool` shipped first. A bottle written by that build
+        // meant "wrap the launch", so migrate rather than silently switching it
+        // off under someone who had turned it on.
+        if let mode = try container.decodeIfPresent(VirtualDesktopMode.self, forKey: .virtualDesktopMode) {
+            self.virtualDesktopMode = mode
+        } else if try container.decodeIfPresent(Bool.self, forKey: .virtualDesktop) == true {
+            self.virtualDesktopMode = .launch
+        } else {
+            self.virtualDesktopMode = .off
+        }
         self.virtualDesktopSize = try container.decodeIfPresent(String.self, forKey: .virtualDesktopSize) ?? ""
+    }
+
+    /// Spelled out for the same reason as `CodingKeys`: the legacy
+    /// `virtualDesktop` case has no property, so encoding cannot be synthesised.
+    /// It is deliberately not written back — a bottle saved by this build
+    /// carries the mode, and re-emitting the old boolean would give the next
+    /// reader two answers.
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(wineVersion, forKey: .wineVersion)
+        try container.encode(windowsVersion, forKey: .windowsVersion)
+        try container.encode(enhancedSync, forKey: .enhancedSync)
+        try container.encode(avxEnabled, forKey: .avxEnabled)
+        try container.encode(virtualDesktopMode, forKey: .virtualDesktopMode)
+        try container.encode(virtualDesktopSize, forKey: .virtualDesktopSize)
     }
     // swiftlint:enable line_length
 }
@@ -229,10 +278,10 @@ public struct BottleSettings: Codable, Equatable {
         set { wineConfig.avxEnabled = newValue }
     }
 
-    /// Run inside Wine's own desktop window — see `BottleWineConfig.virtualDesktop`.
-    public var virtualDesktop: Bool {
-        get { return wineConfig.virtualDesktop }
-        set { wineConfig.virtualDesktop = newValue }
+    /// Where launches in this bottle put their windows.
+    public var virtualDesktopMode: VirtualDesktopMode {
+        get { return wineConfig.virtualDesktopMode }
+        set { wineConfig.virtualDesktopMode = newValue }
     }
 
     /// `WxH` for that desktop. Empty asks the main display.
