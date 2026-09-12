@@ -81,6 +81,42 @@ echo "==> installing Wyn.app → /Applications"
 rm -rf /Applications/Wyn.app
 ditto "$BUILT_APP" /Applications/Wyn.app
 
+# xcodebuild ends a Release build with RegisterWithLaunchServices on the build
+# product, so /tmp/WynDerivedData/.../Wyn.app becomes a real app as far as
+# Spotlight, Launchpad and every "choose an application" list are concerned.
+# After install there are then two Wyns with the same icon and name, the wrong
+# one is a build artifact, and picking it runs an app that will vanish on the
+# next `rm -rf /tmp`. Xcode's own Debug builds under ~/Library/Developer add
+# more of the same.
+#
+# So: unregister and delete the copies that are not the installed app. The
+# object files stay, so the next build is still incremental — only the bundle
+# is relinked.
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Support/lsregister"
+if [[ -x "$LSREGISTER" ]]; then
+  echo "==> unregistering build-product Wyn.app copies (Spotlight duplicates)"
+  while IFS= read -r stray; do
+    [[ "$stray" == "/Applications/Wyn.app" ]] && continue
+    "$LSREGISTER" -u "$stray" 2>/dev/null || true
+    # Only ever remove a build product, never something a person installed.
+    case "$stray" in
+      /private/tmp/WynDerivedData/*|/tmp/WynDerivedData/*|"$HOME"/Library/Developer/Xcode/DerivedData/*)
+        rm -rf "$stray"
+        echo "    removed $stray"
+        ;;
+      *)
+        # Not a build product, so not ours to delete — it may be a parked copy
+        # or a second install someone made on purpose. The registration is the
+        # only thing removed, and the path may not even exist any more (a stale
+        # registration for a deleted app also shows up in app pickers).
+        echo "    unregistered, not deleted: $stray"
+        ;;
+    esac
+  done < <("$LSREGISTER" -dump 2>/dev/null | grep -oE '/[^ ]*/Wyn\.app' | sort -u)
+  # Re-assert the installed one, since unregistering siblings can drop it too.
+  "$LSREGISTER" -f "/Applications/Wyn.app" 2>/dev/null || true
+fi
+
 # Keep the `wyn` on PATH in step with the build.
 #
 # install.sh used to be the only thing that placed it, and install.sh runs once.
