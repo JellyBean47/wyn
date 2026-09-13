@@ -28,24 +28,38 @@ export function resourceRoots(repoRoot) {
   };
 }
 
-// Profiles the shipped runtime cannot run even though their layer does not say
-// so. An unset `translationLayer` normally means Wine's own builtins — army-men
-// and New Vegas both measured as ddraw/d3d9 → wined3d → OpenGL, which is inside
-// the hash-pinned tarball. rdr2 is unset for the opposite reason: it runs on
-// vkd3d on a hand-built Libraries.rgl tree, which has no value in the enum and
-// is not something a download can provide.
+// Profiles the download cannot run for a reason the layer name does not carry.
+// Two different reasons live here, and the distinction matters to anyone
+// deciding whether to re-test:
 //
-// Enumerated by name on purpose, like the status ladders: a new profile that
-// needs a runtime Wyn does not ship has to be added here deliberately, and the
-// test below fails until it is.
-export const NEEDS_UNSHIPPED_RUNTIME = new Set(["rdr2"]);
+//   - no runtime ships that runs it at all (rdr2)
+//   - the shipped runtime is right there and the title was measured to fail on
+//     it (satisfactory-dxmt)
+//
+// An unset `translationLayer` decides neither on its own: army-men and New
+// Vegas are unset because they measured as ddraw/d3d9 → wined3d → OpenGL, which
+// is inside the tarball, while rdr2 is unset because vkd3d has no value in the
+// enum. Enumerated by name like the status ladders, so a new one has to be
+// added deliberately and the test fails until it is.
+export const NOT_RUNNABLE_FROM_DOWNLOAD = new Map([
+  [
+    "rdr2",
+    "Runs on vkd3d on a hand-built Libraries.rgl tree. No download provides it.",
+  ],
+  [
+    "satisfactory-dxmt",
+    "Measured 13 Sep 2026: RHIThread assert in PollQueryResults — DXMT supplies " +
+      "no timestamp calibration, so UE dereferences an unset TOptional one " +
+      "second after D3D11 init. Confirmed DXMT by adapter line and lsof.",
+  ],
+]);
 
 /// Whether the hash-pinned runtime the app downloads on first launch can run
 /// this profile. D3DMetal cannot be in the image — Apple's GPTK licence forbids
 /// redistribution, and the winecx game-host it needs is compiled locally — so a
 /// d3dmetal profile is a source install, not a download.
 export function profileRunsFromDownload(profile) {
-  if (NEEDS_UNSHIPPED_RUNTIME.has(profile.id)) return false;
+  if (NOT_RUNNABLE_FROM_DOWNLOAD.has(profile.id)) return false;
   return (profile.bottle?.translationLayer ?? null) !== "d3dmetal";
 }
 

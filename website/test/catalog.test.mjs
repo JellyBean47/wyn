@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { loadCatalog, filterGames, profileApiPayload, profileRunsFromDownload, downloadSupport } from '../lib/catalog.mjs';
-import { gamesPage, submitPage, gamePage, homePage, SUPPORT_PAGE_ENABLED, supportPage, DOWNLOAD_URL, SOURCE_URL, downloadBadge } from '../lib/html.mjs';
+import { loadCatalog, filterGames, profileApiPayload, profileRunsFromDownload, downloadSupport, NOT_RUNNABLE_FROM_DOWNLOAD } from '../lib/catalog.mjs';
+import { gamesPage, submitPage, gamePage, homePage, SUPPORT_PAGE_ENABLED, supportPage, DOWNLOAD_URL, SOURCE_URL } from '../lib/html.mjs';
 const data = loadCatalog(fileURLToPath(new URL('../../', import.meta.url)));
 test('catalog profile references resolve', () => assert.deepEqual(data.missingProfiles, []));
 test('launched titles are the ones with Mac evidence, not theoretical ports', () => {
@@ -91,7 +91,8 @@ test('the download claim is enumerated, not inferred from the layer alone', () =
   assert.deepEqual(by('runs'), [
     'army-men-rts', 'doom-2016', 'fallout-new-vegas', 'rv-there-yet', 'solarpunk', 'wolfenstein-youngblood',
   ]);
-  assert.deepEqual(by('source-install'), ['ac-odyssey', 'fallout-4', 'ready-or-not', 'witcher-3']);
+  assert.deepEqual(by('source-install'), ['ac-odyssey', 'fallout-4', 'ready-or-not', 'satisfactory', 'witcher-3']);
+  assert.deepEqual(by('untested'), []);
   assert.equal(data.counts.verifiedFromDownload, by('runs').length);
 
   // Solarpunk ships both a d3dmetal and a dxmt profile, and solarpunk-dxmt is
@@ -101,14 +102,16 @@ test('the download claim is enumerated, not inferred from the layer alone', () =
   assert.equal(downloadSupport(solarpunk), 'runs');
   assert.ok(solarpunk.profiles.some((p) => !profileRunsFromDownload(p)));
 
-  // Satisfactory is the reason there are three states rather than two: verified
-  // on d3dmetal, with a satisfactory-dxmt variant that is still guessed. The
-  // download might run it; nobody has shown that it does.
+  // Satisfactory was `untested` until 13 Sep 2026, when satisfactory-dxmt was
+  // actually run: RHIThread assert in PollQueryResults, on a launch confirmed
+  // as DXMT by the adapter line and by lsof. Measured-to-fail is not the same
+  // as no-runtime-for-it, so both reasons live in the map with their evidence.
   const satisfactory = data.bySlug.get('satisfactory');
   assert.equal(satisfactory.status, 'verified');
-  assert.equal(satisfactory.downloadSupport, 'untested');
-  assert.equal(data.profilesById.get('satisfactory-dxmt').status, 'guessed');
-  assert.equal(downloadBadge(satisfactory), '');
+  assert.equal(satisfactory.downloadSupport, 'source-install');
+  assert.match(NOT_RUNNABLE_FROM_DOWNLOAD.get('satisfactory-dxmt'), /PollQueryResults/);
+  assert.match(NOT_RUNNABLE_FROM_DOWNLOAD.get('rdr2'), /vkd3d/);
+  assert.equal(profileRunsFromDownload(data.profilesById.get('satisfactory-dxmt')), false);
 
   // rdr2 is the case a layer check alone gets wrong: no d3dmetal anywhere in
   // it, and still not runnable from the download.
