@@ -49,7 +49,7 @@ export const SUPPORT_PAGE_ENABLED = false;
 
 // Where the signed, notarized Wyn.dmg is published, or null while there is no
 // download. Set this to the release asset URL when the DMG goes up.
-export const DOWNLOAD_URL = null;
+export const DOWNLOAD_URL = "https://github.com/JellyBean47/wyn/releases/download/v1.0/Wyn.dmg";
 
 // GPL-3 §6(d): offering the source from the same place as the binary is what
 // makes distributing the binary lawful. These two are rendered together, and
