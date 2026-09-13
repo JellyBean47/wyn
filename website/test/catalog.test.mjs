@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { loadCatalog, filterGames, profileApiPayload } from '../lib/catalog.mjs';
-import { gamesPage, submitPage, gamePage, homePage, SUPPORT_PAGE_ENABLED, supportPage } from '../lib/html.mjs';
+import { gamesPage, submitPage, gamePage, homePage, SUPPORT_PAGE_ENABLED, supportPage, DOWNLOAD_URL, SOURCE_URL } from '../lib/html.mjs';
 const data = loadCatalog(fileURLToPath(new URL('../../', import.meta.url)));
 test('catalog profile references resolve', () => assert.deepEqual(data.missingProfiles, []));
 test('launched titles are the ones with Mac evidence, not theoretical ports', () => {
@@ -78,6 +78,21 @@ test('support page explains free app, guessed vs verified, and has no paywall ti
   assert.ok(html.includes('github.com/sponsors/JellyBean47'));
   assert.ok(html.includes('verified'));
   assert.ok(!html.includes('$7/month'));
+});
+test('the binary is never offered without its source', () => {
+  // GPL-3 §6(d): equivalent access to the source from the same place as the
+  // binary is what makes shipping the binary lawful. Whoever sets DOWNLOAD_URL
+  // must not be able to publish a download that stands alone, so assert the
+  // pairing on every page that can print it rather than trusting the copy.
+  const pages = [homePage(data), supportPage(data)];
+  for (const html of pages) {
+    if (!DOWNLOAD_URL || !html.includes(DOWNLOAD_URL)) continue;
+    assert.ok(html.includes(SOURCE_URL), 'a page offering the DMG must link the source');
+    assert.ok(/GPL-3\.0/.test(html), 'a page offering the DMG must name the license');
+  }
+  // Until the DMG exists, the source install is still the offer, and the home
+  // page has to say where it is.
+  assert.ok(homePage(data).includes(SOURCE_URL));
 });
 test('support is unpublished until SUPPORT_PAGE_ENABLED is true', () => {
   assert.equal(SUPPORT_PAGE_ENABLED, false);

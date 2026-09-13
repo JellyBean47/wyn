@@ -29,6 +29,8 @@ import {
   submitPage,
   SUPPORT_PAGE_ENABLED,
   supportPage,
+  DOWNLOAD_URL,
+  SOURCE_URL,
 } from "./lib/html.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -107,7 +109,8 @@ Availability: GET /api/v1/submit
 
 Status values: guessed (never launched), launched (it ran), verified
 (measured; notes must say what was seen). Do not treat guessed as evidence.
-Install: source until a notarized Wyn.dmg exists.
+Install: ${DOWNLOAD_URL ? `signed Wyn.dmg at ${DOWNLOAD_URL}` : "source until a notarized Wyn.dmg exists"}.
+Wyn is free software, GPL-3.0-or-later. Source: ${SOURCE_URL}
 `,
 );
 

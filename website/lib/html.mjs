@@ -34,6 +34,16 @@ export function layerLabel(layer) {
 // Flip to true to publish /support (nav, footer, home link, static build, local server).
 export const SUPPORT_PAGE_ENABLED = false;
 
+// Where the signed, notarized Wyn.dmg is published, or null while there is no
+// download. Set this to the release asset URL when the DMG goes up.
+export const DOWNLOAD_URL = null;
+
+// GPL-3 §6(d): offering the source from the same place as the binary is what
+// makes distributing the binary lawful. These two are rendered together, and
+// `downloadOffersSource` in the tests holds that: no page may print
+// DOWNLOAD_URL without SOURCE_URL beside it.
+export const SOURCE_URL = "https://github.com/JellyBean47/wyn";
+
 function layout({ title, description, path, body }) {
   const pageTitle = title ? `${title} · Wyn` : "Wyn — Windows games on Mac";
   const supportNav = SUPPORT_PAGE_ENABLED
@@ -95,7 +105,11 @@ export function homePage(data) {
     <section class="hero">
       <p class="kicker">Compatibility catalog</p>
       <h1>Windows games. Mac settings. Shared progress.</h1>
-      <p class="lede">Find launch settings for Windows games on your Mac. See what has actually been tested, download a profile, and share the settings that worked for you. Wyn is free. A signed Mac download is coming; until then the <a href="https://github.com/JellyBean47/wyn">source install</a> is the supported path.${SUPPORT_PAGE_ENABLED ? ' <a href="/support">Support testing</a>.' : ""}</p>
+      <p class="lede">Find launch settings for Windows games on your Mac. See what has actually been tested, download a profile, and share the settings that worked for you. Wyn is free software under GPL-3.0. ${
+        DOWNLOAD_URL
+          ? `<a href="${escapeHtml(DOWNLOAD_URL)}">Download Wyn.dmg</a> — signed and notarized, with the <a href="${escapeHtml(SOURCE_URL)}">source</a>.`
+          : `A signed Mac download is coming; until then the <a href="${escapeHtml(SOURCE_URL)}">source install</a> is the supported path.`
+      }${SUPPORT_PAGE_ENABLED ? ' <a href="/support">Support testing</a>.' : ""}</p>
       <form class="search" action="/games" method="get">
         <label class="sr-only" for="q">Search games</label>
         <input id="q" name="q" type="search" placeholder="Satisfactory, Solarpunk, Steam app id…" autocomplete="off">
@@ -345,8 +359,13 @@ export function supportPage(data) {
     </section>
     <section>
       <h2>Install</h2>
-      <p>A signed, notarized <code>Wyn.dmg</code> (drag to Applications, then set up Wine in the app) is the download we want. It is not ready: it needs Apple Developer ID signing. Until then:</p>
-      <pre><code>git clone https://github.com/JellyBean47/wyn.git
+      ${
+        DOWNLOAD_URL
+          ? `<p><a class="btn" href="${escapeHtml(DOWNLOAD_URL)}">Download Wyn.dmg</a> — signed and notarized. Drag it to Applications, then set up Wine in the app.</p>
+      <p>Wyn is free software under <a href="${escapeHtml(SOURCE_URL)}/blob/main/LICENSE">GPL-3.0-or-later</a>, and you are entitled to the source for the build you just downloaded: <a href="${escapeHtml(SOURCE_URL)}">${escapeHtml(SOURCE_URL)}</a>. Or build it yourself:</p>`
+          : `<p>A signed, notarized <code>Wyn.dmg</code> (drag to Applications, then set up Wine in the app) is the download we want. It is not published yet. Until then, build from source — Wyn is free software under <a href="${escapeHtml(SOURCE_URL)}/blob/main/LICENSE">GPL-3.0-or-later</a>:</p>`
+      }
+      <pre><code>git clone ${escapeHtml(SOURCE_URL)}.git
 cd wyn
 ./install.sh
 open /Applications/Wyn.app</code></pre>
