@@ -1,6 +1,6 @@
 # Wyn
 
-Windows games on Mac. Open source. [Compatibility catalog](https://wyn-dev.com).
+Windows games on Mac. Open source. [Compatibility catalog](https://wyn-dev.com). [Discord](https://discord.gg/3qZe74NmE9).
 
 Wyn is a macOS Wine wrapper for running Windows games. Per-game profiles pick
 the translation layer (DXMT / D3DMetal / DXVK), not a star rating. The site
@@ -90,6 +90,9 @@ Checks what you have against what you should have — build tools, Wine runtime,
 D3DMetal, renderer wiring, bottles, Steam — and prints the exact command to fix
 anything that is wrong. It needs nothing but bash, so it works before Wyn is
 built, and it only reports: it never installs or rewires anything.
+
+Still stuck? Ask in `#help` on [The Wyn Cellar](https://discord.gg/3qZe74NmE9), Wyn's Discord, and paste
+what `doctor.sh` printed.
 
 ## Optional pieces (you obtain these)
 

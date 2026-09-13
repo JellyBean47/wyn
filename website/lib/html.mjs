@@ -90,7 +90,7 @@ function layout({ title, description, path, body }) {
   <main id="main">${body}</main>
   <footer>
     <p>Wyn runs Windows games on macOS through Wine. Profiles here are the launch settings that actually get used — layer, DLLs, arguments — not a star rating.</p>
-    <p>Built for the Wyn community. <a href="https://github.com/JellyBean47/wyn">Source</a>${supportFooter} · GPL-3.0-or-later.</p>
+    <p>Built for the Wyn community. <a href="https://github.com/JellyBean47/wyn">Source</a> · <a href="https://discord.gg/3qZe74NmE9">Discord</a>${supportFooter} · GPL-3.0-or-later.</p>
   </footer>
   <script src="/client.js" type="module"></script>
 </body>
