@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { loadCatalog, filterGames, profileApiPayload } from '../lib/catalog.mjs';
-import { gamesPage, submitPage, gamePage, homePage, SUPPORT_PAGE_ENABLED, supportPage, DOWNLOAD_URL, SOURCE_URL } from '../lib/html.mjs';
+import { loadCatalog, filterGames, profileApiPayload, profileRunsFromDownload, downloadSupport } from '../lib/catalog.mjs';
+import { gamesPage, submitPage, gamePage, homePage, SUPPORT_PAGE_ENABLED, supportPage, DOWNLOAD_URL, SOURCE_URL, downloadBadge } from '../lib/html.mjs';
 const data = loadCatalog(fileURLToPath(new URL('../../', import.meta.url)));
 test('catalog profile references resolve', () => assert.deepEqual(data.missingProfiles, []));
 test('launched titles are the ones with Mac evidence, not theoretical ports', () => {
@@ -78,6 +78,56 @@ test('support page explains free app, guessed vs verified, and has no paywall ti
   assert.ok(html.includes('github.com/sponsors/JellyBean47'));
   assert.ok(html.includes('verified'));
   assert.ok(!html.includes('$7/month'));
+});
+test('the download claim is enumerated, not inferred from the layer alone', () => {
+  // The promise on the front page is "install this and these games run", so it
+  // is held by name like the status ladders are. An unset translationLayer is
+  // not enough on its own to decide: army-men and New Vegas measured as
+  // ddraw/d3d9 → wined3d → OpenGL, which the tarball carries, while rdr2 is
+  // unset because it runs on vkd3d on a hand-built tree that no download has.
+  const verified = data.games.filter((g) => g.status === 'verified');
+  const by = (state) => verified.filter((g) => g.downloadSupport === state).map((g) => g.slug).sort();
+
+  assert.deepEqual(by('runs'), [
+    'army-men-rts', 'doom-2016', 'fallout-new-vegas', 'rv-there-yet', 'solarpunk', 'wolfenstein-youngblood',
+  ]);
+  assert.deepEqual(by('source-install'), ['ac-odyssey', 'fallout-4', 'ready-or-not', 'witcher-3']);
+  assert.equal(data.counts.verifiedFromDownload, by('runs').length);
+
+  // Solarpunk ships both a d3dmetal and a dxmt profile, and solarpunk-dxmt is
+  // itself verified — so the download claim is carried by evidence, not by the
+  // layer name.
+  const solarpunk = data.bySlug.get('solarpunk');
+  assert.equal(downloadSupport(solarpunk), 'runs');
+  assert.ok(solarpunk.profiles.some((p) => !profileRunsFromDownload(p)));
+
+  // Satisfactory is the reason there are three states rather than two: verified
+  // on d3dmetal, with a satisfactory-dxmt variant that is still guessed. The
+  // download might run it; nobody has shown that it does.
+  const satisfactory = data.bySlug.get('satisfactory');
+  assert.equal(satisfactory.status, 'verified');
+  assert.equal(satisfactory.downloadSupport, 'untested');
+  assert.equal(data.profilesById.get('satisfactory-dxmt').status, 'guessed');
+  assert.equal(downloadBadge(satisfactory), '');
+
+  // rdr2 is the case a layer check alone gets wrong: no d3dmetal anywhere in
+  // it, and still not runnable from the download.
+  const rdr2 = data.profilesById.get('rdr2');
+  assert.equal(rdr2.bottle?.translationLayer ?? null, null);
+  assert.equal(profileRunsFromDownload(rdr2), false);
+});
+test('a title needing the source install says so on its own page', () => {
+  const witcher = data.bySlug.get('witcher-3');
+  assert.equal(witcher.downloadSupport, 'source-install');
+  const html = gamePage(witcher);
+  assert.ok(html.includes('badge needs-source'));
+  assert.ok(html.includes('--accept-gptk-licence'));
+
+  const doom = data.bySlug.get('doom-2016');
+  assert.equal(doom.downloadSupport, 'runs');
+  const doomHtml = gamePage(doom);
+  assert.ok(doomHtml.includes('badge from-download'));
+  assert.ok(!doomHtml.includes('--accept-gptk-licence'));
 });
 test('the binary is never offered without its source', () => {
   // GPL-3 §6(d): equivalent access to the source from the same place as the

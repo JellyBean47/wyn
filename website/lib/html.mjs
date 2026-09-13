@@ -24,6 +24,19 @@ export function statusLabel(status) {
   return "Guessed";
 }
 
+/// The download's three answers, kept in one place so the games table and the
+/// game page cannot drift apart. `untested` gets no badge on purpose — an
+/// absent claim reads better than a hedged one, and the page's notice says it.
+export function downloadBadge(game) {
+  if (game.downloadSupport === "runs") {
+    return '<span class="badge from-download">Runs from the download</span>';
+  }
+  if (game.downloadSupport === "source-install") {
+    return '<span class="badge needs-source">Needs the source install</span>';
+  }
+  return "";
+}
+
 export function layerLabel(layer) {
   if (layer === "d3dmetal") return "D3DMetal";
   if (layer === "dxvk") return "DXVK";
@@ -163,7 +176,7 @@ export function gamesPage(games, query) {
       <td><a href="/games/${escapeHtml(game.slug)}">${escapeHtml(game.name)}</a></td>
       <td>${escapeHtml(game.publisher ?? "—")}</td>
       <td><span class="badge ${escapeHtml(game.status)}">${statusLabel(game.status)}</span></td>
-      <td>${escapeHtml([...new Set(game.profiles.map(p => layerLabel(p.bottle?.translationLayer)))].join(", ") || "—")}</td>
+      <td>${escapeHtml([...new Set(game.profiles.map(p => layerLabel(p.bottle?.translationLayer)))].join(", ") || "—")}${game.downloadSupport === "source-install" ? ' <span class="badge needs-source" title="Needs the source install: D3DMetal cannot ship in the download">Source install</span>' : ""}</td>
       <td class="mono">${game.steamAppId ? escapeHtml(String(game.steamAppId)) : "—"}</td>
     </tr>`).join("");
 
@@ -263,8 +276,17 @@ export function gamePage(game) {
     <header class="page">
       <p class="kicker"><a href="/games">Games</a></p>
       <h1>${escapeHtml(game.name)}</h1>
-      <p>${escapeHtml(game.publisher ?? "")}${game.publisher ? " · " : ""}Steam ${steam} · <span class="badge ${escapeHtml(game.status)}">${statusLabel(game.status)}</span></p>
+      <p>${escapeHtml(game.publisher ?? "")}${game.publisher ? " · " : ""}Steam ${steam} · <span class="badge ${escapeHtml(game.status)}">${statusLabel(game.status)}</span> · ${
+        downloadBadge(game)
+      }</p>
     </header>
+    ${
+      game.downloadSupport === "source-install"
+        ? '<p class="notice">Every profile here is D3DMetal, which comes from Apple\'s Game Porting Toolkit and cannot be redistributed — so it is not in the <code>Wyn.dmg</code> download and never will be. This title needs the source install: <code>./install.sh --with-d3dmetal --accept-gptk-licence</code>, with Apple\'s GPTK supplied by you.</p>'
+        : game.downloadSupport === "untested"
+          ? '<p class="notice">The best-tested profile here is D3DMetal, which is not in the download. There is a profile the download could run, but nobody has reported running this game that way — so whether the download handles it is untested, not known.</p>'
+          : ""
+    }
     <p class="notice">${game.status === "guessed" ? "This game has no tested profile yet. These settings are a starting point, not evidence that it runs." : game.status === "launched" ? "This title launched on a Mac. Notes say what was seen. That is not verified: verified needs a loaded-map measurement on the current Wyn stack." : "Results depend on your Mac, macOS, Wyn version, and game version. Read each profile’s notes before using it."}</p>
     <details class="guide"><summary>How to use or share a profile</summary><p>Download the JSON to keep a copy of the launch settings. Your Wyn agent can inspect it and apply the profile. Test it on your Mac before treating it as compatible.</p><p>To contribute an improvement, choose “Improve this profile”, update the settings and notes, then submit for review. Uploading here does not change your installed Wyn profiles.</p></details>
     ${game.profiles.map((p) => profileSection(p, game.slug)).join("")}
@@ -372,7 +394,7 @@ cd wyn
 open /Applications/Wyn.app</code></pre>
       <p>That needs an Apple Silicon Mac, Xcode 16+, and Rosetta. Wyn downloads a hash-pinned Wine runtime; it does not ship Apple GPTK.</p>
       <h3>Which renderer you get</h3>
-      <p>The download gives you <strong>DXMT</strong> — Direct3D 11 to Metal. That is the default renderer, it needs no compiler, and it is what every verified title here was measured on unless its page says otherwise.</p>
+      <p>The download runs <strong>${data.counts.verifiedFromDownload} of the ${data.counts.verified} verified titles</strong> here, with no compiler and nothing else to install: DXMT (Direct3D 11 to Metal), DXVK, and Wine's own builtins all ship inside the runtime the app fetches on first launch. Every game page says which side it falls on.</p>
       <p><strong>D3DMetal is not in the download, and cannot be.</strong> It comes from Apple's Game Porting Toolkit, whose licence forbids redistribution, so Wyn never ships it and never downloads it. It is an opt-in upgrade for Direct3D 12-only titles, it needs the source install, and you supply Apple's GPTK yourself:</p>
       <pre><code>./install.sh --with-d3dmetal --accept-gptk-licence</code></pre>
       <p>That path compiles Wine from source, so it also wants <code>brew install ccache mingw-w64</code>. If a game's page lists its layer as <code>d3dmetal</code>, the download alone will not run it.</p>

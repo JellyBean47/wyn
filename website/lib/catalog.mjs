@@ -28,6 +28,47 @@ export function resourceRoots(repoRoot) {
   };
 }
 
+// Profiles the shipped runtime cannot run even though their layer does not say
+// so. An unset `translationLayer` normally means Wine's own builtins — army-men
+// and New Vegas both measured as ddraw/d3d9 → wined3d → OpenGL, which is inside
+// the hash-pinned tarball. rdr2 is unset for the opposite reason: it runs on
+// vkd3d on a hand-built Libraries.rgl tree, which has no value in the enum and
+// is not something a download can provide.
+//
+// Enumerated by name on purpose, like the status ladders: a new profile that
+// needs a runtime Wyn does not ship has to be added here deliberately, and the
+// test below fails until it is.
+export const NEEDS_UNSHIPPED_RUNTIME = new Set(["rdr2"]);
+
+/// Whether the hash-pinned runtime the app downloads on first launch can run
+/// this profile. D3DMetal cannot be in the image — Apple's GPTK licence forbids
+/// redistribution, and the winecx game-host it needs is compiled locally — so a
+/// d3dmetal profile is a source install, not a download.
+export function profileRunsFromDownload(profile) {
+  if (NEEDS_UNSHIPPED_RUNTIME.has(profile.id)) return false;
+  return (profile.bottle?.translationLayer ?? null) !== "d3dmetal";
+}
+
+/// What the signed download can do with this game. Three answers, because two
+/// would force a claim the evidence does not support:
+///
+/// - `source-install`: nothing here can run on the shipped runtime. A capability
+///   statement about D3DMetal, true whatever the profiles' status is.
+/// - `runs`: a profile that the download can run has actually been run —
+///   verified or launched. This is a promise, so it needs evidence.
+/// - `untested`: the download could run one of these profiles, but nobody has.
+///   Satisfactory is the case that forced this: verified on d3dmetal, with a
+///   `satisfactory-dxmt` variant still guessed. Saying "runs from the download"
+///   there would be inferring a result from a layer name, which is the one
+///   thing this project does not do.
+export function downloadSupport(game) {
+  if (!game.profiles.some(profileRunsFromDownload)) return "source-install";
+  const tested = game.profiles.some(
+    (profile) => profileRunsFromDownload(profile) && profile.status !== "guessed"
+  );
+  return tested ? "runs" : "untested";
+}
+
 export function loadCatalog(repoRoot) {
   const { catalogPath, profilesDir } = resourceRoots(repoRoot);
   const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
@@ -60,7 +101,7 @@ export function loadCatalog(repoRoot) {
     }
     const status = bestStatus(profiles);
     const primary = profiles[0] ?? null;
-    return {
+    const game = {
       slug: entry.slug,
       name: entry.name,
       publisher: entry.publisher ?? null,
@@ -74,6 +115,8 @@ export function loadCatalog(repoRoot) {
       translationLayer: primary?.bottle?.translationLayer ?? null,
       winetricks: primary?.winetricks ?? [],
     };
+    game.downloadSupport = downloadSupport(game);
+    return game;
   });
 
   games.sort((a, b) => a.name.localeCompare(b.name));
@@ -85,8 +128,12 @@ export function loadCatalog(repoRoot) {
   }
 
   const counts = { games: games.length, profiles: profilesById.size, verified: 0, launched: 0, guessed: 0 };
+  // Counted over verified titles only: "runs from the download" is a promise,
+  // and a guessed profile is explicitly not evidence that anything runs.
+  counts.verifiedFromDownload = 0;
   for (const game of games) {
     counts[game.status] = (counts[game.status] ?? 0) + 1;
+    if (game.status === "verified" && game.downloadSupport === "runs") counts.verifiedFromDownload += 1;
   }
 
   return {

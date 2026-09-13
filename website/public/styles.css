@@ -207,6 +207,10 @@ section h3 {
 .badge.verified { color: var(--ok); border-color: var(--ok); }
 .badge.launched { color: var(--warn); border-color: var(--warn); }
 .badge.guessed { color: var(--muted); }
+/* Whether the signed download can run it, which is a different axis from how
+   well tested it is — a verified title can still need the source install. */
+.badge.from-download { color: var(--ok); border-color: var(--ok); }
+.badge.needs-source { color: var(--muted); border-style: dashed; }
 
 .table-wrap { overflow-x: auto; }
 table.games { width: 100%; border-collapse: collapse; }
