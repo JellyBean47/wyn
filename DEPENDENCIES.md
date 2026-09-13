@@ -68,14 +68,41 @@ binaries. See [Documentation/user/game-host.md](Documentation/user/game-host.md)
   `server` — 13 of them — appears in both trees, with **none unique to the
   mirror**. The CrossOver code in it is CodeWeavers' published LGPL code.
 
-  **Not verified, and the one check left:** that the `crossover 26.3 on wine
-  11.0` commit's full tree matches CodeWeavers' published **26.3** dump. The
-  mirror is based on 26.3 and only 26.1.0 / 26.2.0 are on this machine. Fetch
-  the official 26.3 source tarball and diff it against that commit to close it.
+  **Verified 13 Sep 2026, by git tree hash rather than by diff.** A tree hash
+  covers every file's bytes *and* mode, so a match is stronger than a clean
+  `diff -r`. The three imported layers are exactly what their publishers
+  released:
 
-  Exposure is bounded either way: Wyn never redistributes this build.
+  | winecx commit | is identical to | tree hash |
+  | --- | --- | --- |
+  | `18dd655` synthetic base: wine 11.0 | WineHQ tag `wine-11.0` | `c143c87e72ec…` |
+  | `5477282` wine 11.15 | WineHQ tag `wine-11.15` | `54f9c320b2c1…` |
+  | `9e92b77` crossover 26.3 on wine 11.0 | `wine/` in CodeWeavers' `crossover-sources-26.3.0.tar.gz` (11,086 files) | `c2843c34d906…` |
+
+  Tarball: `https://media.codeweavers.com/pub/crossover/source/crossover-sources-26.3.0.tar.gz`,
+  149,054,023 bytes, SHA-256 `ac99c8ca4b3848f3e81784135f023df266b61c2345726ea55a50b3e030dd6872`.
+  Upstream's own `crossover-26.3.0` branch carries the same tree. Method: stage
+  the extracted `wine/` into a throwaway bare repo with `git add -A -f`, then
+  compare `git write-tree` against `git rev-parse <commit>^{tree}`.
+
+  **Still not verified**, because no published tree exists to hash against:
+  - `84c0ec9` merge wine 11.15 into crossover 26.3 — one person's conflict
+    resolution across 5,589 files. Re-computing the merge is the only check.
+  - The layer on top: `d83e975` (winecx-gptk patch set, 23 files) and 13
+    fix-ups to `c2cce0e` (19 files) — 42 files in all, 16 commits, one author
+    (`millia ampora`, dappermint). Small enough to read line by line.
+
+  **The pin is not on upstream's default branch.** `c2cce0e` lives on
+  `wine1115` (and `wine1116`, `arm64` build on it); `master` is a separate line.
+  GitHub still serves it by SHA. Nothing about that is wrong, but it means the
+  source Wyn builds from sits on a branch someone else can delete.
+
+  Exposure today is bounded: Wyn does not redistribute this build.
   `build-foss-game-host.sh` compiles it on the user's own machine, so Wyn is not
   a distributor of it and LGPL-2.1's source-offer obligation does not attach.
+  **That changes the moment Wyn ships a prebuilt game-host.** Wyn then becomes
+  the distributor and must publish the exact corresponding source itself —
+  pointing at dappermint's branch does not discharge it.
 - **Build:** `./scripts/build-foss-game-host.sh` (mingw-w64 gcc, not llvm-mingw)
 - **Install:** `wyn runtime install --gptk-aware --directory <wine-root>`
   or `./scripts/install-foss-game-host.sh --directory …`
