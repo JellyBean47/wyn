@@ -8,9 +8,21 @@ See [apple-developer.md](apple-developer.md) for the certificate.
 ./scripts/package-dmg.sh --notarize   # friends; needs Developer ID + notary profile
 ```
 
-The image is **Wyn.app plus an Applications symlink**. It does not contain Wine
-binaries, GPTK, or games. First launch uses the in-app setup sheet to download
-the hash-pinned Wine runtime.
+The image is **Wyn.app, an Applications symlink, and `Legal/`**. It does not
+contain Wine binaries, GPTK, or games. First launch uses the in-app setup sheet
+to download the hash-pinned Wine runtime.
+
+`Legal/` carries `LICENSE`, `NOTICE`, `COPYRIGHT`, `THIRD_PARTY_LICENSES.md`
+and `licenses/`; the same files are copied into
+`Wyn.app/Contents/Resources/` before signing, so the notices survive someone
+keeping only the app (GPL-3 §4). Packaging signs the Mach-O helpers in
+`Contents/Resources/` individually before sealing the bundle — signing the
+bundle alone leaves them ad-hoc, and notarization rejects that.
+
+Distributing the DMG obliges you to offer the corresponding source from the
+same place (GPL-3 §6(d)). `website/lib/html.mjs` holds `DOWNLOAD_URL` beside
+`SOURCE_URL` for that reason, and a test refuses a page that prints one without
+the other.
 
 Create a notary keychain profile once (App Store Connect API key):
 
