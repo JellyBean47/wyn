@@ -55,8 +55,8 @@ export const NOT_RUNNABLE_FROM_DOWNLOAD = new Map([
 ]);
 
 /// Whether the hash-pinned runtime the app downloads on first launch can run
-/// this profile. D3DMetal cannot be in the image — Apple's GPTK licence forbids
-/// redistribution, and the winecx game-host it needs is compiled locally — so a
+/// this profile. D3DMetal is not in the image today — the winecx game-host it needs is
+/// compiled locally and Apple's GPTK comes from the user, not from Wyn — so a
 /// d3dmetal profile is a source install, not a download.
 export function profileRunsFromDownload(profile) {
   if (NOT_RUNNABLE_FROM_DOWNLOAD.has(profile.id)) return false;

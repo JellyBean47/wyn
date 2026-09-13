@@ -176,7 +176,7 @@ export function gamesPage(games, query) {
       <td><a href="/games/${escapeHtml(game.slug)}">${escapeHtml(game.name)}</a></td>
       <td>${escapeHtml(game.publisher ?? "—")}</td>
       <td><span class="badge ${escapeHtml(game.status)}">${statusLabel(game.status)}</span></td>
-      <td>${escapeHtml([...new Set(game.profiles.map(p => layerLabel(p.bottle?.translationLayer)))].join(", ") || "—")}${game.downloadSupport === "source-install" ? ' <span class="badge needs-source" title="Needs the source install: D3DMetal cannot ship in the download">Source install</span>' : ""}</td>
+      <td>${escapeHtml([...new Set(game.profiles.map(p => layerLabel(p.bottle?.translationLayer)))].join(", ") || "—")}${game.downloadSupport === "source-install" ? ' <span class="badge needs-source" title="Needs the source install: D3DMetal is not in the download yet">Source install</span>' : ""}</td>
       <td class="mono">${game.steamAppId ? escapeHtml(String(game.steamAppId)) : "—"}</td>
     </tr>`).join("");
 
@@ -282,7 +282,7 @@ export function gamePage(game) {
     </header>
     ${
       game.downloadSupport === "source-install"
-        ? '<p class="notice">Every profile here is D3DMetal, which comes from Apple\'s Game Porting Toolkit and cannot be redistributed — so it is not in the <code>Wyn.dmg</code> download and never will be. This title needs the source install: <code>./install.sh --with-d3dmetal --accept-gptk-licence</code>, with Apple\'s GPTK supplied by you.</p>'
+        ? '<p class="notice">Every profile here is D3DMetal, which comes from Apple\'s Game Porting Toolkit. It is not in the <code>Wyn.dmg</code> download today, because the Wine build D3DMetal needs is compiled on your Mac. This title needs the source install: <code>./install.sh --with-d3dmetal --accept-gptk-licence</code>, with Apple\'s GPTK supplied by you.</p>'
         : game.downloadSupport === "untested"
           ? '<p class="notice">The best-tested profile here is D3DMetal, which is not in the download. There is a profile the download could run, but nobody has reported running this game that way — so whether the download handles it is untested, not known.</p>'
           : ""
@@ -395,7 +395,7 @@ open /Applications/Wyn.app</code></pre>
       <p>That needs an Apple Silicon Mac, Xcode 16+, and Rosetta. Wyn downloads a hash-pinned Wine runtime; it does not ship Apple GPTK.</p>
       <h3>Which renderer you get</h3>
       <p>The download runs <strong>${data.counts.verifiedFromDownload} of the ${data.counts.verified} verified titles</strong> here, with no compiler and nothing else to install: DXMT (Direct3D 11 to Metal), DXVK, and Wine's own builtins all ship inside the runtime the app fetches on first launch. Every game page says which side it falls on.</p>
-      <p><strong>D3DMetal is not in the download, and cannot be.</strong> It comes from Apple's Game Porting Toolkit, whose licence forbids redistribution, so Wyn never ships it and never downloads it. It is an opt-in upgrade for Direct3D 12-only titles, it needs the source install, and you supply Apple's GPTK yourself:</p>
+      <p><strong>D3DMetal is not in the download yet.</strong> It comes from Apple's Game Porting Toolkit, and the Wine build it runs on is compiled on your Mac, so today Wyn does not ship it or download it for you. It is an opt-in upgrade for Direct3D 12-only titles, it needs the source install, and you supply Apple's GPTK yourself:</p>
       <pre><code>./install.sh --with-d3dmetal --accept-gptk-licence</code></pre>
       <p>That path compiles Wine from source, so it also wants <code>brew install ccache mingw-w64</code>. If a game's page lists its layer as <code>d3dmetal</code>, the download alone will not run it.</p>
     </section>
