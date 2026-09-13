@@ -12,11 +12,11 @@ Game Porting Toolkit / D3DMetal, store clients, or game files. It is a modified
 version of [Whisky](https://github.com/Whisky-App/Whisky). See [LICENSE](LICENSE)
 and [NOTICE](NOTICE).
 
-**Install today** still needs Xcode (below). A signed, notarized `Wyn.dmg` (drag
-to Applications) is the next packaging step — see
-[Documentation/user/apple-developer.md](Documentation/user/apple-developer.md)
-and [Documentation/user/packaging.md](Documentation/user/packaging.md). Do not
-treat an ad-hoc build as 1.0.
+**Two ways in.** Build from source with the commands below: that is the
+supported path, and the only one that can add D3DMetal. Or download the signed,
+notarized [`Wyn.dmg`](https://github.com/JellyBean47/wyn/releases/tag/v1.0), drag
+it to Applications, and let it set up Wine on first launch. The download gives
+you DXMT, DXVK and Wine's own renderer, not D3DMetal.
 
 ## What you need
 
