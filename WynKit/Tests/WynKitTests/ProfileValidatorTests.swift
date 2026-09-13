@@ -132,6 +132,13 @@ struct ProfileValidatorTests {
             // Sim at 1024x768, wined3d, layer unset).
             "assetto-corsa",
             "cities-skylines",
+            // rdr2 launched 12 Sep 2026 — Epic copy, ~16 min of in-world play,
+            // clean exit. Launched and NOT verified on the site's own wording:
+            // launched is "ran on a Mac", verified needs "a loaded-map
+            // measurement on the current Wyn stack", and none of this ran on
+            // Wyn — no `wyn play`, no Wyn bottle, no Wyn tree, no launch
+            // record. See FINDING-20260912-rdr2-epic-runs.md.
+            "rdr2",
             "skyrim-se",
         ]
         // Bundled only, for the same reason as the verified ladder above: a

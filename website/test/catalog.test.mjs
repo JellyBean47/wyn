@@ -14,7 +14,10 @@ test('launched titles are the ones with Mac evidence, not theoretical ports', ()
   // frames, LogExit: Exiting., adapter Apple M4 through DXMT.
   // witcher-3 graduated the same night on the Ready or Not bar (in-world play,
   // D3DMetal lsof, no REDengine log).
-  assert.deepEqual(launched, ['assetto-corsa', 'cities-skylines', 'skyrim-se']);
+  // rdr2 joined `launched` on 12 Sep 2026: the Epic copy, ~16 min of in-world
+  // play, clean exit — but on a hand-built Libraries.rgl tree with vkd3d, not
+  // on the Wyn stack, so it cannot reach `verified` as this site defines it.
+  assert.deepEqual(launched, ['assetto-corsa', 'cities-skylines', 'rdr2', 'skyrim-se']);
   assert.deepEqual(verified, ['ac-odyssey', 'army-men-rts', 'doom-2016', 'fallout-4', 'fallout-new-vegas', 'ready-or-not', 'rv-there-yet', 'satisfactory', 'solarpunk', 'witcher-3', 'wolfenstein-youngblood']);
   assert.equal(data.counts.verified, 11);
 });
