@@ -74,15 +74,43 @@ mkdir -p "$STAGE"
 ditto "$SRC_APP" "$STAGE/Wyn.app"
 ln -s /Applications "$STAGE/Applications"
 
+# GPL-3 §4: the license travels with the binary. The .app is what a person
+# keeps — the image gets thrown away — so the notices go in both, and the
+# copies land before signing so they are sealed by the signature.
+LEGAL_DOCS=(LICENSE NOTICE COPYRIGHT THIRD_PARTY_LICENSES.md)
+mkdir -p "$STAGE/Legal"
+for doc in "${LEGAL_DOCS[@]}"; do
+  ditto "$ROOT/$doc" "$STAGE/Legal/$doc"
+  ditto "$ROOT/$doc" "$STAGE/Wyn.app/Contents/Resources/$doc"
+done
+ditto "$ROOT/Documentation/licenses" "$STAGE/Legal/licenses"
+ditto "$ROOT/Documentation/licenses" "$STAGE/Wyn.app/Contents/Resources/licenses"
+
 ENTITLEMENTS="$ROOT/WynApp/Wyn.entitlements"
-echo "==> codesign ($IDENTITY)"
 if [[ "$IDENTITY" == "-" ]]; then
-  codesign --force --sign - --entitlements "$ENTITLEMENTS" \
-    --options runtime --timestamp=none "$STAGE/Wyn.app"
+  TIMESTAMP=(--timestamp=none)
 else
-  codesign --force --sign "$IDENTITY" --entitlements "$ENTITLEMENTS" \
-    --options runtime --timestamp "$STAGE/Wyn.app"
+  TIMESTAMP=(--timestamp)
 fi
+
+# Signing the bundle does not re-sign the Mach-O helpers in Contents/Resources.
+# They arrive ad-hoc signed from build.sh, and notarization rejects ad-hoc
+# nested code even when the outer bundle carries a Developer ID — so sign
+# inside-out. Entitlements are deliberately not passed here: they belong to the
+# executable, not to libraries loaded into other processes.
+echo "==> codesign nested Mach-O ($IDENTITY)"
+nested=0
+while IFS= read -r candidate; do
+  [[ "$candidate" == "$STAGE/Wyn.app/Contents/MacOS/"* ]] && continue
+  file -b "$candidate" | grep -q "Mach-O" || continue
+  codesign --force --sign "$IDENTITY" --options runtime "${TIMESTAMP[@]}" "$candidate"
+  nested=$((nested + 1))
+done < <(find "$STAGE/Wyn.app/Contents" -type f)
+echo "    $nested nested Mach-O signed"
+
+echo "==> codesign Wyn.app ($IDENTITY)"
+codesign --force --sign "$IDENTITY" --entitlements "$ENTITLEMENTS" \
+  --options runtime "${TIMESTAMP[@]}" "$STAGE/Wyn.app"
 codesign --verify --deep --strict "$STAGE/Wyn.app"
 
 DMG="$OUT_DIR/Wyn.dmg"
@@ -90,14 +118,28 @@ rm -f "$DMG"
 echo "==> hdiutil $DMG"
 hdiutil create -volname Wyn -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 
+# Gatekeeper checks the stapled ticket, so an unsigned image would still pass.
+# Sign it anyway: it is what Apple's reference flow does, and it means the
+# container carries the same identity as the app inside it rather than being
+# anonymous.
+if [[ "$IDENTITY" != "-" ]]; then
+  echo "==> codesign $DMG ($IDENTITY)"
+  codesign --force --sign "$IDENTITY" --timestamp "$DMG"
+  codesign --verify --strict "$DMG"
+fi
+
 if (( NOTARIZE )); then
   PROFILE="${WYN_NOTARY_PROFILE:-wyn}"
   echo "==> notarytool (profile $PROFILE)"
   xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
   xcrun stapler staple "$DMG"
   echo "Notarized: $DMG"
-else
-  echo "Ad-hoc or unsigned-for-distribution image: $DMG"
+elif [[ "$IDENTITY" == "-" ]]; then
+  echo "Ad-hoc image, this Mac only: $DMG"
   echo "Do not publish this as Wyn 1.0. Do not put it on wyn-dev.com."
   echo "When Developer ID is in the keychain: ./scripts/package-dmg.sh --notarize"
+else
+  echo "Developer ID signed but NOT notarized: $DMG"
+  echo "Gatekeeper will still refuse this on another Mac. Do not publish it."
+  echo "To notarize and staple: ./scripts/package-dmg.sh --notarize"
 fi

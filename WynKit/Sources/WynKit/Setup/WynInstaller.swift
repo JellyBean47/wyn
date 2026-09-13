@@ -36,6 +36,17 @@ public struct WynInstallResult: Sendable {
 public enum WynInstaller {
     /// One-shot setup: WynWine runtime + Steam bottle + Steam installer download.
     public static func setup(installSteamClient: Bool = true) async throws -> WynInstallResult {
+        // Before anything is downloaded. Wine's unix half is x86_64, so without
+        // Rosetta nothing that follows can run — and the failure would arrive
+        // after a ~317 MB download, as an opaque exec error from a launch.
+        //
+        // check-environment.sh gates this for a source install, but someone who
+        // dragged Wyn.app out of the disk image never runs it. This is that
+        // check, on the path they do take.
+        guard Rosetta2.isRosettaInstalled else {
+            throw WynInstallError.rosettaMissing
+        }
+
         var runtimeInstalled = WynWineInstaller.isWynWineInstalled()
 
         if !runtimeInstalled {
@@ -105,6 +116,7 @@ public enum WynInstaller {
 
 public enum WynInstallError: LocalizedError {
     case cannotResolveRuntimeVersion
+    case rosettaMissing
 
     public var errorDescription: String? {
         switch self {
@@ -114,6 +126,25 @@ public enum WynInstallError: LocalizedError {
             Download manually from https://github.com/frankea/Whisky/releases and run:
               wyn runtime install --from /path/to/Libraries.tar.gz
             """
+        case .rosettaMissing:
+            return """
+            Rosetta 2 is not installed. Wine's unix half is x86_64, so Wyn \
+            cannot run Windows games without it.
+            """
+        }
+    }
+
+    /// `Failure(step:error:)` surfaces this as the "Try:" line, so it has to be
+    /// something a person can act on without leaving the dialog.
+    public var recoverySuggestion: String? {
+        switch self {
+        case .cannotResolveRuntimeVersion:
+            return nil
+        case .rosettaMissing:
+            // Deliberately an instruction rather than a button: installing
+            // Rosetta needs admin rights, and an app that silently invokes a
+            // privileged installer is worse than one that says what to run.
+            return "Run this in Terminal, then press Setup again:\n  softwareupdate --install-rosetta --agree-to-license"
         }
     }
 }

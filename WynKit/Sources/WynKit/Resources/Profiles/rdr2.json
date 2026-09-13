@@ -9,25 +9,16 @@
   ],
   "bottle": {
     "windowsVersion": "win10",
-    "translationLayer": "d3dmetal",
     "dxvk": false,
     "dxvkAsync": false,
     "enhancedSync": "msync",
-    "avxEnabled": true,
+    "avxEnabled": false,
     "metalHud": false,
     "dxrEnabled": false
   },
-  "environment": {
-    "WINEDLLOVERRIDES": "d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b",
-    "MTL_HUD_ENABLED": "0",
-    "D3DM_ENABLE_METALFX": "0",
-    "D3DM_SHOW_HUD_STATS": "0"
-  },
-  "winetricks": [
-    "vcrun2019",
-    "vcrun2022"
-  ],
-  "launchArgs": "",
-  "notes": "RAGE DX12 → D3DMetal (Cyberpunk/Control class). Prefer RDR2.exe over PlayRDR2.exe. In-game renderer should stay DirectX 12 — Vulkan is a MoltenVK/DXVK path, not this profile. Rockstar Launcher may be required on first run (same bottle as Steam). Do not use Libraries.rgl or Libraries.vk.",
-  "status": "guessed"
+  "environment": {},
+  "winetricks": [],
+  "launchArgs": "-width 1920 -height 1080 -fullscreen",
+  "notes": "THE GAME RUNS ON THIS MAC, AND WYN CANNOT LAUNCH IT. Both halves are measured; do not act on one without the other.\n\nSTATUS IS `launched`, AND NOT `verified`, ON THE SITE'S OWN DEFINITIONS. Launched is published as \"the game ran on a Mac and notes say what was seen\" — true here. Verified is published as needing \"a loaded-map measurement on the current Wyn stack\" — and this ran on no part of the Wyn stack, so verified is out of reach until Wyn can launch the title. `guessed` would be the false one: it is published as \"not evidence that it runs\", and a person played this for 16 minutes.\n\nEXPECT THE APP AND THE SITE TO DISAGREE ON THIS ONE PROFILE. wyn-dev.com renders this field directly, but in-app `LaunchRecord.effectiveStatus` recomputes from launch records and will keep saying `guessed`, because a launch outside Wyn writes none. That divergence is correct rather than a bug to fix: the site is describing the game, the app is describing what Wyn has done.\n\nWHAT RAN, 12 Sep 2026, ~16 minutes, Apple M4, macOS 26.5.1 (25F80). Epic copy at /Volumes/SSD1TB/EpicLibrary/RedDeadRedemption2 (Heroic/legendary app name \"Heather\"). Reached in-world play — Chapter 1 in the Colter snowstorm, minimap and control prompts live, a person at the controls — then quit from the game's own menu with every process gone, no crash directory and no macOS crash report. RDR2.exe peaked at ~305% CPU and 4.2 GB RSS.\n\nTHE LAYER IS vkd3d, NOT D3DMetal. This file used to declare `d3dmetal`; that was never measured and is wrong. `translationLayer` is now deliberately unset, because the path it runs on has no value in the TranslationLayer enum: D3D12 -> vkd3d -> winevulkan -> MoltenVK, on a Wine tree whose GPTK D3D DLLs were swapped back for Wine's own. Evidence, two independent kinds: lsof on the live RDR2.exe mapped vkd3d-1.dll, vkd3d-shader-1.dll, vkd3d-utils-1.dll, d3d12.dll, winevulkan, libMoltenVK; and the game's own Settings/system.xml records <API>kSettingAPI_DX12</API> at 1920x1080, windowed value=2 (borderless), configSource kSettingsConfig_Safe. It also wrote sga_win32_60_final_init.d3d12PipelineCacheWindows. Note libd3dshared.dylib IS also mapped into RDR2.exe and does not mean D3DMetal renders anything — the tree still symlinks atidxx64/nvapi64/nvngx to it, and the game's amd_ags_x64.dll pulls one in.\n\nWHY IT CANNOT BE D3DMetal: the Rockstar Games Launcher has to paint before the game starts, its window is Direct2D -> d3d10_1 -> DXGI, and D3DMetal stubs DXGID3D10CreateDevice. Measured again 12 Sep: Launcher.exe loads d3d10_1/d3d10core/d3d11/dxgi -> wined3d.dll -> opengl32, with `err:winediag:wined3d_dll_init Using the OpenGL renderer.` in the log. That is what `renderer=gl` under AppDefaults\\Launcher.exe (per-exe ONLY, never bottle-wide) buys.\n\nsteamAppId 1174180 is kept because it is true of the game and the catalog test cross-checks it. It is NOT a claim that a Steam copy exists: there is no appmanifest for it on any volume, so `wyn play rdr2` fails at findGameExecutable. Ownership here is Epic, and Rockstar decides the store by the NAME OF THE PARENT PROCESS — a compiled EpicGamesLauncher.exe wrapper starts PlayRDR2.exe with a legendary exchange code. Setting SteamAppId makes Rockstar guess Steam and refuse the entitlement, so the Steam launch paths are actively harmful for this title.\n\nLaunch args are the measured ones. avxEnabled false records that the working run advertised no AVX at all (the shell path never sets ROSETTA_ADVERTISE_AVX); `true` here was a guess and is the knob that SIGILL'd Satisfactory. `environment` is empty and `winetricks` is empty because the working run declared neither — the previous WINEDLLOVERRIDES d3d*=b line was copied from the D3DMetal profiles and was never measured for this title. The Rockstar installer brings its own VC redist.\n\nFULL RECIPE, and it is not short: ~/wyn-handovers/FINDING-20260912-rdr2-epic-runs.md, with the working scripts in .scratch/rdr2-20260813/ (recovered from parked-home-20260823.tar). Do not use Libraries.vk or the Steam bottle: this needs its own tree and its own prefix.",
+  "status": "launched"
 }

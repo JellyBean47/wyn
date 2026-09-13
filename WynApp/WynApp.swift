@@ -16,8 +16,54 @@
 //  If not, see https://www.gnu.org/licenses/.
 //
 
+import AppKit
 import SwiftUI
 import WynKit
+
+/// The About panel's contents.
+///
+/// GPL-3 §6 is answered by the download page carrying the source link beside
+/// the binary, but someone who was handed the DMG directly never sees that
+/// page. The app has to be able to say what it is on its own.
+private enum About {
+    static let sourceURL = URL(string: "https://github.com/JellyBean47/wyn")!
+
+    static func show() {
+        let body = """
+        Wyn runs Windows games on macOS through Wine and a Direct3D→Metal layer.
+
+        Copyright (C) 2024–2026 Wyn contributors
+        Copyright (C) 2023 Isaac Marovitz and Whisky contributors
+
+        Free software under GPL-3.0-or-later, with NO WARRANTY, to the extent \
+        permitted by law. Wyn ships no Apple Game Porting Toolkit, no Wine, and \
+        no games; those are fetched or supplied by you. Full notices are in \
+        Legal/ on the disk image.
+
+        Source, and the corresponding source for this build:
+        """
+
+        let credits = NSMutableAttributedString(
+            string: body + "\n",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+                .foregroundColor: NSColor.labelColor,
+            ]
+        )
+        credits.append(
+            NSAttributedString(
+                string: sourceURL.absoluteString,
+                attributes: [
+                    .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+                    .link: sourceURL,
+                ]
+            )
+        )
+
+        NSApplication.shared.orderFrontStandardAboutPanel(options: [.credits: credits])
+        NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+}
 
 @main
 struct WynApp: App {
@@ -35,6 +81,20 @@ struct WynApp: App {
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            CommandGroup(replacing: .appInfo) {
+                Button("About Wyn") {
+                    About.show()
+                }
+            }
+            CommandGroup(replacing: .help) {
+                Button("Wyn Source Code (GPL-3.0)") {
+                    NSWorkspace.shared.open(About.sourceURL)
+                }
+                Divider()
+                Button("Install Command Line Tool…") {
+                    CommandLineTool.install()
+                }
+            }
             CommandGroup(after: .importExport) {
                 Button("Refresh Library") {
                     vm.refresh()
