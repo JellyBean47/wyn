@@ -361,7 +361,8 @@ export function supportPage(data) {
       <h2>Install</h2>
       ${
         DOWNLOAD_URL
-          ? `<p><a class="btn" href="${escapeHtml(DOWNLOAD_URL)}">Download Wyn.dmg</a> — signed and notarized. Drag it to Applications, then set up Wine in the app.</p>
+          ? `<p><a class="btn" href="${escapeHtml(DOWNLOAD_URL)}">Download Wyn.dmg</a> — signed and notarized. Drag it to Applications and open it; the app downloads a hash-pinned Wine runtime on first launch.</p>
+      <p>You need an Apple Silicon Mac and <strong>Rosetta 2</strong> — Wine's unix half is x86_64. If you do not have it: <code>softwareupdate --install-rosetta --agree-to-license</code>.</p>
       <p>Wyn is free software under <a href="${escapeHtml(SOURCE_URL)}/blob/main/LICENSE">GPL-3.0-or-later</a>, and you are entitled to the source for the build you just downloaded: <a href="${escapeHtml(SOURCE_URL)}">${escapeHtml(SOURCE_URL)}</a>. Or build it yourself:</p>`
           : `<p>A signed, notarized <code>Wyn.dmg</code> (drag to Applications, then set up Wine in the app) is the download we want. It is not published yet. Until then, build from source — Wyn is free software under <a href="${escapeHtml(SOURCE_URL)}/blob/main/LICENSE">GPL-3.0-or-later</a>:</p>`
       }
@@ -369,7 +370,12 @@ export function supportPage(data) {
 cd wyn
 ./install.sh
 open /Applications/Wyn.app</code></pre>
-      <p>That needs an Apple Silicon Mac, Xcode 16+, and Rosetta. Wyn downloads a hash-pinned Wine runtime; it does not ship Apple GPTK. D3DMetal stays opt-in and user-supplied.</p>
+      <p>That needs an Apple Silicon Mac, Xcode 16+, and Rosetta. Wyn downloads a hash-pinned Wine runtime; it does not ship Apple GPTK.</p>
+      <h3>Which renderer you get</h3>
+      <p>The download gives you <strong>DXMT</strong> — Direct3D 11 to Metal. That is the default renderer, it needs no compiler, and it is what every verified title here was measured on unless its page says otherwise.</p>
+      <p><strong>D3DMetal is not in the download, and cannot be.</strong> It comes from Apple's Game Porting Toolkit, whose licence forbids redistribution, so Wyn never ships it and never downloads it. It is an opt-in upgrade for Direct3D 12-only titles, it needs the source install, and you supply Apple's GPTK yourself:</p>
+      <pre><code>./install.sh --with-d3dmetal --accept-gptk-licence</code></pre>
+      <p>That path compiles Wine from source, so it also wants <code>brew install ccache mingw-w64</code>. If a game's page lists its layer as <code>d3dmetal</code>, the download alone will not run it.</p>
     </section>
     <section>
       <h2>If you post about a game</h2>

@@ -67,6 +67,20 @@ for helper in "${HELPERS[@]}"; do
 done
 echo "    $copied/${#HELPERS[@]} helpers bundled"
 
+# The CLI rides inside the app too. Someone who installed from the disk image
+# has no checkout and no ~/.local/bin, so without this `wyn` simply does not
+# exist for them — and with it, "Install Command Line Tool" in the app is a
+# copy out of Resources rather than a build. SPM links WynKit statically and
+# Swift's runtime ships with macOS, so the single binary relocates cleanly;
+# that is already how it reaches ~/.local/bin below.
+if [[ -f "$ROOT/.build/release/wyn" ]]; then
+  ditto "$ROOT/.build/release/wyn" "$BUILT_APP/Contents/Resources/wyn"
+  copied=$((copied + 1))
+  echo "    wyn CLI bundled"
+else
+  echo "warning: .build/release/wyn missing; Wyn.app will not carry the CLI" >&2
+fi
+
 # Adding files invalidates the signature xcodebuild just applied, and an app
 # with a broken signature will not launch under the hardened runtime.
 if (( copied > 0 )); then

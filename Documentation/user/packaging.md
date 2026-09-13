@@ -12,6 +12,19 @@ The image is **Wyn.app, an Applications symlink, and `Legal/`**. It does not
 contain Wine binaries, GPTK, or games. First launch uses the in-app setup sheet
 to download the hash-pinned Wine runtime.
 
+**The image is DXMT-only, and the download page has to say so.** D3DMetal comes
+from Apple's GPTK, which forbids redistribution, and the game-host it needs is
+compiled by `build-foss-game-host.sh` on the user's own machine. Neither can
+travel in the image, so a title whose profile names `d3dmetal` will not run for
+someone who only has the DMG.
+
+`Wyn.app/Contents/Resources/wyn` is the CLI, put there by `build.sh` and
+installed to `~/.local/bin` by **Install Command Line Tool…** in the app's Help
+menu. Without it, a DMG install has no `wyn` at all.
+
+Setup refuses to start without Rosetta 2 (`WynInstaller.setup`), because Wine's
+unix half is x86_64 and `check-environment.sh` never runs on this path.
+
 `Legal/` carries `LICENSE`, `NOTICE`, `COPYRIGHT`, `THIRD_PARTY_LICENSES.md`
 and `licenses/`; the same files are copied into
 `Wyn.app/Contents/Resources/` before signing, so the notices survive someone

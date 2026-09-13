@@ -90,6 +90,10 @@ struct WynApp: App {
                 Button("Wyn Source Code (GPL-3.0)") {
                     NSWorkspace.shared.open(About.sourceURL)
                 }
+                Divider()
+                Button("Install Command Line Tool…") {
+                    CommandLineTool.install()
+                }
             }
             CommandGroup(after: .importExport) {
                 Button("Refresh Library") {
