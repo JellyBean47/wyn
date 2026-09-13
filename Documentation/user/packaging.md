@@ -13,9 +13,12 @@ contain Wine binaries, GPTK, or games. First launch uses the in-app setup sheet
 to download the hash-pinned Wine runtime.
 
 **The image is DXMT-only, and the download page has to say so.** D3DMetal comes
-from Apple's GPTK, which forbids redistribution, and the game-host it needs is
-compiled by `build-foss-game-host.sh` on the user's own machine. Neither can
-travel in the image, so a title whose profile names `d3dmetal` will not run for
+from Apple's GPTK, and the game-host it needs is compiled by
+`build-foss-game-host.sh` on the user's own machine, so neither is in the image
+today. Apple's licence (GPTK 3.0, §2A(iii) and §2C) does permit free,
+non-commercial redistribution of the `/redist` components, so shipping a
+prebuilt game-host is a build and provenance problem, not a licensing one.
+Until then, a title whose profile names `d3dmetal` will not run for
 someone who only has the DMG.
 
 `Wyn.app/Contents/Resources/wyn` is the CLI, put there by `build.sh` and
