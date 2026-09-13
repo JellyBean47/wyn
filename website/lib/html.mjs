@@ -82,6 +82,7 @@ function layout({ title, description, path, body }) {
     <a class="mark" href="/"><img class="mark-icon" src="/favicon.svg" width="32" height="32" alt="">Wyn</a>
     <nav>
       <a href="/games"${path.startsWith("/games") ? ' aria-current="page"' : ""}>Games</a>
+      <a href="/install"${path === "/install" ? ' aria-current="page"' : ""}>Install</a>
       <a href="/submit"${path === "/submit" ? ' aria-current="page"' : ""}>Submit</a>${supportNav}
       <a href="/api"${path === "/api" ? ' aria-current="page"' : ""}>API</a>
     </nav>
@@ -121,7 +122,7 @@ export function homePage(data) {
       <p class="lede">Find launch settings for Windows games on your Mac. See what has actually been tested, download a profile, and share the settings that worked for you. Wyn is free software under GPL-3.0. ${
         DOWNLOAD_URL
           ? `<a href="${escapeHtml(DOWNLOAD_URL)}">Download Wyn.dmg</a> — signed and notarized, with the <a href="${escapeHtml(SOURCE_URL)}">source</a>.`
-          : `A signed Mac download is coming; until then the <a href="${escapeHtml(SOURCE_URL)}">source install</a> is the supported path.`
+          : `A signed Mac download is coming; until then, <a href="/install">install from source</a> — the <a href="${escapeHtml(SOURCE_URL)}">source is on GitHub</a>.`
       }${SUPPORT_PAGE_ENABLED ? ' <a href="/support">Support testing</a>.' : ""}</p>
       <form class="search" action="/games" method="get">
         <label class="sr-only" for="q">Search games</label>
@@ -381,6 +382,29 @@ export function supportPage(data) {
     </section>
     <section>
       <h2>Install</h2>
+      <p>Install steps, requirements and which graphics layer you get are on the <a href="/install">Install</a> page.</p>
+    </section>
+    <section>
+      <h2>If you post about a game</h2>
+      <p>Link a <strong>verified</strong> page, not a launch announcement. Examples: <a href="/games/solarpunk">Solarpunk</a>, <a href="/games/satisfactory">Satisfactory</a>. Say when a profile is still guessed.</p>
+    </section>
+  `;
+  return layout({
+    title: "Support",
+    path: "/support",
+    description: "Wyn is free. Sponsor testing, read verified vs guessed, and install from source until the signed DMG exists.",
+    body,
+  });
+}
+
+export function installPage(data) {
+  const body = `
+    <header class="page">
+      <h1>Install Wyn</h1>
+      <p>Wyn is free software. Build it from source on an Apple Silicon Mac and the installer does the rest, including the Wine runtime.</p>
+    </header>
+    <section>
+      <h2>Get Wyn</h2>
       ${
         DOWNLOAD_URL
           ? `<p><a class="btn" href="${escapeHtml(DOWNLOAD_URL)}">Download Wyn.dmg</a> — signed and notarized. Drag it to Applications and open it; the app downloads a hash-pinned Wine runtime on first launch.</p>
@@ -392,22 +416,18 @@ export function supportPage(data) {
 cd wyn
 ./install.sh
 open /Applications/Wyn.app</code></pre>
-      <p>That needs an Apple Silicon Mac, Xcode 16+, and Rosetta. Wyn downloads a hash-pinned Wine runtime; it does not ship Apple GPTK.</p>
+      <p>That needs an Apple Silicon Mac on macOS 14 or later, Xcode 16 or later, and Rosetta 2 (<code>softwareupdate --install-rosetta</code>). Wyn downloads a hash-pinned Wine runtime; it does not ship Apple GPTK.</p>
       <h3>Which renderer you get</h3>
       <p>The download runs <strong>${data.counts.verifiedFromDownload} of the ${data.counts.verified} verified titles</strong> here, with no compiler and nothing else to install: DXMT (Direct3D 11 to Metal), DXVK, and Wine's own builtins all ship inside the runtime the app fetches on first launch. Every game page says which side it falls on.</p>
       <p><strong>D3DMetal is not in the download yet.</strong> It comes from Apple's Game Porting Toolkit, and the Wine build it runs on is compiled on your Mac, so today Wyn does not ship it or download it for you. It is an opt-in upgrade for Direct3D 12-only titles, it needs the source install, and you supply Apple's GPTK yourself:</p>
       <pre><code>./install.sh --with-d3dmetal --accept-gptk-licence</code></pre>
       <p>That path compiles Wine from source, so it also wants <code>brew install ccache mingw-w64</code>. If a game's page lists its layer as <code>d3dmetal</code>, the download alone will not run it.</p>
     </section>
-    <section>
-      <h2>If you post about a game</h2>
-      <p>Link a <strong>verified</strong> page, not a launch announcement. Examples: <a href="/games/solarpunk">Solarpunk</a>, <a href="/games/satisfactory">Satisfactory</a>. Say when a profile is still guessed.</p>
-    </section>
   `;
   return layout({
-    title: "Support",
-    path: "/support",
-    description: "Wyn is free. Sponsor testing, read verified vs guessed, and install from source until the signed DMG exists.",
+    title: "Install",
+    path: "/install",
+    description: "Install Wyn from source on an Apple Silicon Mac: the requirements, three commands, and which graphics layer you get.",
     body,
   });
 }
