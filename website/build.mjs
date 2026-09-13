@@ -25,6 +25,7 @@ import {
   gamePage,
   gamesPage,
   homePage,
+  installPage,
   notFoundPage,
   submitPage,
   SUPPORT_PAGE_ENABLED,
@@ -65,6 +66,7 @@ write("validate.mjs", fs.readFileSync(path.join(here, "lib/validate.mjs")));
 html("index.html", homePage(data));
 html("games/index.html", gamesPage(data.games, {}));
 html("submit/index.html", submitPage());
+html("install/index.html", installPage(data));
 if (SUPPORT_PAGE_ENABLED) html("support/index.html", supportPage(data));
 html("api/index.html", apiPage());
 html("404.html", notFoundPage());

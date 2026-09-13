@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { loadCatalog, filterGames, profileApiPayload, profileRunsFromDownload, downloadSupport, NOT_RUNNABLE_FROM_DOWNLOAD } from '../lib/catalog.mjs';
-import { gamesPage, submitPage, gamePage, homePage, SUPPORT_PAGE_ENABLED, supportPage, DOWNLOAD_URL, SOURCE_URL } from '../lib/html.mjs';
+import { gamesPage, submitPage, gamePage, homePage, installPage, SUPPORT_PAGE_ENABLED, supportPage, DOWNLOAD_URL, SOURCE_URL } from '../lib/html.mjs';
 const data = loadCatalog(fileURLToPath(new URL('../../', import.meta.url)));
 test('catalog profile references resolve', () => assert.deepEqual(data.missingProfiles, []));
 test('launched titles are the ones with Mac evidence, not theoretical ports', () => {
@@ -137,7 +137,10 @@ test('the binary is never offered without its source', () => {
   // binary is what makes shipping the binary lawful. Whoever sets DOWNLOAD_URL
   // must not be able to publish a download that stands alone, so assert the
   // pairing on every page that can print it rather than trusting the copy.
-  const pages = [homePage(data), supportPage(data)];
+  // /install carries the download block now, so it has to be in this list —
+  // otherwise the guardrail would quietly stop covering the one page that
+  // can print DOWNLOAD_URL.
+  const pages = [homePage(data), supportPage(data), installPage(data)];
   for (const html of pages) {
     if (!DOWNLOAD_URL || !html.includes(DOWNLOAD_URL)) continue;
     assert.ok(html.includes(SOURCE_URL), 'a page offering the DMG must link the source');
@@ -146,6 +149,18 @@ test('the binary is never offered without its source', () => {
   // Until the DMG exists, the source install is still the offer, and the home
   // page has to say where it is.
   assert.ok(homePage(data).includes(SOURCE_URL));
+});
+test('install steps are on a public page, not only behind the support flag', () => {
+  // The install section used to live only on /support, which is switched off,
+  // so the live site had no install steps at all. /install is built
+  // unconditionally and linked from every page's nav.
+  const html = installPage(data);
+  assert.ok(html.includes('git clone https://github.com/JellyBean47/wyn.git'));
+  assert.ok(html.includes('./install.sh'));
+  assert.ok(html.includes('--accept-gptk-licence'));
+  assert.ok(html.includes('GPL-3.0-or-later'));
+  assert.ok(homePage(data).includes('href="/install"'));
+  assert.ok(gamesPage(data.games, {}).includes('href="/install"'));
 });
 test('support is unpublished until SUPPORT_PAGE_ENABLED is true', () => {
   assert.equal(SUPPORT_PAGE_ENABLED, false);
