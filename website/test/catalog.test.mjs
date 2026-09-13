@@ -162,6 +162,15 @@ test('install steps are on a public page, not only behind the support flag', () 
   assert.ok(homePage(data).includes('href="/install"'));
   assert.ok(gamesPage(data.games, {}).includes('href="/install"'));
 });
+test('every page links the community Discord', () => {
+  // The footer is shared by every page, so one link reaches the home page,
+  // the install page and every game page. Checked on three kinds of page so a
+  // layout change that drops it from one of them fails here.
+  const invite = 'https://discord.gg/3qZe74NmE9';
+  for (const html of [homePage(data), installPage(data), gamesPage(data.games, {})]) {
+    assert.ok(html.includes(invite));
+  }
+});
 test('support is unpublished until SUPPORT_PAGE_ENABLED is true', () => {
   assert.equal(SUPPORT_PAGE_ENABLED, false);
   const home = homePage(data);
