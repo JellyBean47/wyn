@@ -58,7 +58,20 @@ if [[ -n "${WYN_APP:-}" ]]; then
 else
   echo "==> building Wyn.app"
   "$ROOT/scripts/build.sh"
-  SRC_APP="/tmp/WynDerivedData/Build/Products/Release/Wyn.app"
+  # build.sh installs the product to /Applications and then deletes the copy
+  # under /tmp/WynDerivedData on purpose, so Spotlight shows one Wyn. That copy
+  # is gone by the time we get here, which is why this path failed on every
+  # run without WYN_APP. Package the installed copy instead, but prove it is
+  # the build that just ran rather than trusting the path: the CLI build.sh
+  # bundled into the app must be byte-identical to the one it compiled.
+  SRC_APP="/Applications/Wyn.app"
+  bundled_cli="$SRC_APP/Contents/Resources/wyn"
+  built_cli="$ROOT/.build/release/wyn"
+  if [[ ! -f "$bundled_cli" || ! -f "$built_cli" ]] || ! cmp -s "$bundled_cli" "$built_cli"; then
+    echo "error: $SRC_APP is not the Wyn.app build.sh just produced" >&2
+    echo "       (bundled CLI does not match $built_cli)" >&2
+    exit 1
+  fi
 fi
 
 if [[ ! -d "$SRC_APP" ]]; then
