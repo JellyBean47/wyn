@@ -21,7 +21,7 @@
 //
 //  Odyssey (and any `requiresUbisoftConnect` title) also needs `upc.exe` on
 //  the *game-host* wineserver for D3DMetal play. That UI may be transparent
-//  (no FLY4); the process + a new StartView line still count. Do not
+//  (no FLY4); game readiness requires account-startup evidence. Do not
 //  wineserver -k a Logged-On session to start Connect.
 //
 
@@ -75,14 +75,23 @@ public enum ConnectLauncher {
     /// If a real readiness signal is ever found, replace this with it.
     static let signedInSettleSeconds: UInt64 = 30
 
-    /// Hold after a *freshly started* Connect signs in. Not called when
-    /// `launch()` early-returns on an already-running client — that one has
-    /// had whatever time it has had, and re-waiting would punish the fast path.
-    private static func settleAfterSignIn() async throws {
+    /// Hold after authentication is confirmed for a game launch. An existing
+    /// client may have just completed interactive sign-in, so it also needs
+    /// the settling interval.
+    private static func settleAfterSignIn(in bottle: Bottle) async throws {
         LaunchProgress.emit(
             "Ubisoft Connect: signed in — settling for \(signedInSettleSeconds)s before the game starts."
         )
         try await Task.sleep(nanoseconds: signedInSettleSeconds * 1_000_000_000)
+        // A restart during settling invalidates the earlier account evidence.
+        let (logURL, _) = launcherLogPosition(in: bottle)
+        guard let startedAt = runningConnectStartDate(),
+              authenticationStatus(log: logTail(logURL, offset: 0),
+                                   elapsedSeconds: startViewTimeoutSeconds,
+                                   isRunning: PlatformCatalog.isRunning(.ubisoft),
+                                   processStartedAt: startedAt) == .ready else {
+            throw PlatformLaunchError.connectSignInUnconfirmed
+        }
     }
 
     private static let spawned = SpawnedProcesses()
@@ -99,13 +108,25 @@ public enum ConnectLauncher {
         installDirectory(in: bottle).appending(path: "upc.exe")
     }
 
-    public static func launch(in bottle: Bottle) async throws {
+    public enum LaunchPurpose { case signIn, game }
+
+    public static func launch(in bottle: Bottle, purpose: LaunchPurpose) async throws {
         let fm = FileManager.default
         let exe = exeURL(in: bottle)
         guard fm.fileExists(atPath: exe.path(percentEncoded: false)) else {
             throw PlatformLaunchError.executableMissing(.ubisoft)
         }
         if PlatformCatalog.isRunning(.ubisoft) {
+            if purpose == .game {
+                let (logURL, _) = launcherLogPosition(in: bottle)
+                guard let startedAt = runningConnectStartDate() else {
+                    throw PlatformLaunchError.connectSignInUnconfirmed
+                }
+                try await waitForWindow(logURL: logURL, offset: 0,
+                                        requirePaintedFrame: false, requireAuthentication: true,
+                                        processStartedAt: startedAt)
+                try await settleAfterSignIn(in: bottle)
+            }
             return
         }
 
@@ -121,8 +142,8 @@ public enum ConnectLauncher {
             try prepareConnectFiles(in: bottle)
             let (logURL, offset) = launcherLogPosition(in: bottle)
             try spawnConnect(in: bottle, wineTree: .game, injectPresent: false)
-            try await waitForWindow(logURL: logURL, offset: offset, requirePaintedFrame: false)
-            try await settleAfterSignIn()
+            try await waitForWindow(logURL: logURL, offset: offset, requirePaintedFrame: false, requireAuthentication: true)
+            if purpose == .game { try await settleAfterSignIn(in: bottle) }
             return
         }
 
@@ -139,8 +160,8 @@ public enum ConnectLauncher {
             unlinkFLY4()
             let (logURL, offset) = launcherLogPosition(in: bottle)
             try spawnConnect(in: bottle, wineTree: .steam, injectPresent: true)
-            try await waitForWindow(logURL: logURL, offset: offset, requirePaintedFrame: true)
-            try await settleAfterSignIn()
+            try await waitForWindow(logURL: logURL, offset: offset, requirePaintedFrame: true, requireAuthentication: purpose == .game)
+            if purpose == .game { try await settleAfterSignIn(in: bottle) }
             return
         }
 
@@ -158,10 +179,13 @@ public enum ConnectLauncher {
                 LaunchProgress.emit("Ubisoft Connect: waiting for the window to paint…")
             }
             do {
-                try await coldStartAttempt(in: bottle)
+                try await coldStartAttempt(in: bottle, purpose: purpose)
                 return
             } catch is CancellationError {
                 throw CancellationError()
+            } catch PlatformLaunchError.connectSignInUnconfirmed {
+                // Leave the client open for interactive sign-in; retries cannot authenticate it.
+                throw PlatformLaunchError.connectSignInUnconfirmed
             } catch {
                 lastError = error
                 await drainConnect(in: bottle)
@@ -170,14 +194,14 @@ public enum ConnectLauncher {
         throw lastError
     }
 
-    private static func coldStartAttempt(in bottle: Bottle) async throws {
+    private static func coldStartAttempt(in bottle: Bottle, purpose: LaunchPurpose) async throws {
         await drainConnect(in: bottle)
         try prepareConnectFiles(in: bottle)
         unlinkFLY4()
         let (logURL, offset) = launcherLogPosition(in: bottle)
         try spawnConnect(in: bottle, wineTree: .steam, injectPresent: true)
-        try await waitForWindow(logURL: logURL, offset: offset, requirePaintedFrame: true)
-        try await settleAfterSignIn()
+        try await waitForWindow(logURL: logURL, offset: offset, requirePaintedFrame: true, requireAuthentication: purpose == .game)
+        if purpose == .game { try await settleAfterSignIn(in: bottle) }
     }
 
     private static func launcherLogPosition(in bottle: Bottle) -> (URL, Int) {
@@ -284,7 +308,9 @@ public enum ConnectLauncher {
     private static func waitForWindow(
         logURL: URL,
         offset: Int,
-        requirePaintedFrame: Bool
+        requirePaintedFrame: Bool,
+        requireAuthentication: Bool,
+        processStartedAt: Date? = nil
     ) async throws {
         for second in 1...startViewTimeoutSeconds {
             try Task.checkCancellation()
@@ -292,7 +318,10 @@ public enum ConnectLauncher {
             let chunk = logTail(logURL, offset: offset)
             let running = PlatformCatalog.isRunning(.ubisoft)
             let status: StartupStatus
-            if requirePaintedFrame {
+            if requireAuthentication {
+                status = authenticationStatus(log: chunk, elapsedSeconds: second,
+                                              isRunning: running, processStartedAt: processStartedAt)
+            } else if requirePaintedFrame {
                 status = startupStatus(
                     log: chunk,
                     elapsedSeconds: second,
@@ -309,13 +338,66 @@ public enum ConnectLauncher {
             switch status {
             case .ready: return
             case .waiting: continue
-            case .failed: throw PlatformLaunchError.connectWedged
+            case .failed:
+                if requireAuthentication && running {
+                    throw PlatformLaunchError.connectSignInUnconfirmed
+                }
+                throw PlatformLaunchError.connectWedged
             }
         }
         throw PlatformLaunchError.connectWedged
     }
 
     enum StartupStatus { case waiting, ready, failed }
+
+    /// Scope evidence to the latest startup, including restarts within one process.
+    /// A historical account line must not authenticate a currently signed-out client.
+    static func authenticationStatus(log: String, elapsedSeconds: Int, isRunning: Bool,
+                                     processStartedAt: Date? = nil) -> StartupStatus {
+        if !isRunning && elapsedSeconds > 15 { return .failed }
+        let session = log.range(of: "Client launched", options: .backwards)
+            .map { String(log[$0.lowerBound...]) } ?? log
+        let confirmed = session.components(separatedBy: "\n").contains { line in
+            guard line.contains(signedInMarker),
+                  line.range(of: #"User:\s*\S+"#, options: .regularExpression) != nil else { return false }
+            guard let processStartedAt else { return true }
+            guard let date = launcherTimestamp(line) else { return false }
+            return date >= processStartedAt
+        }
+        if isRunning && confirmed { return .ready }
+        return elapsedSeconds >= startViewTimeoutSeconds ? .failed : .waiting
+    }
+
+    static func launcherTimestamp(_ line: String) -> Date? {
+        guard let range = line.range(of: #"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"#,
+                                     options: .regularExpression) else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.date(from: String(line[range]))
+    }
+
+    /// ps emits only start time and executable name, never account tokens or arguments.
+    private static func runningConnectStartDate() -> Date? {
+        let output = PlatformCatalog.captureProcessOutput(
+            executable: "/bin/ps", arguments: ["-axo", "lstart=,comm="])
+        return connectStartDate(processListing: output)
+    }
+
+    static func connectStartDate(processListing: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "EEE MMM d HH:mm:ss yyyy"
+        let dates = processListing.components(separatedBy: "\n").compactMap { line -> Date? in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.count > 24,
+                  trimmed.dropFirst(24).trimmingCharacters(in: .whitespaces)
+                    .lowercased().hasSuffix("upc.exe") else { return nil }
+            return formatter.date(from: String(trimmed.prefix(24)))
+        }
+        // Multiple clients are ambiguous: do not borrow another client's account evidence.
+        return dates.count == 1 ? dates.first : nil
+    }
 
     /// A CEF initialization line is progress, not a deadline. Only the new
     /// launch's log tail is considered; old StartView entries cannot pass it.
@@ -344,9 +426,7 @@ public enum ConnectLauncher {
     /// nothing on the game-host path — that UI is transparent, so interactive
     /// sign-in is impossible there and a saved token is mandatory regardless.
     static func gameHostStartupStatus(log: String, elapsedSeconds: Int, isRunning: Bool) -> StartupStatus {
-        if !isRunning && elapsedSeconds > 15 { return .failed }
-        if isRunning && log.contains(signedInMarker) { return .ready }
-        return elapsedSeconds >= startViewTimeoutSeconds ? .failed : .waiting
+        authenticationStatus(log: log, elapsedSeconds: elapsedSeconds, isRunning: isRunning)
     }
 
     /// FLY4 header + pixels. Empty or hwnd-less surfaces are not a painted window.

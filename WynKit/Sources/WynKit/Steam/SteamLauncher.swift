@@ -1957,12 +1957,8 @@ public enum SteamLauncher {
 
     /// Attach Connect to the live game-host wineserver. Never wineserver -k.
     private static func ensureUbisoftConnectOnGameHost(in bottle: Bottle) async throws {
-        if PlatformCatalog.isRunning(.ubisoft) {
-            progress("Ubisoft Connect is already running on this wineserver.")
-            return
-        }
         progress("Opening Ubisoft Connect on game-host Wine (same wineserver as Steam).")
-        try await ConnectLauncher.launch(in: bottle)
+        try await ConnectLauncher.launch(in: bottle, purpose: .game)
         guard PlatformCatalog.isRunning(.ubisoft) else {
             throw PlatformLaunchError.connectWedged
         }
@@ -1983,7 +1979,7 @@ public enum SteamLauncher {
         options.preferGPTKSteam = false
 
         progress("Opening Ubisoft Connect…")
-        try await ConnectLauncher.launch(in: bottle)
+        try await ConnectLauncher.launch(in: bottle, purpose: .game)
         try Task.checkCancellation()
 
         if !isSteamClientRunning(in: bottle) {

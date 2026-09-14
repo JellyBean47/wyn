@@ -4,6 +4,58 @@ import Testing
 
 @Suite("Ubisoft Connect startup")
 struct ConnectLauncherTests {
+    @Test func paintedSignInPageOpensTileButDoesNotAuthorizeGame() {
+        let log = "StartView.cpp\nClient launched with argOffline: false"
+        #expect(ConnectLauncher.startupStatus(log: log, elapsedSeconds: 20,
+                                             isRunning: true, hasFrame: true) == .ready)
+        #expect(ConnectLauncher.authenticationStatus(log: log, elapsedSeconds: 20,
+                                                     isRunning: true) == .waiting)
+        #expect(ConnectLauncher.authenticationStatus(log: log, elapsedSeconds: 120,
+                                                     isRunning: true) == .failed)
+    }
+
+    @Test func accountFromEarlierStartupCannotAuthorizeRestart() {
+        let old = "Client launched\nAccountStartupUser.cpp (238) User: test-account\n"
+        #expect(ConnectLauncher.authenticationStatus(log: old, elapsedSeconds: 20,
+                                                     isRunning: true) == .ready)
+        let restarted = old + "StartView.cpp\nClient launched with argOffline: false\n"
+        #expect(ConnectLauncher.authenticationStatus(log: restarted, elapsedSeconds: 120,
+                                                     isRunning: true) == .failed)
+        #expect(ConnectLauncher.authenticationStatus(
+            log: restarted + "AccountStartupUser.cpp (238) User: test-account",
+            elapsedSeconds: 20, isRunning: true) == .ready)
+    }
+
+    @Test func existingProcessRequiresDatedAccountEvidenceFromItsOwnLifetime() throws {
+        let start = try #require(ConnectLauncher.launcherTimestamp("2026-09-14 00:09:17"))
+        for line in [
+            "2026-09-10 18:24:02 AccountStartupUser.cpp (238) User: test-account",
+            "AccountStartupUser.cpp (238) User: test-account",
+            "2026-09-14 00:09:30 AccountStartupUser.cpp (238) failed",
+            "2026-09-14 00:09:30 AccountStartupUser.cpp (238) User: "
+        ] {
+            #expect(ConnectLauncher.authenticationStatus(log: line, elapsedSeconds: 120,
+                isRunning: true, processStartedAt: start) == .failed)
+        }
+        let current = "2026-09-14 00:09:30 AccountStartupUser.cpp (238) User: test-account"
+        #expect(ConnectLauncher.authenticationStatus(log: current, elapsedSeconds: 20,
+            isRunning: true, processStartedAt: start) == .ready)
+        #expect(ConnectLauncher.authenticationStatus(log: current, elapsedSeconds: 20,
+            isRunning: false, processStartedAt: start) == .failed)
+    }
+
+    @Test func processStartParsingRejectsMissingAndAmbiguousClients() throws {
+        let client = #"Mon Sep 14 00:09:17 2026 C:\Program Files (x86)\Ubisoft\upc.exe"#
+        let expected = try #require(ConnectLauncher.launcherTimestamp("2026-09-14 00:09:17"))
+        #expect(ConnectLauncher.connectStartDate(processListing: client) == expected)
+        #expect(ConnectLauncher.connectStartDate(processListing: "") == nil)
+        #expect(ConnectLauncher.connectStartDate(processListing: client + "\n" + client) == nil)
+        #expect(ConnectLauncher.connectStartDate(processListing:
+            client.replacingOccurrences(of: "upc.exe", with: "UplayWebCore.exe")) == nil)
+        #expect(ConnectLauncher.connectStartDate(processListing:
+            #"Wed Sep  9 01:00:00 2026 C:\Ubisoft\upc.exe"#) != nil)
+    }
+
     @Test func cefArgsKeepInProcessGpuSoFLY4GetsStretchBlts() {
         #expect(ConnectLauncher.cefArgs.contains("--in-process-gpu"))
         #expect(!ConnectLauncher.cefArgs.contains("--disable-gpu"))
