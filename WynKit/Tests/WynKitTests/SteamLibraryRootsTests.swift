@@ -104,8 +104,43 @@ struct SteamLibraryRootsTests {
         #expect(!SteamLauncher.insertLibraryFolder(at: vdf, windowsPath: extra))
 
         let text = try String(contentsOf: vdf, encoding: .utf8)
-        #expect(text.contains(extra))
-        #expect(text.components(separatedBy: extra).count == 2)
+        let written = #""path"\#t\#t"Z:\\Volumes\\SSD1TB\\SteamLibrary""#
+        #expect(text.components(separatedBy: written).count == 2)
+    }
+
+    /// The shape Steam itself writes. An unescaped comparison never matched it,
+    /// so every launch with Steam closed appended the library again.
+    @Test func aLibraryAlreadyWrittenBySteamIsNotAddedAgain() throws {
+        let root = try makeTree()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let vdf = root.appending(path: "libraryfolders.vdf")
+        let steamWritten = #"""
+        "libraryfolders"
+        {
+        	"0"
+        	{
+        		"path"		"C:\\Program Files (x86)\\Steam"
+        	}
+        	"1"
+        	{
+        		"path"		"Z:\\Volumes\\SSD1TB\\SteamLibrary"
+        		"apps"
+        		{
+        			"526870"		"0"
+        		}
+        	}
+        }
+        """#
+        try steamWritten.write(to: vdf, atomically: true, encoding: .utf8)
+
+        #expect(!SteamLauncher.insertLibraryFolder(at: vdf, windowsPath: #"Z:\Volumes\SSD1TB\SteamLibrary"#))
+        #expect(try String(contentsOf: vdf, encoding: .utf8) == steamWritten)
+    }
+
+    @Test func vdfEscapingRoundTripsWindowsPaths() {
+        let path = #"Z:\Volumes\SSD1TB\SteamLibrary"#
+        #expect(SteamLauncher.vdfEscaped(path) == #"Z:\\Volumes\\SSD1TB\\SteamLibrary"#)
+        #expect(SteamLauncher.vdfUnescaped(SteamLauncher.vdfEscaped(path)) == path)
     }
 
     @Test func windowsPathUsesZWhenZPointsAtRoot() throws {
