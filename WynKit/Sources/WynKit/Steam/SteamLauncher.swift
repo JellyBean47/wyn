@@ -176,6 +176,13 @@ public enum SteamLauncher {
 
     /// Insert a `"path"` folder into a Steam `libraryfolders.vdf` if missing.
     /// Returns true when the file was changed.
+    ///
+    /// Paths are VDF-escaped both ways. Before 15 Sep 2026 neither direction
+    /// was: the raw `Z:\Volumes\SSD1TB\SteamLibrary` never matched Steam's
+    /// `Z:\\Volumes\\SSD1TB\\SteamLibrary`, so every launch with Steam closed
+    /// appended the library again, and Steam read the unescaped copy back as
+    /// the bare path `Z:` ("Install folder Z: not mounted"). One Mac collected
+    /// 38 such entries in a week.
     static func insertLibraryFolder(at vdf: URL, windowsPath: String) -> Bool {
         let fm = FileManager.default
         let existing = (try? String(contentsOf: vdf, encoding: .utf8)) ?? """
@@ -194,7 +201,7 @@ public enum SteamLauncher {
         let block = """
         	"\(nextIndex)"
         	{
-        		"path"		"\(windowsPath)"
+        		"path"		"\(vdfEscaped(windowsPath))"
         		"label"		""
         		"contentid"		"0"
         		"totalsize"		"0"
@@ -2495,14 +2502,36 @@ public enum SteamLauncher {
         parseManifestValues(named: key, in: manifest).first
     }
 
+    /// Values are returned unescaped: Steam writes `"Z:\\Volumes\\SSD1TB"` in
+    /// VDF text for the path `Z:\Volumes\SSD1TB`.
     private static func parseManifestValues(named key: String, in manifest: String) -> [String] {
         let pattern = #""\#(key)"\s+"([^"]+)""#
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
         let range = NSRange(manifest.startIndex..., in: manifest)
         return regex.matches(in: manifest, range: range).compactMap { match in
             guard let r = Range(match.range(at: 1), in: manifest) else { return nil }
-            return String(manifest[r])
+            return vdfUnescaped(String(manifest[r]))
         }
+    }
+
+    /// VDF string escaping, as Steam's own writer applies it to paths.
+    static func vdfEscaped(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
+    static func vdfUnescaped(_ value: String) -> String {
+        var result = ""
+        var iterator = value.makeIterator()
+        while let character = iterator.next() {
+            if character == "\\", let next = iterator.next() {
+                result.append(next)
+            } else {
+                result.append(character)
+            }
+        }
+        return result
     }
 
     /// Map a Wine/Steam Windows path (`C:\…`, `Z:\Volumes\…`) onto the host filesystem.
