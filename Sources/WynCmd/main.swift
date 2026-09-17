@@ -42,6 +42,7 @@ struct WynCLI: AsyncParsableCommand {
             Profiles.self,
             Runtime.self,
             Steam.self,
+            Connect.self,
             GPTK.self,
             Renderer.self,
             MCP.self,
@@ -1545,6 +1546,116 @@ extension WynCLI {
             print("Renderer → \(layer.displayName)")
             for line in RendererWiring.inspect().statusLines {
                 print("  \(line)")
+            }
+        }
+    }
+}
+
+// MARK: - Ubisoft Connect
+
+extension WynCLI {
+    /// Games that need Connect fail in three different ways, and a screenshot of
+    /// a blank window tells them apart for nobody. These commands say which one
+    /// it is, and recover the one that a person can actually fix.
+    struct Connect: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "connect",
+            abstract: "Check Ubisoft Connect's sign-in, or recover a blocked one.",
+            discussion: """
+            wyn connect status
+                Running? Signed in, and when? Did its ownership connection come \
+                up? Is a saved sign-in on disk (size and date only)?
+
+            wyn connect signin [--fresh-browser-cache]
+                Opens Connect for an interactive sign-in and waits for its \
+                account line. --fresh-browser-cache renames Connect's browser \
+                profile first (never deletes it), which recovered a sign-in that \
+                Ubisoft's bot check had refused. Saved credentials are untouched.
+            """,
+            subcommands: [ConnectStatus.self, ConnectSignIn.self],
+            defaultSubcommand: ConnectStatus.self
+        )
+    }
+
+    fileprivate static func connectBottle() throws -> Bottle {
+        guard let bottle = GameLibrary.steamBottle() else {
+            throw ValidationError("No Steam bottle. Run: wyn install")
+        }
+        return bottle
+    }
+
+    fileprivate static func connectStamp(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.string(from: date)
+    }
+
+    struct ConnectStatus: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "status",
+            abstract: "Show whether Connect can authorise a game right now."
+        )
+
+        mutating func run() throws {
+            let bottle = try WynCLI.connectBottle()
+            let state = ConnectLauncher.state(in: bottle)
+
+            print("Connect:    \(state.isRunning ? "running" : "not running")")
+            if let signedInAt = state.signedInAt {
+                print("Signed in:  yes, account startup at \(WynCLI.connectStamp(signedInAt))")
+            } else {
+                print("Signed in:  no account startup in the newest session")
+            }
+            if let code = state.ownership {
+                print("Ownership:  FAILED (\(code)) — Connect cannot authorise a game")
+            } else {
+                print("Ownership:  no startup failure logged")
+            }
+            if let bytes = state.storeBytes, let modified = state.storeModified {
+                print("Saved sign-in: \(bytes) bytes, \(WynCLI.connectStamp(modified)) (contents never read)")
+            } else {
+                print("Saved sign-in: none on disk")
+            }
+
+            print("")
+            if state.ownership != nil {
+                print("Quit Connect, wait about five minutes, then launch again.")
+                print("Measured: this follows a signed-in Connect being killed minutes earlier.")
+            } else if state.signedInAt == nil {
+                print("Sign in first:  wyn connect signin")
+                print("If its window shows \"Access is temporarily restricted\":")
+                print("  wyn connect signin --fresh-browser-cache")
+            } else {
+                print("Ready for a game launch.")
+            }
+        }
+    }
+
+    struct ConnectSignIn: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "signin",
+            abstract: "Open Connect for an interactive sign-in and wait for it to land."
+        )
+
+        @Flag(name: .customLong("fresh-browser-cache"),
+              help: "Rename Connect's browser profile first (never deletes it).")
+        var freshBrowserCache = false
+
+        @Option(help: "Seconds to wait for the account line.")
+        var wait: Int = 240
+
+        mutating func run() async throws {
+            let bottle = try WynCLI.connectBottle()
+            print("Opening Ubisoft Connect for sign-in. Enter your credentials in its window.")
+            let state = try await ConnectLauncher.signIn(
+                in: bottle, freshBrowserCache: freshBrowserCache, waitSeconds: wait
+            )
+            if let signedInAt = state.signedInAt {
+                print("Signed in — account startup at \(WynCLI.connectStamp(signedInAt)).")
+            }
+            if let code = state.ownership {
+                print("Ownership connection failed (\(code)). Wait about five minutes before launching a game.")
             }
         }
     }

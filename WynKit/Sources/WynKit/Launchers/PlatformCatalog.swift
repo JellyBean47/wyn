@@ -88,6 +88,9 @@ public enum PlatformLaunchError: LocalizedError, Sendable {
     case presentDylibsMissing
     case connectOnGPTK
     case unexpectedWineserver
+    case connectSignInUnconfirmed
+    case connectOwnershipUnavailable
+    case connectAlreadyRunning
     case connectWedged
     case notWired(PlatformKind)
 
@@ -106,6 +109,18 @@ public enum PlatformLaunchError: LocalizedError, Sendable {
             """
         case .unexpectedWineserver:
             return "This bottle already has a wineserver that is not frankea. Quit it before opening Ubisoft Connect."
+        case .connectSignInUnconfirmed:
+            return "Ubisoft Connect sign-in could not be confirmed. Open the Ubisoft Connect tile and finish signing in before launching the game. If no sign-in window appears, quit Ubisoft Connect and Steam normally, then reopen the tile."
+        case .connectOwnershipUnavailable:
+            return """
+            Ubisoft Connect signed in but could not bring up its ownership connection, \
+            so it cannot authorise the game (its own window shows a dolphin-### recovery page). \
+            Measured cause: Connect was restarted within a few minutes of a signed-in session \
+            being killed. Quit Connect, wait about five minutes, then launch again. \
+            If it persists, check Ubisoft's service status.
+            """
+        case .connectAlreadyRunning:
+            return "Ubisoft Connect is already running. Quit it first, then run this command again."
         case .connectWedged:
             return "Ubisoft Connect wedged at StartView. Try again in a moment."
         case .notWired(let kind):
@@ -534,7 +549,7 @@ public enum PlatformCatalog {
             options.detachAfterStart = true
             try await SteamLauncher.launchSteam(in: bottle, options: options)
         case .ubisoft:
-            try await ConnectLauncher.launch(in: bottle)
+            try await ConnectLauncher.launch(in: bottle, purpose: .signIn)
         case .rockstar:
             try await RockstarLauncher.launch(in: bottle)
         case .epic, .gog:
@@ -670,10 +685,20 @@ public enum PlatformCatalog {
         return nil
     }
 
-    static func captureProcessOutput(executable: String, arguments: [String]) -> String {
+    /// `environment` is merged over the inherited one; pass `LC_ALL=C` when the
+    /// output is parsed, since `ps` and friends format dates by locale.
+    static func captureProcessOutput(
+        executable: String,
+        arguments: [String],
+        environment: [String: String]? = nil
+    ) -> String {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: executable)
         proc.arguments = arguments
+        if let environment {
+            proc.environment = ProcessInfo.processInfo.environment
+                .merging(environment, uniquingKeysWith: { _, new in new })
+        }
         let pipe = Pipe()
         proc.standardOutput = pipe
         proc.standardError = FileHandle.nullDevice
@@ -687,7 +712,7 @@ public enum PlatformCatalog {
         return String(data: data, encoding: .utf8) ?? ""
     }
 
-    private static func lineLooksLike(_ kind: PlatformKind, _ line: String) -> Bool {
+    static func lineLooksLike(_ kind: PlatformKind, _ line: String) -> Bool {
         let lower = line.lowercased()
         switch kind {
         case .steam:
@@ -695,7 +720,10 @@ public enum PlatformCatalog {
             return lower.contains("\\steam\\steam.exe") || lower.contains("/steam/steam.exe")
         case .ubisoft:
             if lower.contains("uplaywebcore") { return false }
-            return lower.contains("upc.exe")
+            // Match the executable's path, not the bare name: a shell or script
+            // whose own command line merely mentions `upc.exe` is not Connect,
+            // and a false positive here refuses launches and sign-in commands.
+            return lower.contains(#"\upc.exe"#) || lower.contains("/upc.exe")
         case .rockstar:
             return lower.contains("rockstar games") && lower.contains("launcher.exe")
         case .epic:

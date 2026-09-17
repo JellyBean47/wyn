@@ -149,6 +149,12 @@ rm -f "$BIN_DIR/wyn"
 cp "$ROOT/.build/release/wyn" "$BIN_DIR/wyn"
 chmod +x "$BIN_DIR/wyn"
 ln -sfn "$BIN_DIR/wyn" "$BIN_DIR/fly"
+# The CLI finds WynKit's resources beside the path it was started from, and
+# otherwise only at the absolute .build path it was compiled in. Without this
+# copy it works until that build folder is removed, then aborts on every command
+# ("could not load resource bundle") — measured 15 Sep 2026.
+rm -rf "$BIN_DIR/WynKit_WynKit.bundle"
+ditto "$ROOT/.build/release/WynKit_WynKit.bundle" "$BIN_DIR/WynKit_WynKit.bundle"
 
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;

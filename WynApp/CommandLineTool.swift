@@ -37,8 +37,16 @@ enum CommandLineTool {
         Bundle.main.url(forResource: "wyn", withExtension: nil)
     }
 
+    /// WynKit's SwiftPM resources (profiles, catalog). The CLI looks for this
+    /// next to the path it was started from and aborts without it — a copy of
+    /// the binary alone crashes on its first command, and so does a symlink to
+    /// the bundled binary (measured 15 Sep 2026). It has to travel with `wyn`.
+    static var bundledResources: URL? {
+        Bundle.main.url(forResource: "WynKit_WynKit", withExtension: "bundle")
+    }
+
     static func install() {
-        guard let source = bundled else {
+        guard let source = bundled, let resources = bundledResources else {
             report(
                 title: "This build does not carry the command line tool",
                 body: "Install from source to get `wyn`:\n  ./install.sh",
@@ -50,6 +58,7 @@ enum CommandLineTool {
         let fm = FileManager.default
         let destination = binDirectory.appending(path: "wyn")
         let alias = binDirectory.appending(path: "fly")
+        let resourcesDestination = binDirectory.appending(path: resources.lastPathComponent)
 
         do {
             try fm.createDirectory(at: binDirectory, withIntermediateDirectories: true)
@@ -58,10 +67,11 @@ enum CommandLineTool {
             // fails with "Text file busy", and an MCP server started by an
             // editor is exactly that. The running process keeps the old inode
             // and the next start picks this one up.
-            for path in [destination, alias] where fm.fileExists(atPath: path.path) {
+            for path in [destination, alias, resourcesDestination] where fm.fileExists(atPath: path.path) {
                 try fm.removeItem(at: path)
             }
 
+            try fm.copyItem(at: resources, to: resourcesDestination)
             try fm.copyItem(at: source, to: destination)
             try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destination.path)
             try fm.createSymbolicLink(at: alias, withDestinationURL: destination)
