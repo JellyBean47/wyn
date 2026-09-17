@@ -65,3 +65,40 @@ were confirmed on that path. `--disable-gpu` was a regression: StartView logged
 but FAST blit/s stayed 0 and the HWND stayed transparent.
 
 Regression checks: `swift test --package-path WynKit --filter ConnectLauncherTests`.
+
+# Connect readiness and recovery — 17 September 2026
+
+Three failures were measured on this project, and Wyn now treats them as three
+different things instead of "the window looks fine".
+
+**1. Signed out / web sign-in blocked.** 14 Sep: Connect discarded its saved
+sign-in, and Ubisoft's bot check (DataDome) refused the sign-in page inside
+Connect's CEF. Recovered by hand on 15 Sep by renaming the CEF profile
+(`…/Ubisoft Game Launcher/cache/http2`) and signing in on a tree that paints a
+window. That recovery is now a command:
+
+    wyn connect status              # running / signed in / ownership / store
+    wyn connect signin              # open Connect and wait for the account line
+    wyn connect signin --fresh-browser-cache
+
+`--fresh-browser-cache` **renames** the CEF profile to `http2.parked-<stamp>` and
+lets Connect build a new one. Nothing is deleted, and saved credentials are never
+read or written. Restore by renaming the parked directory back to `http2`.
+
+**2. Signed in, ownership refused.** Measured 9 Sep 19:32 and 15 Sep 21:42, both
+within five minutes of a signed-in Connect being killed: `AccountStartupUser`
+appears, then `Ownership connection is not set up` and a `dolphin-028` recovery
+page. A game launched into that client cannot be authorised.
+`ConnectLauncher.ownershipStatus` reads the newest session and a game launch now
+fails with `connectOwnershipUnavailable`, which says to wait about five minutes.
+`Ownership connection lost` after play (10 Sep 18:47, 23 minutes in) is a network
+drop and is explicitly not treated as a startup failure.
+
+**3. Sign-in confirmation on non-US Macs.** `ps -o lstart` is locale-formatted;
+an en_ZA Mac prints `Tue 15 Sep …`, not `Tue Sep 15 …`. The readiness check found
+no process start date and refused every launch with "sign-in could not be
+confirmed" while Connect was signed in (15 Sep 23:35). `ps` now runs with
+`LC_ALL=C`, and the parser accepts day-first output as well.
+
+What this does not do: it does not defeat Ubisoft's bot check, validate a token
+server-side, or prove a session is still valid without a fresh startup line.

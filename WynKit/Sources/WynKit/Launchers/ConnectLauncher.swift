@@ -85,12 +85,20 @@ public enum ConnectLauncher {
         try await Task.sleep(nanoseconds: signedInSettleSeconds * 1_000_000_000)
         // A restart during settling invalidates the earlier account evidence.
         let (logURL, _) = launcherLogPosition(in: bottle)
+        let settled = logTail(logURL, offset: 0)
         guard let startedAt = runningConnectStartDate(),
-              authenticationStatus(log: logTail(logURL, offset: 0),
+              authenticationStatus(log: settled,
                                    elapsedSeconds: startViewTimeoutSeconds,
                                    isRunning: PlatformCatalog.isRunning(.ubisoft),
                                    processStartedAt: startedAt) == .ready else {
             throw PlatformLaunchError.connectSignInUnconfirmed
+        }
+        // Signed in is not the same as able to authorise a game: Connect can
+        // resolve the account and still fail to bring up its ownership
+        // connection, which the client surfaces as its dolphin recovery page.
+        if case .failed(let code) = ownershipStatus(log: settled) {
+            LaunchProgress.emit("Ubisoft Connect: ownership connection unavailable (\(code)).")
+            throw PlatformLaunchError.connectOwnershipUnavailable
         }
     }
 
@@ -368,6 +376,158 @@ public enum ConnectLauncher {
         return elapsedSeconds >= startViewTimeoutSeconds ? .failed : .waiting
     }
 
+    public enum OwnershipStatus: Equatable, Sendable {
+        case ok
+        /// Connect reported the code shown on its `dolphin-*` recovery page.
+        case failed(String)
+    }
+
+    /// Whether the newest Connect session brought up its ownership connection.
+    ///
+    /// Measured twice on this project — 9 Sep 19:32 (wine 11.0) and 15 Sep
+    /// 21:42 (game-host) — both after a signed-in Connect had been killed one
+    /// to five minutes earlier. `AccountStartupUser` appeared, then:
+    ///
+    ///     ERROR DemuxFailReason.cpp 11-5002,4004, Ownership connection is not set up with 0 retries
+    ///     ERROR ConnectView.cpp     dolphin-028, Shell recovery page
+    ///
+    /// The game was then handed a client that could not authorise it. A later
+    /// `Ownership connection lost` (10 Sep 18:47, after 23 minutes of play) is
+    /// a network drop, not a startup failure, and must not be treated as one.
+    static func ownershipStatus(log: String) -> OwnershipStatus {
+        let session = log.range(of: "Client launched", options: .backwards)
+            .map { String(log[$0.lowerBound...]) } ?? log
+        let failures = session.components(separatedBy: "\n").filter {
+            $0.contains("Ownership connection is not set up") || $0.contains("dolphin-")
+        }
+        guard !failures.isEmpty else { return .ok }
+
+        // The dolphin code is what the client shows the person, so prefer it.
+        for line in failures {
+            if let code = line.range(of: #"dolphin-\d+"#, options: .regularExpression) {
+                return .failed(String(line[code]))
+            }
+        }
+        for line in failures {
+            // Drop log timestamps first: `2026-09-15 21:43:24` also looks like a
+            // hyphenated Ubisoft error code.
+            let withoutTimestamps = line.replacingOccurrences(
+                of: #"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"#, with: " ", options: .regularExpression
+            )
+            if let code = withoutTimestamps.range(of: #"\d+-\d+(,\d+)*"#, options: .regularExpression) {
+                return .failed(String(withoutTimestamps[code]))
+            }
+        }
+        return .failed("unknown")
+    }
+
+    /// Connect's CEF profile — cookies, the bot-check cookie, cached pages.
+    static func browserCacheDirectory(in bottle: Bottle) -> URL? {
+        let fm = FileManager.default
+        let usersRoot = bottle.url.appending(path: "drive_c").appending(path: "users")
+        guard let users = try? fm.contentsOfDirectory(at: usersRoot, includingPropertiesForKeys: nil)
+        else { return nil }
+        for user in users where user.lastPathComponent != "Public" {
+            let cache = user.appending(path: "AppData").appending(path: "Local")
+                .appending(path: connectProfileLeaf).appending(path: "cache").appending(path: "http2")
+            // Follows the shared-profile symlink, so either Windows user resolves
+            // to the one real directory.
+            if fm.fileExists(atPath: cache.path(percentEncoded: false)) { return cache }
+        }
+        return nil
+    }
+
+    /// Dated sibling name, so a parked cache is never confused with the live one
+    /// and nothing is ever deleted.
+    static func parkedCacheName(at date: Date = Date()) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return "http2.parked-\(formatter.string(from: date))"
+    }
+
+    /// Rename (never delete) Connect's browser profile so the next start builds a
+    /// fresh one. Recovered a blocked web sign-in by hand on 15 Sep 2026.
+    @discardableResult
+    static func parkBrowserCache(in bottle: Bottle, at date: Date = Date()) throws -> URL? {
+        guard let cache = browserCacheDirectory(in: bottle) else { return nil }
+        let parked = cache.deletingLastPathComponent().appending(path: parkedCacheName(at: date))
+        try FileManager.default.moveItem(at: cache, to: parked)
+        return parked
+    }
+
+    /// What a person needs to know before launching a game that needs Connect.
+    public struct State: Sendable {
+        public var isRunning: Bool
+        public var signedInAt: Date?
+        public var ownership: String?
+        public var hasSignInStore: Bool
+        public var storeBytes: Int?
+        public var storeModified: Date?
+    }
+
+    public static func state(in bottle: Bottle) -> State {
+        let (logURL, _) = launcherLogPosition(in: bottle)
+        let log = logTail(logURL, offset: 0)
+        let session = log.range(of: "Client launched", options: .backwards)
+            .map { String(log[$0.lowerBound...]) } ?? log
+        let signedInAt = session.components(separatedBy: "\n")
+            .last { $0.contains(signedInMarker) && $0.contains("User:") }
+            .flatMap { launcherTimestamp($0) }
+        var ownership: String?
+        if case .failed(let code) = ownershipStatus(log: log) { ownership = code }
+
+        var bytes: Int?
+        var modified: Date?
+        let fm = FileManager.default
+        if let cache = browserCacheDirectory(in: bottle) {
+            let store = cache.deletingLastPathComponent().deletingLastPathComponent()
+                .appending(path: "ConnectSecureStorage.dat")
+            if let attrs = try? fm.attributesOfItem(atPath: store.path(percentEncoded: false)) {
+                bytes = (attrs[.size] as? NSNumber)?.intValue
+                modified = attrs[.modificationDate] as? Date
+            }
+        }
+        return State(isRunning: PlatformCatalog.isRunning(.ubisoft),
+                     signedInAt: signedInAt, ownership: ownership,
+                     hasSignInStore: bytes != nil, storeBytes: bytes, storeModified: modified)
+    }
+
+    /// Open Connect for an interactive sign-in and wait for the account line.
+    ///
+    /// `freshBrowserCache` parks the CEF profile first. Ubisoft's bot check
+    /// (DataDome) refused the sign-in page on 14 Sep 2026 with a cookie that had
+    /// been flagged; a parked cache plus a visible window recovered it on 15 Sep.
+    /// Nothing is deleted, and saved credentials are never touched.
+    @discardableResult
+    public static func signIn(in bottle: Bottle, freshBrowserCache: Bool,
+                              waitSeconds: Int = 240) async throws -> State {
+        guard !PlatformCatalog.isRunning(.ubisoft) else {
+            throw PlatformLaunchError.connectAlreadyRunning
+        }
+        if freshBrowserCache, let parked = try parkBrowserCache(in: bottle) {
+            LaunchProgress.emit("Ubisoft Connect: parked the browser cache as \(parked.lastPathComponent).")
+            LaunchProgress.emit("  Restore it by renaming that directory back to http2.")
+        }
+        try await launch(in: bottle, purpose: .signIn)
+
+        // The previous session's account line is still in the log, so require
+        // one from the process that is running now.
+        let (logURL, _) = launcherLogPosition(in: bottle)
+        for second in 1...max(1, waitSeconds) {
+            try Task.checkCancellation()
+            let running = PlatformCatalog.isRunning(.ubisoft)
+            guard running else { break }
+            if let startedAt = runningConnectStartDate(),
+               authenticationStatus(log: logTail(logURL, offset: 0), elapsedSeconds: second,
+                                    isRunning: running, processStartedAt: startedAt) == .ready {
+                return state(in: bottle)
+            }
+            try await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+        throw PlatformLaunchError.connectSignInUnconfirmed
+    }
+
     static func launcherTimestamp(_ line: String) -> Date? {
         guard let range = line.range(of: #"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"#,
                                      options: .regularExpression) else { return nil }
@@ -378,22 +538,33 @@ public enum ConnectLauncher {
     }
 
     /// ps emits only start time and executable name, never account tokens or arguments.
+    ///
+    /// `lstart` follows the user's locale: on an en_ZA Mac it prints
+    /// `Tue 15 Sep 23:34:29 2026`, not `Tue Sep 15 …`. Parsing only the US order
+    /// rejected every game launch with "sign-in could not be confirmed" while
+    /// Connect was signed in (measured 15 Sep 2026). `LC_ALL=C` pins the order;
+    /// the parser still accepts both in case the environment does not take.
     private static func runningConnectStartDate() -> Date? {
         let output = PlatformCatalog.captureProcessOutput(
-            executable: "/bin/ps", arguments: ["-axo", "lstart=,comm="])
+            executable: "/bin/ps", arguments: ["-axo", "lstart=,comm="],
+            environment: ["LC_ALL": "C"])
         return connectStartDate(processListing: output)
     }
 
     static func connectStartDate(processListing: String) -> Date? {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "EEE MMM d HH:mm:ss yyyy"
+        let formatters = ["EEE MMM d HH:mm:ss yyyy", "EEE d MMM HH:mm:ss yyyy"].map { format in
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = format
+            return formatter
+        }
         let dates = processListing.components(separatedBy: "\n").compactMap { line -> Date? in
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             guard trimmed.count > 24,
                   trimmed.dropFirst(24).trimmingCharacters(in: .whitespaces)
                     .lowercased().hasSuffix("upc.exe") else { return nil }
-            return formatter.date(from: String(trimmed.prefix(24)))
+            let stamp = String(trimmed.prefix(24))
+            return formatters.lazy.compactMap { $0.date(from: stamp) }.first
         }
         // Multiple clients are ambiguous: do not borrow another client's account evidence.
         return dates.count == 1 ? dates.first : nil
