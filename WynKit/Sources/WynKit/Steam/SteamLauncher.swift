@@ -1251,7 +1251,45 @@ public enum SteamLauncher {
     }
 
     /// Wine PE `steam.exe` (not steamwebhelper lines that only mention steampath=…steam.exe).
+    /// Compiled once. `range(of:options:.regularExpression)` builds a fresh
+    /// `NSRegularExpression` on every call, and this predicate runs over every
+    /// row of the process table on every poll of `waitForSteamClient` /
+    /// `waitForSteamLoggedOn`.
+    private static let steamExeTokenRegex = try? NSRegularExpression(
+        pattern: #"(^|[\\/ ])steam\.exe(\s|$)"#,
+        options: [.caseInsensitive]
+    )
+
+    /// `steam`, lowercase ASCII — the prefilter needle for `lineIsSteamClientExe`.
+    private static let steamNeedleASCII: [UInt8] = Array("steam".utf8)
+
+    /// Case-insensitive ASCII substring test that allocates nothing.
+    ///
+    /// Only valid for needles made of ASCII letters: `| 0x20` lowercases
+    /// letters but mangles punctuation (`\` would become `|`).
+    private static func containsASCIILetters(_ haystack: String, _ needle: [UInt8]) -> Bool {
+        guard !needle.isEmpty else { return true }
+        let utf8 = haystack.utf8
+        guard utf8.count >= needle.count else { return false }
+        var start = utf8.startIndex
+        while start != utf8.endIndex {
+            var i = start
+            var j = 0
+            while j < needle.count, i != utf8.endIndex, (utf8[i] | 0x20) == needle[j] {
+                i = utf8.index(after: i)
+                j += 1
+            }
+            if j == needle.count { return true }
+            start = utf8.index(after: start)
+        }
+        return false
+    }
+
     static func lineIsSteamClientExe(_ line: String) -> Bool {
+        // Cheap reject first. Nearly every row of `ps -ax` has no "steam" in it,
+        // and `lowercased()` allocated a copy of each command line — CEF's are
+        // kilobytes — before we knew whether the row was interesting at all.
+        guard containsASCIILetters(line, steamNeedleASCII) else { return false }
         let lower = line.lowercased()
         if lower.contains("steamwebhelper") { return false }
         if lower.contains("steampath=") { return false }
@@ -1260,7 +1298,8 @@ public enum SteamLauncher {
             return true
         }
         // Fallback: command token is steam.exe
-        return lower.range(of: #"(^|[\\/ ])steam\.exe([\s]|$)"#, options: .regularExpression) != nil
+        guard let regex = steamExeTokenRegex else { return false }
+        return regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) != nil
     }
 
     /// Whether a wineserver process owns this bottle (`WINEPREFIX` on that PID only).
@@ -1293,7 +1332,46 @@ public enum SteamLauncher {
     }
 
     /// `pid` + command from a cheap `ps` (no environ — CEF `ps eww` can deadlock).
+    /// Short-lived memo of the process table.
+    ///
+    /// One logical check enumerates it several times — `isSteamClientRunning`
+    /// -> `steamClientCommandLines` -> `isBottleWineserverRunning` +
+    /// `pidAndCommandRows` + `wineserverProcessCount` — each spawning `ps`.
+    /// The TTL is far shorter than the 500ms/1s poll intervals, so successive
+    /// polls still see fresh data; only the duplicate reads inside a single
+    /// poll are collapsed.
+    private static let processRowsTTL: TimeInterval = 0.2
+    private static let processRowsLock = NSLock()
+    nonisolated(unsafe) private static var processRowsCache:
+        (taken: Date, rows: [(pid: Int, command: String)])?
+
+    /// Drop the memo so the next read re-runs `ps` (tests, and callers that
+    /// have just started or killed a process and must observe it immediately).
+    static func invalidateProcessRowsCache() {
+        processRowsLock.lock()
+        processRowsCache = nil
+        processRowsLock.unlock()
+    }
+
     static func pidAndCommandRows() -> [(pid: Int, command: String)] {
+        processRowsLock.lock()
+        if let cached = processRowsCache,
+           Date().timeIntervalSince(cached.taken) < processRowsTTL {
+            let rows = cached.rows
+            processRowsLock.unlock()
+            return rows
+        }
+        processRowsLock.unlock()
+
+        let rows = readPidAndCommandRows()
+
+        processRowsLock.lock()
+        processRowsCache = (Date(), rows)
+        processRowsLock.unlock()
+        return rows
+    }
+
+    private static func readPidAndCommandRows() -> [(pid: Int, command: String)] {
         let text = captureProcessOutput(
             executable: "/bin/ps",
             arguments: ["-ax", "-o", "pid=,command="]
@@ -2005,12 +2083,32 @@ public enum SteamLauncher {
         progress("Launching game…")
     }
 
+    /// Poll delay that starts responsive and then backs off.
+    ///
+    /// Each poll here scans the whole process table, so a wait that runs to a
+    /// 120s or 180s deadline is expensive at a flat interval — that is what
+    /// pinned a core after Play. Steam almost always appears in the first few
+    /// seconds, so the early polls keep the old cadence and only a genuinely
+    /// long wait slows down.
+    private static func backedOffPollDelay(
+        base: UInt64,
+        attempt: Int,
+        cap: UInt64 = 3_000_000_000
+    ) -> UInt64 {
+        let doublings = UInt64(min(max(attempt, 0), 8) / 2)
+        return min(base << doublings, cap)
+    }
+
     private static func waitForSteamClient(in bottle: Bottle, seconds: TimeInterval) async throws {
         let deadline = Date().addingTimeInterval(seconds)
+        var attempt = 0
         while Date() < deadline {
             try Task.checkCancellation()
             if isSteamClientRunning(in: bottle) { return }
-            try await Task.sleep(nanoseconds: 500_000_000)
+            try await Task.sleep(
+                nanoseconds: backedOffPollDelay(base: 500_000_000, attempt: attempt)
+            )
+            attempt += 1
         }
         progress("Steam did not appear after Connect. Log in with Steam on frankea, then Play again.")
         throw SteamError.steamNotLoggedOn
@@ -2020,10 +2118,14 @@ public enum SteamLauncher {
         if isSteamLoggedOn(in: bottle) { return }
         progress("Waiting for Steam Logged On…")
         let deadline = Date().addingTimeInterval(seconds)
+        var attempt = 0
         while Date() < deadline {
             try Task.checkCancellation()
             if isSteamLoggedOn(in: bottle) { return }
-            try await Task.sleep(nanoseconds: 1_000_000_000)
+            try await Task.sleep(
+                nanoseconds: backedOffPollDelay(base: 1_000_000_000, attempt: attempt)
+            )
+            attempt += 1
         }
         throw SteamError.steamNotLoggedOn
     }
