@@ -107,4 +107,54 @@ struct QuitSteamTests {
         let unlikely = "wyn-test-\(UUID().uuidString.prefix(8)).exe"
         #expect(SteamLauncher.runningGameNames(among: [profile("Ghost", [unlikely])]).isEmpty)
     }
+
+    // MARK: - steam.exe detection (fast path added for the Play-button CPU spin)
+
+    /// The predicate runs over every row of `ps -ax` on every poll, so it now
+    /// rejects lines with a no-allocation ASCII prefilter before lowercasing.
+    /// These pin the behaviour that prefilter must not change.
+
+    @Test func bareSteamExeTokenStillMatches() {
+        // Exercises the regex fallback, not the `\steam\steam.exe` fast path.
+        #expect(SteamLauncher.lineIsSteamClientExe(#"steam.exe"#))
+        #expect(SteamLauncher.lineIsSteamClientExe(#"C:\Games\steam.exe -foo"#))
+        #expect(SteamLauncher.lineIsSteamClientExe(#"/opt/steam.exe"#))
+    }
+
+    @Test func detectionIsCaseInsensitive() {
+        #expect(SteamLauncher.lineIsSteamClientExe(#"C:\Program Files (x86)\STEAM\STEAM.EXE"#))
+        #expect(SteamLauncher.lineIsSteamClientExe(#"C:\Program Files (x86)\Steam\Steam.Exe -silent"#))
+    }
+
+    @Test func webHelperAndSteamPathAreRejected() {
+        #expect(!SteamLauncher.lineIsSteamClientExe(
+            #"C:\Program Files (x86)\Steam\bin\cef\cef.win64\steamwebhelper.exe --type=renderer"#
+        ))
+        #expect(!SteamLauncher.lineIsSteamClientExe(
+            #"some.exe -steampath=C:\Program Files (x86)\Steam\steam.exe"#
+        ))
+    }
+
+    /// The prefilter's reject path — the overwhelmingly common case.
+    @Test func linesWithoutSteamAreRejected() {
+        #expect(!SteamLauncher.lineIsSteamClientExe("/usr/libexec/logd"))
+        #expect(!SteamLauncher.lineIsSteamClientExe(""))
+        #expect(!SteamLauncher.lineIsSteamClientExe("/Applications/Safari.app/Contents/MacOS/Safari"))
+        // A substring of the needle must not match.
+        #expect(!SteamLauncher.lineIsSteamClientExe("/usr/bin/stea"))
+    }
+
+    /// Non-ASCII must not crash or false-negative the prefilter: the bytes of
+    /// "steam" are single-byte UTF-8 wherever they appear.
+    @Test func unicodeCommandLinesAreSafe() {
+        #expect(SteamLauncher.lineIsSteamClientExe(#"C:\Jeux\Ünïcødé\steam.exe"#))
+        #expect(!SteamLauncher.lineIsSteamClientExe("日本語のプロセス"))
+    }
+
+    /// A game exe that merely lives under a Steam folder is not the client.
+    @Test func gameUnderSteamFolderIsNotTheClient() {
+        #expect(!SteamLauncher.lineIsSteamClientExe(
+            #"C:\Program Files (x86)\Steam\steamapps\common\Slip & Skid\Slip & Skid.exe"#
+        ))
+    }
 }
