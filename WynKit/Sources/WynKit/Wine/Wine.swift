@@ -903,7 +903,20 @@ public class Wine {
             try setAppDllOverrides(bottle: bottle, exeName: steamExe, overrides: frankeaSafe)
         }
 
-        try SteamCEFShim.uninstall(from: bottle, debug: debug)
+        // A separate frankea tree draws Steam's CEF without the shim, so Valve's
+        // helper goes back. On a one-tree runtime the same Wine needs the shim,
+        // and removing it here is what turned Steam's window black. There it
+        // stays, and it goes back on when Steam is stopped and has finished
+        // installing itself (a first run is SteamLauncher.launchSteam's job).
+        if WynWineInstaller.steamTreeIsGameTree {
+            if !SteamLauncher.anySteamClientRunning(),
+               SteamCEFShim.hasLaunchedUISinceLastUpdate(in: bottle),
+               SteamCEFShim.bundledShimURL != nil {
+                try SteamCEFShim.install(into: bottle, debug: debug)
+            }
+        } else {
+            try SteamCEFShim.uninstall(from: bottle, debug: debug)
+        }
         if debug {
             print("[wyn:debug] Frankea Steam prep: removed \(removed) local graphics DLLs; AppDefaults → builtin")
         }

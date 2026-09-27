@@ -577,15 +577,17 @@ public enum SteamLauncher {
             gameExeNames: gameExeNames,
             extraEnvironment: extraEnvironment
         )
-        if plan.useGameHost {
+        // On a one-tree runtime the frankea plan runs the game-host Wine too,
+        // so its CEF needs the same readiness as the game-host plan.
+        if plan.useGameHost || WynWineInstaller.steamTreeIsGameTree {
             // No second shim pass here: ensureGameHostCEFReady already left the
             // bottle shimmed with Steam stopped, and re-running it against a
             // client it chose to adopt is exactly the verify/re-extract loop.
             try await ensureGameHostCEFReady(plan: plan, bottle: bottle)
-            if !plan.options.debug {
-                print("Steam UI: game-host Wine (Libraries/ — FOSS winecx + D3DMetal).")
-                print("Press Play in Steam — games inherit this D3DMetal wrapper. wyn play is fallback.")
-            }
+        }
+        if plan.useGameHost, !plan.options.debug {
+            print("Steam UI: game-host Wine (Libraries/ — FOSS winecx + D3DMetal).")
+            print("Press Play in Steam — games inherit this D3DMetal wrapper. wyn play is fallback.")
         }
 
         // Never start a second steam.exe. A leftover `-silent` bootstrap cannot

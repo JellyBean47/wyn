@@ -66,6 +66,23 @@ public class WynWineInstaller {
         steamLibraryFolder.appending(path: "Wine").appending(path: "bin")
     }
 
+    /// True when Steam's Wine is the game-host Wine itself: the 1.1 bundled
+    /// runtime, where `Libraries.steam` is a symlink back to `Libraries`.
+    ///
+    /// "Frankea Steam" then names an environment, not a Wine. There is no
+    /// separate tree whose CEF draws on its own, so Steam's window needs the
+    /// steamwebhelper shim on every launch, whichever path starts it. Measured
+    /// 28 Sep 2026: the frankea path removed the shim before DOOM's launch
+    /// (00:30:44) and before a D3DMetal rollback (00:46:49), and both Steam
+    /// windows were black.
+    public static var steamTreeIsGameTree: Bool {
+        isSameTree(steamLibraryFolder, libraryFolder)
+    }
+
+    static func isSameTree(_ a: URL, _ b: URL) -> Bool {
+        SteamLauncher.canonicalPath(a) == SteamLauncher.canonicalPath(b)
+    }
+
     /// Rockstar / RDR2 clone tree. Do not use for Steam or Connect.
     public static var rglLibraryFolder: URL {
         applicationFolder.appending(path: "Libraries.rgl")
