@@ -57,23 +57,43 @@ public extension Process {
 
             continuation.yield(.started(self))
 
-            pipe.fileHandleForReading.readabilityHandler = { pipe in
-                guard let line = pipe.nextLine() else { return }
+            // A `readabilityHandler` fires whenever the descriptor is readable,
+            // and once the child closes its end, EOF is readable *forever*.
+            // Returning early without clearing the handler therefore spins the
+            // dispatch queue at 100% CPU for the lifetime of the app — one core
+            // per pipe, two pipes here — and it outlives the child process.
+            // Clearing the handler on empty data is the only way out, which is
+            // why these read `availableData` directly: `nextLine()` collapsed
+            // "EOF" and "nothing yet" into the same `nil`.
+            pipe.fileHandleForReading.readabilityHandler = { handle in
+                let data = handle.availableData
+                guard !data.isEmpty else {
+                    handle.readabilityHandler = nil
+                    return
+                }
+                guard let line = String(data: data, encoding: .utf8), !line.isEmpty else { return }
                 continuation.yield(.message(line))
-                guard !line.isEmpty else { return }
                 Logger.wynKit.info("\(line, privacy: .public)")
                 fileHandle?.write(line: line)
             }
 
-            errorPipe.fileHandleForReading.readabilityHandler = { pipe in
-                guard let line = pipe.nextLine() else { return }
+            errorPipe.fileHandleForReading.readabilityHandler = { handle in
+                let data = handle.availableData
+                guard !data.isEmpty else {
+                    handle.readabilityHandler = nil
+                    return
+                }
+                guard let line = String(data: data, encoding: .utf8), !line.isEmpty else { return }
                 continuation.yield(.error(line))
-                guard !line.isEmpty else { return }
                 Logger.wynKit.warning("\(line, privacy: .public)")
                 fileHandle?.write(line: line)
             }
 
             terminationHandler = { (process: Process) in
+                // Clear before draining: `readToEnd` leaves the descriptor at
+                // EOF, and a live handler on an EOF descriptor is the spin above.
+                pipe.fileHandleForReading.readabilityHandler = nil
+                errorPipe.fileHandleForReading.readabilityHandler = nil
                 do {
                     _ = try pipe.fileHandleForReading.readToEnd()
                     _ = try errorPipe.fileHandleForReading.readToEnd()
@@ -120,6 +140,10 @@ public extension Process {
 }
 
 extension FileHandle {
+    /// - Warning: a `nil` here means *either* EOF or "nothing buffered yet", and
+    ///   a `readabilityHandler` that cannot tell those apart will spin at 100%
+    ///   CPU once the child closes the pipe. `makeStream` reads `availableData`
+    ///   itself for that reason. Prefer that pattern over this.
     func nextLine() -> String? {
         guard let line = String(data: availableData, encoding: .utf8) else { return nil }
         if !line.isEmpty {
