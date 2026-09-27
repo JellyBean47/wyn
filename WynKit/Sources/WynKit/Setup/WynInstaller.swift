@@ -50,10 +50,16 @@ public enum WynInstaller {
         var runtimeInstalled = WynWineInstaller.isWynWineInstalled()
 
         if !runtimeInstalled {
-            RuntimeManager.activeSource = .whiskyCDN
-            let pin = RuntimeIntegrity.whiskyCDN
-            let tarball = try await downloadFile(from: pin.url)
-            try WynWineInstaller.install(from: tarball, expectedSHA256: pin.sha256)
+            if BundledRuntime.isAvailable {
+                // A release app carries its runtime and D3DMetal: nothing to
+                // download, and D3DMetal titles work without a source install.
+                try BundledRuntime.install()
+            } else {
+                RuntimeManager.activeSource = .whiskyCDN
+                let pin = RuntimeIntegrity.whiskyCDN
+                let tarball = try await downloadFile(from: pin.url)
+                try WynWineInstaller.install(from: tarball, expectedSHA256: pin.sha256)
+            }
             runtimeInstalled = true
         }
 

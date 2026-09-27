@@ -42,8 +42,19 @@ arch -x86_64 /usr/bin/true >/dev/null || fail "Rosetta required (x86_64 Wine uni
 command -v ccache >/dev/null || fail "need ccache (brew install ccache)"
 
 USE_NIX=0
+USE_DEPS=0
 FRANKEA_LIB=""
-if command -v nix >/dev/null; then
+DEPS_PREFIX="${WINECX_DEPS_PREFIX:-}"
+if [[ -n "$DEPS_PREFIX" ]]; then
+  # scripts/build-runtime-deps.sh output: FreeType, GnuTLS, SDL2 and MoltenVK
+  # built on this machine from pinned upstream tarballs. This is the mode a
+  # release runtime is built in, because the tarballs are the corresponding
+  # source; it wins over Nix and over borrowing frankea's MacPorts dylibs.
+  [[ -f "$DEPS_PREFIX/DEPS-MANIFEST.txt" && -f "$DEPS_PREFIX/lib/libgnutls.30.dylib" ]] \
+    || fail "WINECX_DEPS_PREFIX=$DEPS_PREFIX is not scripts/build-runtime-deps.sh output"
+  USE_DEPS=1
+  echo "    runtime libraries: $DEPS_PREFIX (build-runtime-deps.sh)"
+elif command -v nix >/dev/null; then
   USE_NIX=1
 else
   echo "note: Nix not installed (sudo required). Using frankea x86_64 dylibs for"
@@ -92,13 +103,28 @@ mkdir -p "$SCRATCH"
 cd "$SCRATCH"
 
 if [[ ! -d winecx/.git ]]; then
-  git clone --filter=blob:none --single-branch --branch wine1115 "$WINECX_REPO" winecx
+  if [[ -n "${WINECX_SEED_REPO:-}" ]]; then
+    # A local checkout that already holds the pinned commit spares a slow
+    # line the whole clone. Only its object store is taken: the working tree
+    # is written fresh from the pin, and the pin and clean-tree checks below
+    # apply exactly as they do to a clone from GitHub.
+    mkdir -p winecx
+    cp -R "$WINECX_SEED_REPO/.git" winecx/.git
+    git -C winecx reset -q --hard "$WINECX_COMMIT"
+  else
+    git clone --filter=blob:none --single-branch --branch wine1115 "$WINECX_REPO" winecx
+  fi
 fi
-git -C winecx fetch --depth 1 origin "$WINECX_COMMIT"
-git -C winecx checkout --detach "$WINECX_COMMIT"
+if ! git -C winecx cat-file -e "$WINECX_COMMIT^{commit}" 2>/dev/null; then
+  git -C winecx fetch --depth 1 origin "$WINECX_COMMIT"
+fi
+git -C winecx checkout -q --detach "$WINECX_COMMIT"
 git -C winecx --no-pager log -1 --oneline
 got="$(git -C winecx rev-parse HEAD)"
 [[ "$got" == "$WINECX_COMMIT" ]] || fail "winecx HEAD $got != pin $WINECX_COMMIT"
+# The corresponding source is this commit, so the build must be exactly it.
+[[ -z "$(git -C winecx status --porcelain --untracked-files=no)" ]] \
+  || fail "winecx checkout has local modifications; the build would not match $WINECX_COMMIT"
 
 grep -q CX_APPLEGPTK_LIBD3DSHARED_PATH winecx/dlls/ntdll/unix/loader.c \
   || fail "ntdll tree missing CX_APPLEGPTK_LIBD3DSHARED_PATH"
@@ -158,6 +184,25 @@ if [[ "$USE_NIX" -eq 1 ]]; then
   for d in $native_outs; do
     [[ -d "$d/lib/pkgconfig" ]] && native_pc="$d/lib/pkgconfig:$native_pc"
   done
+elif [[ "$USE_DEPS" -eq 1 ]]; then
+  BISON_BIN="$(brew --prefix bison 2>/dev/null)/bin"
+  [[ -x "$BISON_BIN/bison" ]] || fail "need brew bison 3.x (system bison 2.3 is too old for Wine)"
+  NIX_TOOL_PATH="$BISON_BIN:"
+  # The native tools (winebuild, sfnt2fon, …) run on this arm64 Mac, so they
+  # take Homebrew's arm64 FreeType; only the x86_64 build uses DEPS_PREFIX.
+  native_pc="$(brew --prefix freetype)/lib/pkgconfig:$(brew --prefix libpng)/lib/pkgconfig:$(brew --prefix zlib)/lib/pkgconfig:"
+  NIX_INCS="-I$DEPS_PREFIX/include"
+  NIX_LDFS="-L$DEPS_PREFIX/lib"
+  # inotify: the tree users have run has none (config.h: no sys/inotify.h), and
+  # libinotify-kqueue would be one more library to build, ship and license.
+  EXTRA_WITHOUT=(--without-gstreamer --without-ffmpeg --without-inotify)
+  export FREETYPE_CFLAGS="-I$DEPS_PREFIX/include/freetype2"
+  export FREETYPE_LIBS="-L$DEPS_PREFIX/lib -lfreetype"
+  export GNUTLS_CFLAGS="-I$DEPS_PREFIX/include"
+  export GNUTLS_LIBS="-L$DEPS_PREFIX/lib -lgnutls"
+  export SDL2_CFLAGS="-I$DEPS_PREFIX/include/SDL2 -D_THREAD_SAFE"
+  export SDL2_LIBS="-L$DEPS_PREFIX/lib -lSDL2"
+  export ac_cv_lib_soname_SDL2="libSDL2-2.0.0.dylib"
 else
   BISON_BIN="$(brew --prefix bison 2>/dev/null)/bin"
   [[ -x "$BISON_BIN/bison" ]] || fail "need brew bison 3.x (system bison 2.3 is too old for Wine)"
@@ -206,6 +251,11 @@ echo "==> configure x86_64 unix + mingw PE"
 export CC="ccache /usr/bin/clang -arch x86_64"
 export CXX="ccache /usr/bin/clang++ -arch x86_64"
 export PKG_CONFIG_PATH="$NIX_PKG_CONFIG_PATH"
+if [[ "$USE_DEPS" -eq 1 ]]; then
+  # Nothing from Homebrew's pkg-config directory: every .pc file there
+  # describes an arm64 library that cannot link into this x86_64 build.
+  export PKG_CONFIG_LIBDIR="$DEPS_PREFIX/lib/pkgconfig"
+fi
 export CFLAGS="-O2 -Wno-error=implicit-function-declaration $NIX_INCS"
 export CROSSCFLAGS="-O2"
 export LDFLAGS="$NIX_LDFS"
@@ -234,6 +284,14 @@ mkdir -p build
       || fail "ffmpeg was not found; fix Nix PKG_CONFIG_PATH"
     grep -qE '^GSTREAMER_LIBS *= *.+' Makefile \
       || fail "gstreamer was not found; winegstreamer would be missing"
+  elif [[ "$USE_DEPS" -eq 1 ]]; then
+    # Each of these fails silently at runtime if configure missed it: no
+    # fonts, no Steam login (schannel), no controllers.
+    for soname in SONAME_LIBFREETYPE SONAME_LIBGNUTLS SONAME_LIBSDL2; do
+      grep -q "^#define $soname " include/config.h \
+        || fail "configure did not find ${soname#SONAME_LIB} in $DEPS_PREFIX (see build/config.log)"
+    done
+    echo "note: built without gstreamer/ffmpeg, as the runtime users have run is."
   else
     grep -q 'ac_cv_lib_soname_gnutls' include/config.h config.log 2>/dev/null || true
     grep -q '^#define SONAME_LIBGNUTLS' include/config.h \
@@ -251,7 +309,31 @@ make -C build DESTDIR="$PREFIX" prefix=/opt/whiskywine install
 # Relocate from DESTDIR/opt/whiskywine → prefix root Wyn expects (bin/, lib/).
 if [[ -d "$PREFIX/opt/whiskywine" ]]; then
   rsync -a "$PREFIX/opt/whiskywine/" "$PREFIX/wine-root/"
-  if [[ "$USE_NIX" -eq 0 && -d "$FRANKEA_LIB" ]]; then
+  if [[ "$USE_DEPS" -eq 1 ]]; then
+    echo "==> copy build-runtime-deps.sh libraries into wine-root/lib"
+    cp -a "$DEPS_PREFIX"/lib/*.dylib "$PREFIX/wine-root/lib/"
+    # Wine opens these by leaf name, and its unix modules' only LC_RPATH is
+    # @loader_path/ — the unix directory. SDL2 is here too: winebus used to
+    # reach it only through the rpath added below for libinotify.
+    unix="$PREFIX/wine-root/lib/wine/x86_64-unix"
+    for name in libfreetype.6.dylib libfreetype.dylib libgnutls.30.dylib libgnutls.dylib \
+                libSDL2-2.0.0.dylib libMoltenVK.dylib libvulkan.1.dylib; do
+      [[ -e "$PREFIX/wine-root/lib/$name" ]] && ln -sfn "../../$name" "$unix/$name"
+    done
+    # The tree has to relocate: nothing in it may name this build machine.
+    bad=""
+    while IFS= read -r f; do
+      case "$(head -c 4 "$f" | xxd -p)" in cffaedfe|cafebabe) ;; *) continue ;; esac
+      while IFS= read -r dep; do
+        case "$dep" in
+          @rpath/*|@loader_path/*|/usr/lib/*|/System/Library/*) ;;
+          *) bad+="  ${f#"$PREFIX/wine-root/"} -> $dep"$'\n' ;;
+        esac
+      done < <(otool -L "$f" | tail -n +2 | awk '{print $1}')
+    done < <(find "$PREFIX/wine-root/bin" "$PREFIX/wine-root/lib" -type f \( -perm -u+x -o -name '*.so' -o -name '*.dylib' \))
+    [[ -z "$bad" ]] || fail "wine-root links paths outside the tree:
+$bad"
+  elif [[ "$USE_NIX" -eq 0 && -d "$FRANKEA_LIB" ]]; then
     echo "==> copy frankea x86_64 companion dylibs into wine-root/lib"
     rsync -a --exclude wine --exclude external "$FRANKEA_LIB/" "$PREFIX/wine-root/lib/"
     # frankea dylibs use bare install names; LC_RPATH only applies to @rpath/.

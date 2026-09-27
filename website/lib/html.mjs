@@ -49,7 +49,14 @@ export const SUPPORT_PAGE_ENABLED = false;
 
 // Where the signed, notarized Wyn.dmg is published, or null while there is no
 // download. Set this to the release asset URL when the DMG goes up.
-export const DOWNLOAD_URL = "https://github.com/JellyBean47/wyn/releases/download/v1.0/Wyn.dmg";
+export const DOWNLOAD_URL = "https://github.com/JellyBean47/wyn/releases/download/v1.1/Wyn.dmg";
+
+// From 1.1 the DMG carries LGPL binaries (Wine, GnuTLS, Wine Mono), whose exact
+// corresponding source has to be offered from the same place (LGPL-2.1 §4):
+// scripts/package-sources.sh builds it, and it is published on the same
+// release. Printed wherever DOWNLOAD_URL is.
+export const RUNTIME_SOURCE_URL =
+  "https://github.com/JellyBean47/wyn/releases/download/v1.1/Wyn-1.1-runtime-source.tar";
 
 // GPL-3 §6(d): offering the source from the same place as the binary is what
 // makes distributing the binary lawful. These two are rendered together, and
@@ -121,7 +128,7 @@ export function homePage(data) {
       <h1>Windows games. Mac settings. Shared progress.</h1>
       <p class="lede">Find launch settings for Windows games on your Mac. See what has actually been tested, download a profile, and share the settings that worked for you. Wyn is free software under GPL-3.0. ${
         DOWNLOAD_URL
-          ? `<a href="${escapeHtml(DOWNLOAD_URL)}">Download Wyn.dmg</a> — signed and notarized, with the <a href="${escapeHtml(SOURCE_URL)}">source</a>.`
+          ? `<a href="${escapeHtml(DOWNLOAD_URL)}">Download Wyn.dmg</a> — signed and notarized, Wine and D3DMetal included, with the <a href="${escapeHtml(SOURCE_URL)}">source</a> and the <a href="${escapeHtml(RUNTIME_SOURCE_URL)}">runtime source</a>.`
           : `A signed Mac download is coming; until then, <a href="/install">install from source</a> — the <a href="${escapeHtml(SOURCE_URL)}">source is on GitHub</a>.`
       }${SUPPORT_PAGE_ENABLED ? ' <a href="/support">Support testing</a>.' : ""}</p>
       <form class="search" action="/games" method="get">
@@ -177,7 +184,7 @@ export function gamesPage(games, query) {
       <td><a href="/games/${escapeHtml(game.slug)}">${escapeHtml(game.name)}</a></td>
       <td>${escapeHtml(game.publisher ?? "—")}</td>
       <td><span class="badge ${escapeHtml(game.status)}">${statusLabel(game.status)}</span></td>
-      <td>${escapeHtml([...new Set(game.profiles.map(p => layerLabel(p.bottle?.translationLayer)))].join(", ") || "—")}${game.downloadSupport === "source-install" ? ' <span class="badge needs-source" title="Needs the source install: D3DMetal is not in the download yet">Source install</span>' : ""}</td>
+      <td>${escapeHtml([...new Set(game.profiles.map(p => layerLabel(p.bottle?.translationLayer)))].join(", ") || "—")}${game.downloadSupport === "source-install" ? ' <span class="badge needs-source" title="Needs a Wine tree the download does not carry">Source install</span>' : ""}</td>
       <td class="mono">${game.steamAppId ? escapeHtml(String(game.steamAppId)) : "—"}</td>
     </tr>`).join("");
 
@@ -283,9 +290,9 @@ export function gamePage(game) {
     </header>
     ${
       game.downloadSupport === "source-install"
-        ? '<p class="notice">Every profile here is D3DMetal, which comes from Apple\'s Game Porting Toolkit. It is not in the <code>Wyn.dmg</code> download today, because the Wine build D3DMetal needs is compiled on your Mac. This title needs the source install: <code>./install.sh --with-d3dmetal --accept-gptk-licence</code>, with Apple\'s GPTK supplied by you.</p>'
+        ? '<p class="notice">No profile here runs on the runtime inside <code>Wyn.dmg</code>: each needs a Wine tree the download does not carry, or was measured to fail on it. The profile notes say which, and what it takes.</p>'
         : game.downloadSupport === "untested"
-          ? '<p class="notice">The best-tested profile here is D3DMetal, which is not in the download. There is a profile the download could run, but nobody has reported running this game that way — so whether the download handles it is untested, not known.</p>'
+          ? '<p class="notice">There is a profile the download could run, but nobody has reported running this game that way — so whether the download handles it is untested, not known.</p>'
           : ""
     }
     <p class="notice">${game.status === "guessed" ? "This game has no tested profile yet. These settings are a starting point, not evidence that it runs." : game.status === "launched" ? "This title launched on a Mac. Notes say what was seen. That is not verified: verified needs a loaded-map measurement on the current Wyn stack." : "Results depend on your Mac, macOS, Wyn version, and game version. Read each profile’s notes before using it."}</p>
@@ -401,33 +408,33 @@ export function installPage(data) {
   const body = `
     <header class="page">
       <h1>Install Wyn</h1>
-      <p>Wyn is free software. Build it from source on an Apple Silicon Mac and the installer does the rest, including the Wine runtime.</p>
+      <p>Wyn is free software. Download the signed app, or build it from source on an Apple Silicon Mac.</p>
     </header>
     <section>
       <h2>Get Wyn</h2>
       ${
         DOWNLOAD_URL
-          ? `<p><a class="btn" href="${escapeHtml(DOWNLOAD_URL)}">Download Wyn.dmg</a> — signed and notarized. Drag it to Applications and open it; the app downloads a hash-pinned Wine runtime on first launch.</p>
-      <p>You need an Apple Silicon Mac and <strong>Rosetta 2</strong> — Wine's unix half is x86_64. If you do not have it: <code>softwareupdate --install-rosetta --agree-to-license</code>.</p>
-      <p>Wyn is free software under <a href="${escapeHtml(SOURCE_URL)}/blob/main/LICENSE">GPL-3.0-or-later</a>, and you are entitled to the source for the build you just downloaded: <a href="${escapeHtml(SOURCE_URL)}">${escapeHtml(SOURCE_URL)}</a>. Or build it yourself:</p>`
+          ? `<p><a class="btn" href="${escapeHtml(DOWNLOAD_URL)}">Download Wyn.dmg</a> — signed and notarized. Drag it to Applications and open it. Everything it needs is inside the app: Wine, DXMT, DXVK and Apple's D3DMetal. Setup installs them from the app itself, so nothing is compiled and only Steam is downloaded.</p>
+      <p>You need an Apple Silicon Mac on macOS 15 or later, and <strong>Rosetta 2</strong> — Wine's unix half is x86_64. If you do not have it: <code>softwareupdate --install-rosetta --agree-to-license</code>.</p>
+      <p>Wyn is free software under <a href="${escapeHtml(SOURCE_URL)}/blob/main/LICENSE">GPL-3.0-or-later</a>, and you are entitled to the source for the build you just downloaded: <a href="${escapeHtml(SOURCE_URL)}">${escapeHtml(SOURCE_URL)}</a>. The Wine runtime inside it is LGPL, and its exact source is published beside the download: <a href="${escapeHtml(RUNTIME_SOURCE_URL)}">Wyn-1.1-runtime-source.tar</a>. Or build it yourself:</p>`
           : `<p>A signed, notarized <code>Wyn.dmg</code> (drag to Applications, then set up Wine in the app) is the download we want. It is not published yet. Until then, build from source — Wyn is free software under <a href="${escapeHtml(SOURCE_URL)}/blob/main/LICENSE">GPL-3.0-or-later</a>:</p>`
       }
       <pre><code>git clone ${escapeHtml(SOURCE_URL)}.git
 cd wyn
 ./install.sh
 open /Applications/Wyn.app</code></pre>
-      <p>That needs an Apple Silicon Mac on macOS 14 or later, Xcode 16 or later, and Rosetta 2 (<code>softwareupdate --install-rosetta</code>). Wyn downloads a hash-pinned Wine runtime; it does not ship Apple GPTK.</p>
+      <p>That needs an Apple Silicon Mac on macOS 14 or later, Xcode 16 or later, and Rosetta 2 (<code>softwareupdate --install-rosetta</code>). A source build downloads a hash-pinned Wine runtime instead of carrying one, and does not ship Apple GPTK.</p>
       <h3>Which renderer you get</h3>
-      <p>The download runs <strong>${data.counts.verifiedFromDownload} of the ${data.counts.verified} verified titles</strong> here, with no compiler and nothing else to install: DXMT (Direct3D 11 to Metal), DXVK, and Wine's own builtins all ship inside the runtime the app fetches on first launch. Every game page says which side it falls on.</p>
-      <p><strong>D3DMetal is not in the download yet.</strong> It comes from Apple's Game Porting Toolkit, and the Wine build it runs on is compiled on your Mac, so today Wyn does not ship it or download it for you. It is an opt-in upgrade for Direct3D 12-only titles, it needs the source install, and you supply Apple's GPTK yourself:</p>
+      <p>The download runs <strong>${data.counts.verifiedFromDownload} of the ${data.counts.verified} verified titles</strong> here, with no compiler and nothing else to install: D3DMetal (Direct3D 11 and 12 to Metal), DXMT (Direct3D 11 to Metal), DXVK, and Wine's own builtins all ship inside the app. Every game page says which side it falls on.</p>
+      <p><strong>D3DMetal is in the download from Wyn 1.1.</strong> It is Apple's, from the Game Porting Toolkit, and Apple's licence lets Wyn pass it on free of charge: Wyn carries it unmodified, with Apple's licence beside it, and Wyn stays free. A source build still takes it from your own copy of Apple's GPTK:</p>
       <pre><code>./install.sh --with-d3dmetal --accept-gptk-licence</code></pre>
-      <p>That path compiles Wine from source, so it also wants <code>brew install ccache mingw-w64</code>. If a game's page lists its layer as <code>d3dmetal</code>, the download alone will not run it.</p>
+      <p>That path compiles Wine from source, so it also wants <code>brew install ccache mingw-w64</code>.</p>
     </section>
   `;
   return layout({
     title: "Install",
     path: "/install",
-    description: "Install Wyn from source on an Apple Silicon Mac: the requirements, three commands, and which graphics layer you get.",
+    description: "Install Wyn on an Apple Silicon Mac: the signed download with Wine and D3DMetal inside, or a source build, and which graphics layer you get.",
     body,
   });
 }

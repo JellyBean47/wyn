@@ -15,9 +15,11 @@
 //  You should have received a copy of the GNU General Public License along with Wyn.
 //  If not, see https://www.gnu.org/licenses/.
 //
-//  Installs a *user-provided* Apple Game Porting Toolkit (D3DMetal) payload into
-//  the WynWine tree. GPTK is proprietary — never ship it in Wyn releases; only
-//  copy from a local GPTK redist / Apple DMG the user already has.
+//  Installs an Apple Game Porting Toolkit (D3DMetal) payload into the WynWine
+//  tree: the user's own GPTK DMG or redist on a source build, or the evaluation
+//  environment a release Wyn.app (1.1+) carries, unmodified, under Apple's
+//  non-commercial redistribution grant (see BundledRuntime and
+//  Documentation/bundled-runtime-licensing.md). Never committed to the repo.
 //
 
 import Foundation
@@ -119,14 +121,17 @@ public enum GPTKInstaller {
         return kids.filter(looksLikeGPTK).max { score($0) < score($1) }
     }
 
-    /// Auto-detect order: the folder the last install actually used, then
-    /// ~/Downloads, then mounted volumes / GPTK.app.
+    /// Auto-detect order: the folder the last install actually used, then the
+    /// GPTK a release Wyn.app carries, then ~/Downloads, then mounted volumes /
+    /// GPTK.app.
     ///
     /// The remembered folder leads because a user who keeps GPTK in Documents or
     /// on an external drive told us so by browsing there once; re-searching
-    /// Downloads first would ignore that every time.
+    /// anywhere else first would ignore that every time. The bundled copy comes
+    /// next because it is the exact version that release was tested with.
     public static func preferredLocalSource() -> URL? {
         if let remembered = GPTKSourcePicker.rememberedCandidate() { return remembered }
+        if let bundled = BundledRuntime.gptkFolder { return bundled }
         if let downloads = preferredDownloadsCandidate() { return downloads }
         return findLocalSource()
     }

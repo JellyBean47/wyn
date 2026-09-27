@@ -26,7 +26,9 @@ struct SetupView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Set up Wyn")
                 .font(.title2.weight(.semibold))
-            Text("Wine and the Steam bottle need to be in place before the library can launch games. GPTK/D3DMetal is optional and never downloaded.")
+            Text(BundledRuntime.isAvailable
+                 ? "Wine and the Steam bottle need to be in place before the library can launch games. Wyn installs the Wine runtime it carries, with Apple's D3DMetal; only Steam itself is downloaded."
+                 : "Wine and the Steam bottle need to be in place before the library can launch games. GPTK/D3DMetal is optional and never downloaded.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 

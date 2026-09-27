@@ -91,6 +91,16 @@ if (( copied > 0 )); then
     || { echo "error: Wyn.app signature is not valid after bundling" >&2; exit 1; }
 fi
 
+# Packaging builds with WYN_NO_INSTALL=1. A release build carrying a bundled
+# runtime must not replace the Wyn.app someone is playing on, and packaging has
+# no reason to touch ~/.local/bin either. The product stays where xcodebuild
+# left it, and package-dmg.sh packs that.
+if [[ "${WYN_NO_INSTALL:-0}" == "1" ]]; then
+  echo
+  echo "App:  $BUILT_APP  (not installed: WYN_NO_INSTALL=1)"
+  exit 0
+fi
+
 echo "==> installing Wyn.app → /Applications"
 rm -rf /Applications/Wyn.app
 ditto "$BUILT_APP" /Applications/Wyn.app

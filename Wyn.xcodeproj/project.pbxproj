@@ -175,7 +175,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -184,12 +184,13 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "GPL-3.0";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Games running in Wyn use the microphone for voice chat.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.wyn.gaming;
 				PRODUCT_NAME = Wyn;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -206,7 +207,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -215,12 +216,13 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "GPL-3.0";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Games running in Wyn use the microphone for voice chat.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.wyn.gaming;
 				PRODUCT_NAME = Wyn;
 				SWIFT_EMIT_LOC_STRINGS = YES;
