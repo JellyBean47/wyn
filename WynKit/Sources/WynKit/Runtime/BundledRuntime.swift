@@ -139,6 +139,16 @@ public enum BundledRuntime {
 
         if let gptk = gptkFolder {
             _ = try GPTKInstaller.install(from: gptk)
+            // GPTK install is availability only and deliberately never selects
+            // a renderer. Here that is not a choice: in this one-tree runtime
+            // Wine's builtin d3d11/dxgi/d3d12/d3d10 *are* GPTK's PE stubs, so
+            // their unix halves must point at libd3dshared or everything that
+            // loads them as builtins breaks — starting with Steam, whose launch
+            // on the game tree refuses with "D3DMetal is installed but not
+            // selected" (found in the first real 1.1 install, 27 Sep 2026).
+            // DXMT and DXVK launches load native DLLs from the bottle and are
+            // unaffected: the smoke test presents through DXMT in this state.
+            try RendererWiring.set(.d3dMetal)
         }
         clearQuarantine(under: installed)
     }

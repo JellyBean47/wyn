@@ -81,6 +81,12 @@ export HOME="$WORK/home" CFFIXED_USER_HOME="$WORK/home"
 mkdir -p "$HOME"
 "$CLI" runtime install --bundled >"$WORK/install.log" 2>&1
 check install $? "$(grep -m1 'D3DMetal' "$WORK/install.log")"
+# Install itself has to select D3DMetal: on this one tree Wine's builtin D3D
+# modules are GPTK's, and Wyn refuses to open Steam until they are wired. The
+# script used to select it by hand, which hid exactly that gap (27 Sep 2026).
+"$CLI" renderer status >"$WORK/renderer.txt" 2>&1
+grep -q "wired: D3DMetal" "$WORK/renderer.txt"
+check renderer $? "$(grep -m1 'wired:' "$WORK/renderer.txt")"
 T="$HOME/Library/Application Support/com.fly.gaming/Libraries/Wine"
 [[ -x "$T/bin/wine" ]] || { echo "no Wine at $T" >&2; exit 99; }
 
@@ -120,8 +126,7 @@ echo "==> https"
 "$T/bin/wine" "$WORK/tlsprobe.exe" >"$WORK/tls.out" 2>/dev/null
 check https $? "$(tr '\n' ' ' <"$WORK/tls.out")"
 
-echo "==> d3dmetal"
-"$CLI" renderer set d3dmetal >/dev/null 2>&1
+echo "==> d3dmetal (as installed: nothing selected by hand)"
 d3dm_env=(WINEDLLOVERRIDES="$BASE_OVERRIDES;d3d11,dxgi,d3d12,d3d10,atidxx64,nvapi64,nvngx=b"
           CX_APPLEGPTK_LIBD3DSHARED_PATH="$T/lib/external/libd3dshared.dylib"
           CX_APPLEGPT_LIBD3DSHARED_PATH="$T/lib/external/libd3dshared.dylib"
