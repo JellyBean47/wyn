@@ -6,15 +6,25 @@ This product is a modified version of Whisky
 (https://github.com/Whisky-App/Whisky), licensed under the GNU General
 Public License version 3 or later. See LICENSE.
 
-Wyn does not include, and must never ship, Apple Game Porting Toolkit,
+This source repository never contains Apple Game Porting Toolkit,
 D3DMetal.framework, libd3dshared.dylib, or libmetalirconverter.dylib.
-Those components are Apple proprietary software. Users who want D3DMetal
-must obtain Game Porting Toolkit from Apple and install it locally
-(`wyn gptk install`; default `~/Downloads/Game_Porting_Toolkit_3.0.dmg`). See DEPENDENCIES.md.
+Those components are Apple proprietary software.
 
-Wine, DXVK, DXMT, MoltenVK, and other third-party runtimes are fetched
-at install time from the publishers listed in DEPENDENCIES.md. They are
-not part of this source repository.
+Release disk images from Wyn 1.1 on carry Apple's Game Porting Toolkit
+3.0 "Evaluation environment for Windows games" unmodified, inside
+Wyn.app/Contents/SharedSupport/Runtime/GPTK, under Apple's Software
+License Agreement for Game Porting Toolkit (EA18380), which permits
+free, non-commercial redistribution. Apple's License.rtf and
+Acknowledgements.rtf accompany it. Wyn is free and must stay free while
+it carries D3DMetal; see Documentation/bundled-runtime-licensing.md.
+Source builds take GPTK from the user (`wyn gptk install`; default
+`~/Downloads/Game_Porting_Toolkit_3.0.dmg`). See DEPENDENCIES.md.
+
+Wine, DXVK, DXMT, MoltenVK, Wine Mono and the libraries Wine uses are
+not part of this source repository. Source builds fetch them at install
+time from the publishers listed in DEPENDENCIES.md. Release images from
+1.1 on carry them inside Wyn.app, and the corresponding source for
+their LGPL parts is published with each release.
 
 Trademarks: Whisky, Wine, Heroic, Steam, Epic Games, Battle.net, EA,
 GOG, Apple, Metal, and D3DMetal are marks of their respective owners.

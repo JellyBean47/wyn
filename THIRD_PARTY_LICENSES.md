@@ -1,11 +1,32 @@
 # Third-party licenses
 
-This file lists significant third-party software Wyn uses or may download.
-**This repository ships only Wyn source plus copies of license texts.** Runtime
-binaries (Wine, DXVK, DXMT, MoltenVK) are obtained at install time. Apple
-GPTK/D3DMetal is never downloaded or redistributed by Wyn.
+This file lists significant third-party software Wyn uses, may download, or
+carries in its release images.
+**This repository ships only Wyn source plus copies of license texts.** A source
+build obtains its runtime binaries (Wine, DXVK, DXMT, MoltenVK) at install time
+and never downloads Apple GPTK/D3DMetal. A **release image from 1.1 on**
+carries them inside Wyn.app instead; see
+[Carried in release images](#carried-in-release-images-11) and
+[`Documentation/bundled-runtime-licensing.md`](Documentation/bundled-runtime-licensing.md).
 
 Full license texts live under [`Documentation/licenses/`](Documentation/licenses/).
+
+## Carried in release images (1.1+)
+
+`Wyn.app/Contents/SharedSupport/Runtime`, built by `scripts/stage-runtime.sh`.
+Each binary's licence text is in `Runtime/licenses/` and in the image's
+`Legal/runtime/`, with `RUNTIME-MANIFEST.txt` listing every input by SHA-256.
+
+| Component | Version | License | Obligation Wyn carries |
+| --- | --- | --- | --- |
+| Apple GPTK evaluation environment (D3DMetal.framework, libd3dshared.dylib, PE shims) | 3.0 | Apple SLA EA18380 | Non-commercial only; unmodified and still Apple-signed; `License.rtf` + `Acknowledgements.rtf` with every copy |
+| Wine (winecx game-host) | `WINECX_COMMIT` | LGPL-2.1-or-later | Exact corresponding source published with the release |
+| DXMT | 0.80 | MIT | Notice |
+| DXVK-macOS | 1.10.3 | zlib | Notice |
+| MoltenVK | 1.4.x | Apache-2.0 | Licence text |
+| Wine Mono | 11.2.0 | LGPL/MIT (Mono), MS-PL (FNA), zlib, MIT | Notices; WineHQ source tarball published with the release |
+| GnuTLS, Nettle, GMP, libtasn1, libunistring, libidn2, libiconv, libintl | per `RUNTIME-MANIFEST.txt` | LGPL-2.1+/LGPL-3+ | Exact corresponding source published with the release |
+| FreeType, libpng, zlib, bzip2, brotli, zstd, lz4, xz, ICU, libxml2, libxslt, libffi, SDL2, libinotify, p11-kit, libpcap | per `RUNTIME-MANIFEST.txt` | permissive | Notices |
 
 ## Included in this source tree (Swift packages)
 
@@ -42,7 +63,7 @@ must not, without a corresponding-source offer).
 
 | Component | License / terms | How to obtain |
 | --- | --- | --- |
-| Apple Game Porting Toolkit, D3DMetal, libd3dshared, metalirconverter | Apple GPTK Software License Agreement (evaluation / non-commercial redistribution; no reverse engineering) | https://developer.apple.com/download/all/?q=game%20porting%20toolkit |
+| Apple Game Porting Toolkit, D3DMetal, libd3dshared, metalirconverter | Apple GPTK Software License Agreement (evaluation / non-commercial redistribution; no reverse engineering) | Source builds: https://developer.apple.com/download/all/?q=game%20porting%20toolkit. Release images from 1.1 carry the 3.0 evaluation environment (above) |
 | Proprietary Wine.app products | vendor EULA | Do not copy into Wyn; game-host is self-built winecx |
 | CrossOver.app / CodeWeavers binaries | vendor EULA | Never copied into Wyn. `fly-mvkshim` was *found* in a CrossOver 26.2.0 tree in Aug 2026 and is **not** CodeWeavers' code — it is first-party, now shipped as `Tools/fly_mvkshim.c`. CodeWeavers' own MoltenVK is a 556-export patched build; the shim exports nine. Wyn's only CodeWeavers-lineage component is LGPL winecx source, built locally and never redistributed. |
 | Steam, Battle.net, EA App, Epic, GOG, Ubisoft clients | Vendor ToS | Official vendor URLs on explicit user action |

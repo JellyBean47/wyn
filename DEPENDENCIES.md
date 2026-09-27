@@ -164,3 +164,13 @@ when the user runs the matching install command or clicks Install. They are
 - **Wyn never downloads this.**
 - https://developer.apple.com/download/all/?q=game%20porting%20toolkit
 - Install: `wyn gptk install` (default `~/Downloads/Game_Porting_Toolkit_3.0.dmg`)
+- **Release images (1.1+)** carry the 3.0 "Evaluation environment for Windows
+  games" volume unmodified, copied out of the image pinned in
+  `scripts/runtime-pins.env`:
+  - **Image:** `Game_Porting_Toolkit_3.0.dmg`, 93,534,640 bytes
+  - **SHA-256:** `ac8f6eeb2b9e5244d4c8eeb5b69b5cec099b560b143a7e5ef413945fc48b0f8f`
+  - **D3DMetal:** 3.0 (`SourceVersion` 32047000000000), signed by Apple
+  - **Licence:** Apple SLA EA18380 — free, non-commercial redistribution
+    (§2A(iii), §2C). See `Documentation/bundled-runtime-licensing.md`.
+  - Not 4.0 beta 2 (`03893ac4…`): its licence text is identical, but it is
+    pre-release software and stays out of a release.
