@@ -13,19 +13,50 @@ the build product, so the Wyn.app in `/Applications` is left alone.
 
 ## 1.1+: the image carries its runtime
 
+Build on the internal SSD. The Wine build runs the assembler once per exported
+symbol, tens of thousands of tiny files. On the USB hard disk it stalled with
+every `winebuild` blocked on I/O; on the SSD it completes normally.
+
 ```bash
+# 1. FreeType, GnuTLS, SDL2 (+ their deps) from pinned tarballs; MoltenVK from Khronos
+./scripts/build-runtime-deps.sh
+# 2. winecx at WINECX_COMMIT against those libraries (WINECX_SEED_REPO: a local
+#    checkout holding the commit, to skip the clone on a slow line)
+WINECX_DEPS_PREFIX=$PWD/.scratch/runtime-deps/prefix CCACHE_DISABLE=1 \
+  WINECX_BUILD_DIR=<dir on the SSD> ./scripts/build-foss-game-host.sh
+# 3. assemble Runtime/ from the build and the publishers' pinned releases
 ./scripts/stage-runtime.sh \
-  --wine-root <winecx wine-root> --wine-source <winecx checkout> \
-  --dxvk <DXVK x32/x64> --dxmt <DXMT x32/x64/LICENSE> --winemetal <winemetal.so> \
+  --wine-root <build>/prefix/wine-root --wine-source <build>/winecx \
+  --deps-prefix .scratch/runtime-deps/prefix \
+  --dxvk-tarball <dxvk-macOS-async-v1.10.3-20230507-repack.tar.gz> \
+  --dxmt-tarball <dxmt-v0.80-builtin.tar.gz> \
   --mono-msi <wine-mono-11.2.0-x86.msi> --gptk-dmg ~/Downloads/Game_Porting_Toolkit_3.0.dmg
-./scripts/package-dmg.sh --with-runtime .scratch/runtime-stage --notarize
+# 4. seal it into the app and the image, then measure it
+./scripts/package-dmg.sh --with-runtime .scratch/runtime-stage
+./scripts/smoke-runtime.sh .scratch/Wyn.dmg
+# 5. notarize the image that passed, and cut the source archive for the release
+xcrun notarytool submit .scratch/Wyn.dmg --keychain-profile wyn --wait && xcrun stapler staple .scratch/Wyn.dmg
+./scripts/package-sources.sh --wine-source <build>/winecx \
+  --deps-sources .scratch/runtime-deps/sources --mono-source <wine-mono-11.2.0-src.tar.xz> \
+  --dxmt-source <dxmt v0.80 source> --dxvk-source <DXVK-macOS source>
 ```
 
+All URLs and SHA-256 pins are in `scripts/runtime-pins.env` and
+`scripts/runtime-deps.env`.
+
 `stage-runtime.sh` refuses:
-- a Wine tree without winecx's `CX_APPLEGPTK` hook
+- a Wine tree without winecx's `CX_APPLEGPTK` hook, or not at the pinned
+  commit, or from a modified checkout
+- any library in the tree that `build-runtime-deps.sh` did not build, byte
+  for byte
 - a tree with absolute symlinks or Apple files already inside it
-- a GPTK image other than the pinned 3.0 one (by SHA-256)
-- a Mono MSI other than the pinned one
+- any GPTK image, Mono MSI, DXVK or DXMT release other than the pinned one
+
+DXMT's D3D trio gets exactly one change: the 16-byte builtin marker is
+rewritten so Wine loads the DLLs as native. `smoke-runtime.sh` installs the
+image the way a first launch does, into a throwaway HOME, and checks the
+running processes: fonts, HTTPS, D3DMetal (D3D12 and D3D11), DXMT, DXVK and
+SDL.
 
 It copies Apple's evaluation environment into `GPTK/` byte for byte, and
 fails if D3DMetal stops verifying as Apple-signed.

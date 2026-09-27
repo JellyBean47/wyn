@@ -28,11 +28,44 @@ are build and provenance work; neither is a licensing blocker.
 | Wine: winecx (CodeWeavers' CrossOver 26.3 Wine changes on WineHQ 11.15) | LGPL-2.1-or-later | yes | The exact corresponding source, from where the DMG is served; `COPYING.LIB`, `AUTHORS`, `NOTICES.md` in the app; never call it CrossOver |
 | DXMT 0.80 | MIT | yes | Notice. DXMT 1.0 and later are LGPL-2.1+, so moving past 0.80 adds a source obligation |
 | DXVK-macOS 1.10.3 | zlib | yes | Notice (requested, not required, for binaries) |
-| MoltenVK | Apache-2.0 | yes | Licence text |
+| MoltenVK 1.4.2 | Apache-2.0 | yes | Licence text |
 | Wine Mono 11.2.0 | Mono parts LGPL or MIT X11; SharpZipLib GPL with exception; FNA MS-PL; FAudio/SDL zlib; the rest MIT (its `COPYING`, read 27 Sep 2026) | yes | Notices, plus the corresponding source: WineHQ's `wine-mono-11.2.0` source tarball, mirrored with the rest. The MSI is WineHQ's, byte for byte |
-| GnuTLS, Nettle, GMP, libtasn1, libunistring, libidn2, libiconv, gettext `libintl` | LGPL (2.1+ or 3+) | yes | Exact source for each, same as Wine |
-| FreeType, libpng, zlib, bzip2, brotli, zstd, lz4, xz, ICU, libxml2, libxslt, libffi, SDL2, libinotify, p11-kit, libpcap | permissive | yes | Notices (FreeType's FTL asks for a credit line in the documentation) |
-| MacPorts `legacy-support` (pulled in by the MacPorts GnuTLS) | mixed, unverified | **remove** | Rebuilding GnuTLS for macOS 14+ drops it |
+| GnuTLS 3.8.13 (libunistring included), Nettle 3.10.2, GMP 6.3.0, libtasn1 4.21.0 | LGPL (2.1+ or 3+) | yes | Exact source for each, same as Wine: the pinned upstream tarballs |
+| FreeType 2.14.3, libpng 1.6.58, SDL2 2.32.10 | FTL, libpng, zlib | yes | Notices (FreeType's FTL asks for a credit line in the documentation) |
+
+**Where every binary comes from (1.1 build, 27 Sep 2026).**
+- **Built here from pinned source:**
+  - Wine, by `build-foss-game-host.sh` from the pinned winecx commit.
+  - The eight libraries above, by `build-runtime-deps.sh` from upstream tarballs.
+- **Unmodified publishers' releases, pinned by SHA-256:** MoltenVK (Khronos),
+  DXVK-macOS (Gcenx), DXMT (3Shain), Wine Mono (WineHQ) and GPTK (Apple).
+
+Each tarball hash was checked against a record the download did not come
+from, because there is no GnuPG on the build Mac to check signatures:
+- Homebrew's formulae, or their history for Nettle 3.10.2.
+- GitHub's own asset digests, for SDL2, MoltenVK, DXMT and Wine Mono.
+
+The frankea/Gcenx builds of the prototype brought about 40 MacPorts
+dylibs. That included ICU at 32 MB and MacPorts' `legacy-support`, whose
+licensing was never checked. Every one of them is gone: Wine opens exactly
+FreeType, GnuTLS, SDL2 and MoltenVK (winecx `config.h`), and GnuTLS is
+built without the options that pulled in the rest:
+- p11-kit
+- IDN
+- NLS
+- zlib, zstd and Brotli certificate compression
+- C++
+
+zlib, bzip2, iconv and Kerberos are macOS's own.
+
+DXVK and DXMT were compared with the copies in frankea's v3.1.1 runtime,
+which Wyn's DXMT and DXVK profiles were verified on:
+- **DXVK:** identical, file for file.
+- **DXMT:** identical except the D3D trio's 16-byte "Wine builtin DLL"
+  marker at offset 0x40. frankea replaced it with the ordinary DOS-stub
+  bytes so that Wine treats the DLLs as native per-game copies (Wyn's
+  `isNativePE` checks for exactly this). `stage-runtime.sh` makes the same
+  16-byte change and nothing else.
 
 **Never in the image:** Microsoft redistributables and fonts
 (`d3dcompiler_47`, corefonts, VC++ runtimes), Steam and other store
@@ -118,22 +151,20 @@ combined D3DMetal with LGPL Wine in exactly this way.
 
 ## Before a public 1.1 release
 
-1. **Rebuild the runtime from pinned source on a clean builder.** The
-   prototype image uses a winecx build from 30 Aug at the pinned commit
-   `c2cce0e`. Its companion libraries are Gcenx/MacPorts binaries whose
-   exact source Wyn cannot reproduce.
-2. **Build the LGPL companion libraries from pinned upstream tarballs.**
-   That drops MacPorts `legacy-support` too. These then become the
-   corresponding-source asset, published next to `Wyn.dmg` with a
-   pointer to it in `Legal/`:
-   - the library tarballs
-   - the winecx commit
-   - WineHQ's `wine-mono-11.2.0` source
-   - the build scripts
-3. **Do not redistribute frankea's `winecx-gptk` runtime 4.6.4 as it
-   is.** It bundles x264 and x265 (GPL), fdk-aac (GPL-incompatible) and
-   libdvdcss, and ships no licence files. If Wyn wants a media stack,
-   build an LGPL-only one.
-4. **Update the copy** that says D3DMetal is not in the download: the
-   NOTICE GPTK paragraph and the site's download and game pages, at
-   release time.
+Done on 27 Sep 2026:
+- **Runtime rebuilt from pinned source.** winecx `c2cce0e` was built clean
+  against libraries from `build-runtime-deps.sh`. No MacPorts or Gcenx
+  binaries remain; DXVK and DXMT come from their publishers' releases.
+- **Corresponding-source archive written.** `package-sources.sh` produced
+  a 368 MB archive. Its Wine tree hash equals the pinned commit's.
+- **frankea's `winecx-gptk` 4.6.4 is not used.** It bundles x264 and x265
+  (GPL), fdk-aac (GPL-incompatible) and libdvdcss, and ships no licence
+  files. If Wyn ever wants a media stack, build an LGPL-only one.
+
+Still to do, in the release itself:
+1. **Publish `Wyn.dmg` and `Wyn-1.1-runtime-source.tar` together** on the
+   same GitHub release. The `SOURCE.txt` inside the app and the image
+   points there, so neither goes up without the other.
+2. **Update the copy** that says D3DMetal is not in the download: the
+   site's download and game pages (`website/lib/html.mjs`,
+   `website/lib/catalog.mjs`).

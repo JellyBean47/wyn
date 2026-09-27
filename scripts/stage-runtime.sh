@@ -264,6 +264,26 @@ cp "$OUT/GPTK/License.rtf" "$OUT/GPTK/Acknowledgements.rtf" "$lic/apple-gptk/"
 ditto "$DEPS_PREFIX/share/licenses" "$lic/libraries"
 cp "$DEPS_PREFIX/DEPS-MANIFEST.txt" "$lic/libraries/"
 
+# Where the corresponding source is. LGPL-2.1 §4 wants it offered from the
+# same place as the binaries: the GitHub release that carries this image, as
+# the archive scripts/package-sources.sh writes.
+wyn_version="$(sed -n 's/.*MARKETING_VERSION = \([0-9.]*\);.*/\1/p' "$ROOT/Wyn.xcodeproj/project.pbxproj" | head -1)"
+cat > "$lic/SOURCE.txt" <<SOURCE
+Wyn $wyn_version carries Wine (winecx $wine_commit), GnuTLS and the libraries it
+uses, and Wine Mono under the LGPL, and DXMT, DXVK, FreeType, libpng, SDL2 and
+MoltenVK under permissive licences. Their complete corresponding source is
+published on the same release page as this app's disk image, as
+Wyn-$wyn_version-runtime-source.tar:
+
+  https://github.com/JellyBean47/wyn/releases/tag/v$wyn_version
+
+Wyn's own source (GPL-3.0-or-later): https://github.com/JellyBean47/wyn
+
+Apple's Game Porting Toolkit files in GPTK/ are Apple's proprietary software,
+redistributed unmodified and free of charge under Apple's licence
+(GPTK/License.rtf, GPTK/Acknowledgements.rtf). They have no source here.
+SOURCE
+
 echo "==> manifest"
 macho_count=0
 while IFS= read -r f; do

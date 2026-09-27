@@ -1355,7 +1355,11 @@ extension WynCLI {
                 print("nvngx.dll:         \(GPTKInstaller.nvngxDLLURL.path(percentEncoded: false))")
             }
             print("external/:         \(GPTKInstaller.externalFolder.path(percentEncoded: false))")
-            if let dl = GPTKInstaller.preferredDownloadsCandidate() {
+            if let bundled = BundledRuntime.gptkFolder {
+                // A release app carries GPTK itself; sending its user to Apple's
+                // download page for a file they already have would be wrong.
+                print("Bundled GPTK:      \(bundled.path(percentEncoded: false))")
+            } else if let dl = GPTKInstaller.preferredDownloadsCandidate() {
                 print("Downloads 3.0:     \(dl.path(percentEncoded: false))")
             } else {
                 print("Downloads 3.0:     (none — put \(GPTKInstaller.downloadsFileName) in ~/Downloads, or: wyn gptk install --pick)")
