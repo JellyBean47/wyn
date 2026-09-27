@@ -29,9 +29,9 @@
 //  "Every directory that has a helper" is the shim's *scope*, not its finish
 //  line. On a fresh bottle the variants land up to a minute apart, so that rule
 //  reads as done before the variant Steam will actually load exists. The finish
-//  line is `readiness` below: Steam names its own variant in logs/webhelper.txt,
-//  and until it has, a Steam still writing bootstrap_log.txt means more is
-//  coming.
+//  line is `launchedUIVariant` below: a helper launch in logs/webhelper.txt
+//  stamped after the newest updater session in bootstrap_log.txt began. Until
+//  then Steam is still installing itself, however long its download takes.
 
 import Foundation
 
@@ -194,32 +194,6 @@ public enum SteamCEFShim {
         return any
     }
 
-    /// Poll until Steam unpacks steamwebhelper into any `cef.win*` dir.
-    public static func waitUntilHelperExists(
-        in bottle: Bottle,
-        seconds: TimeInterval,
-        debug: Bool = false
-    ) async throws -> Bool {
-        let deadline = Date().addingTimeInterval(seconds)
-        var lastLog = Date.distantPast
-        while Date() < deadline {
-            try Task.checkCancellation()
-            if hasAnyHelper(in: bottle) {
-                if debug {
-                    let names = cefVariantDirectories(in: bottle).map(\.lastPathComponent)
-                    print("[wyn:debug] CEF shim: helper appeared in \(names.joined(separator: ", "))")
-                }
-                return true
-            }
-            if Date().timeIntervalSince(lastLog) >= 15 {
-                print("Waiting for Steam to unpack the login UI…")
-                lastLog = Date()
-            }
-            try await Task.sleep(nanoseconds: 1_000_000_000)
-        }
-        return false
-    }
-
     /// Ensure every `cef.win*` dir has shim as steamwebhelper.exe and Valve as `_real`.
     /// Always re-applies the shim if Steam restored the Valve PE.
     /// Returns false when CEF is not on disk yet (first self-update).
@@ -279,11 +253,15 @@ public enum SteamCEFShim {
         public let variant: String      // "cef.win64"
         public let executable: String   // "steamwebhelper.exe" | "steamwebhelper_real.exe"
         public let shimmed: Bool        // the launch carried --in-process-gpu
+        /// The line's own stamp, "2026-09-27 22:54:46". `bootstrap_log.txt`
+        /// uses the same local-time format, so the two logs order as strings.
+        public let loggedAt: String?
 
-        public init(variant: String, executable: String, shimmed: Bool) {
+        public init(variant: String, executable: String, shimmed: Bool, loggedAt: String? = nil) {
             self.variant = variant
             self.executable = executable
             self.shimmed = shimmed
+            self.loggedAt = loggedAt
         }
     }
 
@@ -334,10 +312,22 @@ public enum SteamCEFShim {
             return WebHelperLaunch(
                 variant: variant,
                 executable: exe,
-                shimmed: lower.contains("--in-process-gpu")
+                shimmed: lower.contains("--in-process-gpu"),
+                loggedAt: logTimestamp(line)
             )
         }
         return nil
+    }
+
+    /// `[2026-09-27 22:54:46] Startup - …` → `2026-09-27 22:54:46`.
+    ///
+    /// Only the exact `yyyy-MM-dd HH:mm:ss` shape is accepted, because the
+    /// callers compare stamps as strings and that is only meaningful for it.
+    static func logTimestamp<S: StringProtocol>(_ line: S) -> String? {
+        guard line.first == "[", let close = line.firstIndex(of: "]") else { return nil }
+        let stamp = line[line.index(after: line.startIndex)..<close]
+        guard stamp.count == 19 else { return nil }
+        return String(stamp)
     }
 
     public static func lastWebHelperLaunch(in bottle: Bottle) -> WebHelperLaunch? {
@@ -355,150 +345,226 @@ public enum SteamCEFShim {
         Set(cefVariantDirectories(in: bottle).filter { isShimmed(in: $0) }.map(\.lastPathComponent))
     }
 
-    private static func modificationDate(of url: URL) -> Date? {
+    private static func fileSize(of url: URL) -> Int {
         let attrs = try? FileManager.default.attributesOfItem(atPath: url.path(percentEncoded: false))
-        return attrs?[.modificationDate] as? Date
+        return (attrs?[.size] as? NSNumber)?.intValue ?? 0
     }
 
-    // MARK: - Has Steam's CEF layout stopped moving?
+    // MARK: - Has Steam finished installing itself?
 
-    enum LayoutState: Equatable {
-        /// Steam is done unpacking `cef.win*`. `variant` is the one it named.
-        case settled(variant: String?)
-        case keepWaiting(String)
+    /// Steam's updater, as the newest session in `bootstrap_log.txt` has it.
+    ///
+    /// Every start of `steam.exe` opens a session with `Startup - updater
+    /// built …`. When the updater has installed something it relaunches Steam
+    /// (`Update complete, launching Steam...`, then `Shutdown`): a new process
+    /// and a new session, sometimes within the same second. A first run does
+    /// that twice, for the 32-bit client and then the 64-bit one. Only the
+    /// newest session is what is running now.
+    public struct UpdaterSession: Equatable, Sendable {
+        public enum Phase: Equatable, Sendable {
+            /// Verifying, checking for updates, or handed over to the client.
+            case starting
+            /// `Downloading update (x of y KB)...`. The bare `Downloading
+            /// update...` form carries no figures.
+            case downloading(doneKB: Int?, totalKB: Int?)
+            case installing
+            /// This process is about to be replaced by the one it installed.
+            case relaunching
+            /// `Exhausted list of download hosts` / `Failed to determine
+            /// download location`. On a first run Steam then shows "Failed to
+            /// load steamui.dll" and waits for someone to close it.
+            case downloadFailed
+        }
+
+        /// The session's first stamp, "2026-09-27 22:54:36".
+        public let startedAt: String
+        public let phase: Phase
+
+        public init(startedAt: String, phase: Phase) {
+            self.startedAt = startedAt
+            self.phase = phase
+        }
     }
 
-    /// Everything the decision needs, so it can be decided without touching disk.
-    struct LayoutInputs: Equatable {
+    static func lastUpdaterSession(inLog text: String) -> UpdaterSession? {
+        var startedAt: String?
+        var phase = UpdaterSession.Phase.starting
+        // Newline-ness, never a literal: Steam writes CRLF (see lastWebHelperLaunch).
+        for line in text.split(whereSeparator: \.isNewline) {
+            if line.contains("Startup - updater built") {
+                guard let stamp = logTimestamp(line) else { continue }
+                startedAt = stamp
+                phase = .starting
+            } else if startedAt == nil {
+                continue
+            } else if line.contains("Downloading update") {
+                let figures = downloadFigures(line)
+                phase = .downloading(doneKB: figures?.done, totalKB: figures?.total)
+            } else if line.contains("Installing update") || line.contains("Extracting package") {
+                phase = .installing
+            } else if line.contains("Update complete, launching Steam") {
+                phase = .relaunching
+            } else if line.contains("Exhausted list of download hosts")
+                        || line.contains("Failed to determine download location") {
+                phase = .downloadFailed
+            }
+        }
+        guard let startedAt else { return nil }
+        return UpdaterSession(startedAt: startedAt, phase: phase)
+    }
+
+    public static func lastUpdaterSession(in bottle: Bottle) -> UpdaterSession? {
+        guard let data = try? Data(contentsOf: bootstrapLogURL(in: bottle)) else { return nil }
+        return lastUpdaterSession(inLog: String(decoding: data, as: UTF8.self))
+    }
+
+    /// `Downloading update (85,858 of 241,937 KB)...` → (85858, 241937). The
+    /// separators are whatever the prefix's locale prints, so only the digits
+    /// are kept.
+    static func downloadFigures<S: StringProtocol>(_ line: S) -> (done: Int, total: Int)? {
+        guard let open = line.firstIndex(of: "("),
+              let close = line[open...].firstIndex(of: ")")
+        else { return nil }
+        let halves = String(line[line.index(after: open)..<close]).components(separatedBy: " of ")
+        guard halves.count == 2 else { return nil }
+        func number(_ text: String) -> Int? {
+            Int(String(text.filter { $0.isASCII && $0.isNumber }))
+        }
+        guard let done = number(halves[0]), let total = number(halves[1]) else { return nil }
+        return (done, total)
+    }
+
+    /// The variant Steam's current install launched its UI from, or nil if it
+    /// has not yet.
+    ///
+    /// The client starts `steamwebhelper` only once the updater has handed
+    /// over, so a launch stamped at or after the newest updater session began
+    /// is first-hand evidence that the install finished: both downloads, the
+    /// 32→64-bit hop, every `cef.win*` extract. It also names the variant Steam
+    /// loads, which is the one the shim has to go into.
+    ///
+    /// "Some variant has a helper" is not this, and the difference has been the
+    /// black window twice. 2 Sep 2026: `cef.win7x64` landed 47 s before
+    /// `cef.win64` existed, and the shim went into the wrong one. 27 Sep 2026:
+    /// a first run that stops between its two downloads leaves exactly that
+    /// layout on disk.
+    static func launchedUIVariant(
+        webHelper: WebHelperLaunch?,
+        session: UpdaterSession?,
+        helperVariants: Set<String>
+    ) -> String? {
+        guard let webHelper, helperVariants.contains(webHelper.variant) else { return nil }
+        if let session {
+            // Stamped before this session began: that was the install before it.
+            guard let at = webHelper.loggedAt, at >= session.startedAt else { return nil }
+        }
+        return webHelper.variant
+    }
+
+    /// Has Steam launched its UI since it last updated itself? False on a
+    /// fresh bottle, and after a first run that stopped before it finished.
+    public static func hasLaunchedUISinceLastUpdate(in bottle: Bottle) -> Bool {
+        launchedUIVariant(
+            webHelper: lastWebHelperLaunch(in: bottle),
+            session: lastUpdaterSession(in: bottle),
+            helperVariants: helperBearingVariants(in: bottle)
+        ) != nil
+    }
+
+    /// What moves while Steam installs itself. Any change counts as progress.
+    struct FirstRunMarks: Equatable {
+        var bootstrapLogBytes: Int
+        var webHelperLogBytes: Int
         var helperVariants: Set<String>
-        /// From `webhelper.txt`; nil until Steam has launched a helper even once.
-        var steamVariant: String?
-        var now: Date
-        /// When `helperVariants` last changed.
-        var lastVariantChange: Date
-        /// mtime of `bootstrap_log.txt` — Steam writes it continuously while it
-        /// is downloading and unpacking. nil when the log does not exist yet.
-        var bootstrapLogMtime: Date?
-        var settle: TimeInterval
     }
 
-    /// Has Steam finished laying out `bin/cef`?
-    ///
-    /// This is deliberately *not* a question about shims. Shimming a running
-    /// client that verifies its files is a loop (see `waitForVariantsToSettle`),
-    /// so the shim goes on after Steam is stopped, and the only thing worth
-    /// waiting for while it runs is the layout itself.
-    ///
-    /// The old rule — "every variant that has a helper is shimmed" — was true on
-    /// a fresh bottle the instant `cef.win7x64` landed, ~47 s before `cef.win64`
-    /// existed at all. Recorded 2 Sep 2026: win7x64 created **and** shimmed
-    /// 23:50:23; win64 created 23:51:10; Valve's unshimmed helper launched out
-    /// of it 23:51:25 → black login window. Reproduced 3 Sep 2026 with the same
-    /// 47-second gap, so it is the shape of a first run, not a fluke.
-    ///
-    /// When Steam has named its variant, that variant decides and nothing else
-    /// does. Until then, having a helper on disk is not enough: a variant that
-    /// appeared moments ago, or a Steam still writing `bootstrap_log.txt`, means
-    /// more is coming.
-    static func layoutState(_ input: LayoutInputs) -> LayoutState {
-        if let steam = input.steamVariant {
-            if input.helperVariants.contains(steam) {
-                return .settled(variant: steam)
-            }
-            return .keepWaiting("Steam loads \(steam) and it is not on disk yet")
-        }
-        if input.helperVariants.isEmpty {
-            return .keepWaiting("no cef.win* helper on disk yet")
-        }
-        if input.now.timeIntervalSince(input.lastVariantChange) < input.settle {
-            return .keepWaiting("a variant appeared less than \(Int(input.settle))s ago")
-        }
-        if let mtime = input.bootstrapLogMtime,
-           input.now.timeIntervalSince(mtime) < input.settle {
-            return .keepWaiting("Steam is still writing bootstrap_log.txt")
-        }
-        return .settled(variant: nil)
+    static func firstRunMarks(in bottle: Bottle) -> FirstRunMarks {
+        FirstRunMarks(
+            bootstrapLogBytes: fileSize(of: bootstrapLogURL(in: bottle)),
+            webHelperLogBytes: fileSize(of: webHelperLogURL(in: bottle)),
+            helperVariants: helperBearingVariants(in: bottle)
+        )
     }
 
-    /// Wait until Steam has finished laying out `bin/cef` — **without touching it**.
+    /// Everything the first-run wait decides on, so it can be decided without
+    /// touching disk.
+    struct FirstRunInputs: Equatable {
+        var clientRunning: Bool
+        /// Seconds since `steam.exe` was last seen, or since Wyn started it.
+        var clientGoneFor: TimeInterval
+        var session: UpdaterSession?
+        var webHelper: WebHelperLaunch?
+        var helperVariants: Set<String>
+        /// Seconds since anything in `FirstRunMarks` last changed.
+        var quietFor: TimeInterval
+        /// How long `steam.exe` may be missing and still be a relaunch in
+        /// progress, or a start that has not reached the process table yet.
+        var relaunchGrace: TimeInterval = 20
+        /// How long a running Steam may go without writing anything.
+        var stallAfter: TimeInterval = 600
+    }
+
+    enum FirstRunState: Equatable {
+        /// The install is finished: its client launched the UI from `variant`.
+        case uiLaunched(variant: String)
+        /// Still installing. The string is for the person watching.
+        case keepWaiting(String)
+        /// `steam.exe` quit before its UI came up: a failed download someone
+        /// closed, or a crash. Starting it again resumes the download.
+        case exitedEarly
+        /// Steam is running and has written nothing for `stallAfter`.
+        case stalled(String)
+    }
+
+    /// Has Steam's first run finished, and if not, what is it doing?
     ///
-    /// > Never shim a running Steam client. Steam verifies its own files on any
-    /// > launch that does not carry `-noverifyfiles`, and the shim is 151,908
-    /// > bytes where the manifest says 7,488,152. Measured on a fresh bottle,
-    /// > 3 Sep 2026 00:14:
-    /// >
-    /// >     BVerifyInstalledFiles: bin\cef\cef.win64\steamwebhelper.exe
-    /// >       is 151908 bytes, expected 7488152
-    /// >
-    /// > Steam then re-extracts the package over the shim and restarts — ten
-    /// > times in a hundred seconds, and it does not stop. The bootstrap
-    /// > `-silent` launches are exactly the ones that verify: `-noverifyfiles`
-    /// > is stripped until `SteamUI.dll` exists, or the first client download
-    /// > never happens. So the shim can only be written while Steam is **down**,
-    /// > and the first process to load it must be a launch carrying
-    /// > `-noverifyfiles`.
+    /// Deliberately no deadline. A first run is two downloads of ~236 MB, and
+    /// on a slow line they take as long as they take: 12 and 5 minutes on 27
+    /// Sep 2026, with Steam logging progress every one to two seconds
+    /// throughout. So progress is the measure. The longest silence that night
+    /// was 50 s, and that was Steam's own error dialog, not a download.
     ///
-    /// Which is why this function waits and reports, and `install(into:)` is
-    /// called by the caller afterwards, once the client has exited.
-    ///
-    /// Returns the variant Steam named in `webhelper.txt`, if it named one.
-    @discardableResult
-    public static func waitForVariantsToSettle(
-        in bottle: Bottle,
-        seconds: TimeInterval = 240,
-        settle: TimeInterval = 15,
-        debug: Bool = false
-    ) async throws -> String? {
-        let deadline = Date().addingTimeInterval(seconds)
-        var knownHelpers = helperBearingVariants(in: bottle)
-        // Backdated so a bottle that has nothing to wait for is not charged the
-        // settle window. It is armed the moment a variant actually appears.
-        var lastChange = Date().addingTimeInterval(-settle)
-        var lastReason = ""
-
-        while true {
-            try Task.checkCancellation()
-
-            let helpers = helperBearingVariants(in: bottle)
-            if helpers != knownHelpers {
-                if debug {
-                    print("[wyn:debug] CEF shim: helpers \(knownHelpers.sorted()) → \(helpers.sorted())")
-                }
-                knownHelpers = helpers
-                lastChange = Date()
-            }
-
-            let state = layoutState(
-                LayoutInputs(
-                    helperVariants: helpers,
-                    steamVariant: lastWebHelperLaunch(in: bottle)?.variant,
-                    now: Date(),
-                    lastVariantChange: lastChange,
-                    bootstrapLogMtime: modificationDate(of: bootstrapLogURL(in: bottle)),
-                    settle: settle
-                )
-            )
-
-            switch state {
-            case .settled(let variant):
-                if debug {
-                    let named = variant ?? "no webhelper launch recorded yet"
-                    print("[wyn:debug] CEF shim: layout settled (\(named))")
-                }
-                return variant
-            case .keepWaiting(let reason):
-                if reason != lastReason {
-                    if debug { print("[wyn:debug] CEF shim: waiting — \(reason)") }
-                    lastReason = reason
-                }
-            }
-
-            if Date() >= deadline { break }
-            try await Task.sleep(nanoseconds: 1_000_000_000)
+    /// The fixed waits this replaces are what broke that night. 180 s for a
+    /// helper to appear gave up with the 32-bit client 77 MB into its download.
+    /// 240 s for the layout to settle ran out part-way through the 64-bit one,
+    /// and the three `-shutdown`s that followed (22:53:31, 22:53:49, 22:54:15)
+    /// went to an updater, which ignores them. At 22:54:34 it finished,
+    /// relaunched Steam `-silent` on Valve's helper, and the sign-in window
+    /// was black.
+    static func firstRunState(_ input: FirstRunInputs) -> FirstRunState {
+        if let variant = launchedUIVariant(
+            webHelper: input.webHelper,
+            session: input.session,
+            helperVariants: input.helperVariants
+        ) {
+            return .uiLaunched(variant: variant)
         }
+        let status = firstRunStatus(input.session)
+        guard input.clientRunning else {
+            return input.clientGoneFor < input.relaunchGrace ? .keepWaiting(status) : .exitedEarly
+        }
+        if input.quietFor >= input.stallAfter {
+            return .stalled(status)
+        }
+        return .keepWaiting(status)
+    }
 
-        print("Steam's CEF layout did not settle in \(Int(seconds))s (\(lastReason)).")
-        return lastWebHelperLaunch(in: bottle)?.variant
+    /// One line for the person watching, from what the updater last logged.
+    static func firstRunStatus(_ session: UpdaterSession?) -> String {
+        switch session?.phase {
+        case .downloading(let done?, let total?) where total > 0:
+            return "Downloading Steam: \(done / 1024) of \(total / 1024) MB…"
+        case .downloading:
+            return "Downloading Steam…"
+        case .installing:
+            return "Installing Steam…"
+        case .relaunching:
+            return "Steam is restarting to finish installing…"
+        case .downloadFailed:
+            return "Steam's download failed. If Steam shows an error, close it: Wyn starts Steam again and the download resumes."
+        case .starting, nil:
+            return "Starting Steam…"
+        }
     }
 
     /// Restore Valve's steamwebhelper in every variant when using frankea Steam Wine.

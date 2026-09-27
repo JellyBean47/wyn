@@ -48,8 +48,8 @@ import Testing
 ///
 /// ten times in a hundred seconds. Steam verifies its own files on any launch
 /// without `-noverifyfiles`, re-extracts the package over the shim and
-/// restarts. So `layoutState` deliberately asks only whether Steam has finished
-/// unpacking — the shim is written afterwards, with the client stopped.
+/// restarts. So `firstRunState` deliberately asks only whether Steam has finished
+/// installing — the shim is written afterwards, with the client stopped.
 @Suite("Steam CEF variant selection")
 struct SteamCEFShimVariantTests {
 
@@ -144,144 +144,87 @@ struct SteamCEFShimVariantTests {
         #expect(SteamCEFShim.lastWebHelperLaunch(inLog: "") == nil)
     }
 
-    // MARK: - Layout settling, replayed against the recorded timeline
+    // MARK: - Has Steam finished installing? Replayed against the 2 Sep timeline
+
+    /// The first-run bootstrap's session, recorded 2 Sep 2026 23:49:31 (the
+    /// line in `noLaunchLineYieldsNil`). Every launch below comes after it.
+    private static let bootstrapSession = SteamCEFShim.UpdaterSession(
+        startedAt: "2026-09-02 23:49:31",
+        phase: .starting
+    )
 
     private func inputs(
         helpers: Set<String>,
-        steamVariant: String? = nil,
-        variantAgeSeconds: TimeInterval = 600,
-        bootstrapLogAgeSeconds: TimeInterval? = 600,
-        settle: TimeInterval = 15
-    ) -> SteamCEFShim.LayoutInputs {
-        let now = Date()
-        return SteamCEFShim.LayoutInputs(
+        launchLine: String? = nil,
+        quietFor: TimeInterval = 0
+    ) -> SteamCEFShim.FirstRunInputs {
+        SteamCEFShim.FirstRunInputs(
+            clientRunning: true,
+            clientGoneFor: 0,
+            session: Self.bootstrapSession,
+            webHelper: launchLine.flatMap { SteamCEFShim.lastWebHelperLaunch(inLog: $0) },
             helperVariants: helpers,
-            steamVariant: steamVariant,
-            now: now,
-            lastVariantChange: now.addingTimeInterval(-variantAgeSeconds),
-            bootstrapLogMtime: bootstrapLogAgeSeconds.map { now.addingTimeInterval(-$0) },
-            settle: settle
+            quietFor: quietFor
         )
-    }
-
-    private func hasSettled(_ state: SteamCEFShim.LayoutState) -> Bool {
-        if case .settled = state { return true }
-        return false
     }
 
     /// **23:50:23.** The exact state the old code called success. `cef.win7x64`
     /// exists; `cef.win64` will not exist for another 47 seconds. Calling this
     /// done — and shimming on the strength of it — is what shipped the black
     /// window.
-    @Test func winSevenX64AloneHasNotSettled() {
-        let state = SteamCEFShim.layoutState(
-            inputs(
-                helpers: ["cef.win7x64"],
-                steamVariant: nil,
-                variantAgeSeconds: 0,        // it landed this second
-                bootstrapLogAgeSeconds: 0    // Steam is still unpacking
-            )
-        )
-        #expect(!hasSettled(state))
+    @Test func winSevenX64AloneIsNotFinished() {
+        let state = SteamCEFShim.firstRunState(inputs(helpers: ["cef.win7x64"]))
+        #expect(!state.isFinished)
     }
 
-    /// Steam has named a variant that is not on disk yet — keep waiting for it,
+    /// Steam has named a variant that is not on disk — keep waiting for it,
     /// whatever else is present.
-    @Test func steamsOwnVariantDecidesAndBlocks() {
-        let state = SteamCEFShim.layoutState(
-            inputs(helpers: ["cef.win7x64"], steamVariant: "cef.win64")
+    @Test func steamsOwnVariantHasToBeOnDisk() {
+        let state = SteamCEFShim.firstRunState(
+            inputs(helpers: ["cef.win7x64"], launchLine: Self.unshimmedLine)
         )
-        #expect(!hasSettled(state))
-        if case .keepWaiting(let reason) = state {
-            #expect(reason.contains("cef.win64"))
-        }
+        #expect(!state.isFinished)
     }
 
-    /// **23:51:10.** Steam's variant is on disk. Settled — and note it is
-    /// settled while still carrying Valve's helper: shimming is a separate step
-    /// that happens after the client is stopped.
-    @Test func settledWhenSteamsVariantIsOnDisk() {
-        let state = SteamCEFShim.layoutState(
-            inputs(helpers: ["cef.win7x64", "cef.win64"], steamVariant: "cef.win64")
+    /// **23:51:25.** Steam launched its UI from `cef.win64`, which is on disk.
+    /// Finished — and note it is finished while still carrying Valve's helper:
+    /// shimming is a separate step that happens after the client is stopped.
+    @Test func finishedWhenSteamLaunchesItsUIFromAVariantOnDisk() {
+        let state = SteamCEFShim.firstRunState(
+            inputs(helpers: ["cef.win7x64", "cef.win64"], launchLine: Self.unshimmedLine)
         )
-        #expect(state == .settled(variant: "cef.win64"))
+        #expect(state == .uiLaunched(variant: "cef.win64"))
     }
 
     /// A variant Steam never loads must not hold the launch hostage.
     @Test func variantsSteamDoesNotLoadDoNotBlock() {
-        let state = SteamCEFShim.layoutState(
-            inputs(helpers: ["cef.win7", "cef.win64"], steamVariant: "cef.win64")
+        let state = SteamCEFShim.firstRunState(
+            inputs(helpers: ["cef.win7", "cef.win64"], launchLine: Self.unshimmedLine)
         )
-        #expect(state == .settled(variant: "cef.win64"))
+        #expect(state == .uiLaunched(variant: "cef.win64"))
     }
 
-    /// The warm path: `webhelper.txt` already names a present variant, so the
-    /// settle window is never charged even though a variant just changed. Every
-    /// launch after the first must not pay for the first one's bug.
-    @Test func warmBottleSettlesWithoutWaiting() {
-        let state = SteamCEFShim.layoutState(
-            inputs(
-                helpers: ["cef.win64"],
-                steamVariant: "cef.win64",
-                variantAgeSeconds: 0,
-                bootstrapLogAgeSeconds: 0
-            )
+    /// Quiet is not finished. The rule this replaces settled a layout once
+    /// `bootstrap_log.txt` had been still for 15 s, and a first run is not
+    /// reliably noisy: on 27 Sep 2026 Steam sat silent for 50 s behind its own
+    /// error dialog, between two downloads. Only Steam's own launch says done.
+    @Test func quietIsNotFinished() {
+        let state = SteamCEFShim.firstRunState(
+            inputs(helpers: ["cef.win7x64"], quietFor: 60)
         )
-        #expect(state == .settled(variant: "cef.win64"))
+        #expect(!state.isFinished)
     }
 
-    /// No launch recorded and Steam has gone quiet: nothing more is coming.
-    @Test func quietSteamWithVariantsOnDiskHasSettled() {
-        let state = SteamCEFShim.layoutState(
-            inputs(
-                helpers: ["cef.win64"],
-                steamVariant: nil,
-                variantAgeSeconds: 60,
-                bootstrapLogAgeSeconds: 60
-            )
-        )
-        #expect(state == .settled(variant: nil))
-    }
-
-    /// Same, but Steam is still writing `bootstrap_log.txt` — mid-update, and
-    /// another variant may still land. This guard alone would have held the
-    /// 23:50:23 pass open.
-    @Test func steamStillWritingBootstrapLogHasNotSettled() {
-        let state = SteamCEFShim.layoutState(
-            inputs(
-                helpers: ["cef.win64"],
-                steamVariant: nil,
-                variantAgeSeconds: 60,
-                bootstrapLogAgeSeconds: 2
-            )
-        )
-        #expect(!hasSettled(state))
-    }
-
-    /// A variant that appeared moments ago means Steam is still unpacking, even
-    /// with no bootstrap log at all.
-    @Test func freshlyAppearedVariantHasNotSettled() {
-        let state = SteamCEFShim.layoutState(
-            inputs(
-                helpers: ["cef.win64"],
-                steamVariant: nil,
-                variantAgeSeconds: 1,
-                bootstrapLogAgeSeconds: nil
-            )
-        )
-        #expect(!hasSettled(state))
-    }
-
-    @Test func noHelperOnDiskHasNotSettled() {
-        let state = SteamCEFShim.layoutState(inputs(helpers: []))
-        #expect(!hasSettled(state))
+    @Test func noHelperOnDiskIsNotFinished() {
+        let state = SteamCEFShim.firstRunState(inputs(helpers: []))
+        #expect(!state.isFinished)
     }
 
     // MARK: - Against a bottle on disk
 
     /// Build the 23:50:23 layout for real and prove the two rules disagree:
     /// the **old** success rule (`isInstalled`) is true, the new one is not.
-    /// Without this the layout tests above could be vacuously green.
+    /// Without this the rule tests above could be vacuously green.
     @Test func oldRuleSaysDoneAtTheMomentTheBugShipped() throws {
         let fixture = try CEFBottleFixture()
         defer { fixture.cleanUp() }
@@ -290,16 +233,7 @@ struct SteamCEFShimVariantTests {
         #expect(SteamCEFShim.isInstalled(in: fixture.bottle))   // old rule: done
         #expect(SteamCEFShim.helperBearingVariants(in: fixture.bottle) == ["cef.win7x64"])
         #expect(SteamCEFShim.shimmedVariants(in: fixture.bottle) == ["cef.win7x64"])
-
-        let state = SteamCEFShim.layoutState(
-            inputs(
-                helpers: SteamCEFShim.helperBearingVariants(in: fixture.bottle),
-                steamVariant: nil,
-                variantAgeSeconds: 0,
-                bootstrapLogAgeSeconds: 0
-            )
-        )
-        #expect(!hasSettled(state))                             // new rule: not yet
+        #expect(!SteamCEFShim.hasLaunchedUISinceLastUpdate(in: fixture.bottle))   // new rule: not yet
     }
 
     /// 23:51:10: Valve's helper lands in `cef.win64`. It must read as a
@@ -330,6 +264,263 @@ struct SteamCEFShimVariantTests {
         let fixture = try CEFBottleFixture()
         defer { fixture.cleanUp() }
         #expect(SteamCEFShim.lastWebHelperLaunch(in: fixture.bottle) == nil)
+    }
+}
+
+/// Regression cover for the black sign-in window on Wyn 1.1 build 3: a fresh
+/// install over a slow line, 27 Sep 2026. Recorded from that bottle's
+/// `Steam/logs/`, its directory birth times and Wyn's launch logs:
+///
+/// | time     | event                                                              |
+/// |----------|--------------------------------------------------------------------|
+/// | 22:36:25 | Setup starts Steam `-silent`: the 32-bit client, 236 MB            |
+/// | 22:39:23 | build 3 gives up after 180 s (`cefDidNotAppear`), 75 MB in         |
+/// | 22:48:20 | `Exhausted list of download hosts`: "Failed to load steamui.dll"   |
+/// | 22:49:10 | the person closes Steam's error; Steam exits                       |
+/// | 22:49:17 | they open Steam again: it installs, relaunches at 22:49:27         |
+/// | 22:49:25 | `cef.win7x64` lands, from the 32-bit client                        |
+/// | 22:49:30 | the 64-bit client, 230 MB, starts downloading                      |
+/// | 22:53:31 | build 3's 240 s wait runs out: `-shutdown` ×3, the updater ignores all three |
+/// | 22:54:30 | `cef.win64` lands                                                  |
+/// | 22:54:34 | `Update complete, launching Steam...`                              |
+/// | 22:54:46 | the relaunched client starts Valve's helper from `cef.win64`: black |
+/// | 23:09:11 | stopped, shimmed, relaunched: `steamwebhelper_real.exe --in-process-gpu`, and the window draws |
+///
+/// Every test below asks the new rule what it would have done at one of
+/// those moments, against the logs exactly as they stood then.
+@Suite("Steam's first run on a slow line")
+struct SteamFirstRunTests {
+
+    /// `bootstrap_log.txt`, verbatim, cut down to the lines that decide
+    /// anything (the real file is 219 KB, most of it progress and pending
+    /// downloads).
+    static let bootstrapLog = #"""
+    [2026-09-27 22:36:25] Startup - updater built May 20 2024 14:26:54
+    [2026-09-27 22:36:25] Startup - Steam Client launched with: "C:\Program Files (x86)\Steam\steam.exe" -no-cef-sandbox -cef-disable-gpu -cef-in-process-gpu -silent
+    [2026-09-27 22:36:25] Verifying installation...
+    [2026-09-27 22:36:25] Unable to read and verify install manifest C:\Program Files (x86)\Steam\package\steam_client_win32.installed
+    [2026-09-27 22:36:25] Verification complete
+    [2026-09-27 22:36:25] Checking for available updates...
+    [2026-09-27 22:36:29] Downloaded new manifest: /client/steam_client_win32 version 1769731672, installed version 0, existing pending version 0
+    [2026-09-27 22:36:29] Downloading update (15 of 241,937 KB)...
+    [2026-09-27 22:39:20] Downloading update (77,631 of 241,937 KB)...
+    [2026-09-27 22:40:10] Error: Download of package (public_all) failed after 0 bytes (0 : 200).
+    [2026-09-27 22:48:10] Downloading update (236,811 of 241,937 KB)...
+    [2026-09-27 22:48:20] Exhausted list of download hosts
+    [2026-09-27 22:48:20] Download complete.
+    [2026-09-27 22:48:20] Error: Failed to determine download location for universe 1
+    [2026-09-27 22:49:10] Shutdown
+    [2026-09-27 22:49:17] Startup - updater built May 20 2024 14:26:54
+    [2026-09-27 22:49:17] Startup - Steam Client launched with: "C:\Program Files (x86)\Steam\steam.exe" -no-cef-sandbox -cef-disable-gpu -cef-in-process-gpu -silent
+    [2026-09-27 22:49:17] Checking for available updates...
+    [2026-09-27 22:49:19] Found pending update
+    [2026-09-27 22:49:19] Installing update...
+    [2026-09-27 22:49:20] Extracting package...
+    [2026-09-27 22:49:27] Update complete, launching Steam...
+    [2026-09-27 22:49:27] Shutdown
+    [2026-09-27 22:49:27] Startup - updater built Jan 29 2026 14:35:32
+    [2026-09-27 22:49:27] Startup - Steam Client launched with: "C:\Program Files (x86)\Steam\Steam.exe" -no-cef-sandbox -cef-disable-gpu -cef-in-process-gpu -silent
+    [2026-09-27 22:49:27] Verification complete
+    [2026-09-27 22:49:27] Downloading update...
+    [2026-09-27 22:49:27] Checking for available updates...
+    [2026-09-27 22:49:30] Downloaded new manifest: /steam_client_win64 version 1788652215, installed version 0, existing pending version 0
+    [2026-09-27 22:49:30] Downloading update (286 of 236,054 KB)...
+    [2026-09-27 22:53:30] Downloading update (196,122 of 236,054 KB)...
+    [2026-09-27 22:54:20] Downloading update (231,337 of 236,054 KB)...
+    [2026-09-27 22:54:25] Download complete.
+    [2026-09-27 22:54:25] Extracting package...
+    [2026-09-27 22:54:30] Installing update...
+    [2026-09-27 22:54:34] Update complete, launching Steam...
+    [2026-09-27 22:54:34] Shutdown
+    [2026-09-27 22:54:36] Startup - updater built Sep  2 2026 18:32:43
+    [2026-09-27 22:54:36] Startup - Steam Client launched with: "C:\Program Files (x86)\Steam\steam.exe" -no-cef-sandbox -cef-disable-gpu -cef-in-process-gpu -silent
+    [2026-09-27 22:54:36] Verification complete
+    [2026-09-27 22:56:51] Nothing to do
+    [2026-09-27 23:09:09] Shutdown
+    [2026-09-27 23:09:10] Startup - updater built Sep  2 2026 18:32:43
+    [2026-09-27 23:09:10] Startup - Steam Client launched with: "C:\Program Files (x86)\Steam\steam.exe" -no-cef-sandbox -noverifyfiles -cef-disable-gpu -cef-in-process-gpu
+    [2026-09-27 23:09:10] Verification skipped
+    [2026-09-27 23:09:10] Verification complete
+    """#
+
+    /// `webhelper.txt`, verbatim, truncated after the flags that matter.
+    static let webHelperLog = #"""
+    [2026-09-27 22:54:46] Startup - webhelper launched pid: 608 commandline: "C:\Program Files (x86)\Steam\bin\cef\cef.win64\steamwebhelper.exe" -nocrashdialog -lang=en_US -cachedir="C:\users\crossover\AppData\Local\Steam\htmlcache" -steampid=568 -buildid=1788652215 -steamid=0
+    [2026-09-27 23:09:08] Shutdown
+    [2026-09-27 23:09:11] Startup - webhelper launched pid: 1620 commandline: "C:\Program Files (x86)\Steam\bin\cef\cef.win64\steamwebhelper_real.exe" --disable-gpu --in-process-gpu -nocrashdialog -lang=en_US -steampid=1560 -buildid=1788652215
+    """#
+
+    /// A log as it stood at `time` ("22:53:31"), CRLF like the real one.
+    private func log(_ text: String, at time: String) -> String {
+        let cutoff = "2026-09-27 \(time)"
+        return text
+            .split(whereSeparator: \.isNewline)
+            .filter { line in SteamCEFShim.logTimestamp(line).map { $0 <= cutoff } ?? false }
+            .joined(separator: "\r\n")
+    }
+
+    private func session(at time: String) -> SteamCEFShim.UpdaterSession? {
+        SteamCEFShim.lastUpdaterSession(inLog: log(Self.bootstrapLog, at: time))
+    }
+
+    private func state(
+        at time: String,
+        helpers: Set<String>,
+        running: Bool = true,
+        goneFor: TimeInterval = 0,
+        quietFor: TimeInterval = 0
+    ) -> SteamCEFShim.FirstRunState {
+        SteamCEFShim.firstRunState(
+            SteamCEFShim.FirstRunInputs(
+                clientRunning: running,
+                clientGoneFor: goneFor,
+                session: session(at: time),
+                webHelper: SteamCEFShim.lastWebHelperLaunch(inLog: log(Self.webHelperLog, at: time)),
+                helperVariants: helpers,
+                quietFor: quietFor
+            )
+        )
+    }
+
+    // MARK: - The moments build 3 got wrong
+
+    /// **22:39:23.** Build 3's 180 s wait for a helper ran out here and Setup
+    /// failed. Steam was a third of the way through a healthy download.
+    @Test func threeMinutesIntoTheDownloadIsStillDownloading() {
+        #expect(state(at: "22:39:23", helpers: []) == .keepWaiting("Downloading Steam: 75 of 236 MB…"))
+    }
+
+    /// **22:53:31.** Build 3 sent the first of three `-shutdown`s here. The
+    /// 64-bit client was 191 MB into 230, `cef.win7x64` had been on disk for
+    /// four minutes, and Steam had never launched a helper.
+    @Test func midDownloadWithAHelperOnDiskIsStillDownloading() {
+        let now = state(at: "22:53:31", helpers: ["cef.win7x64"])
+        #expect(now == .keepWaiting("Downloading Steam: 191 of 230 MB…"))
+    }
+
+    /// **22:54:34–36.** The updater exits and starts the client it installed.
+    /// For a moment there is no `steam.exe`, and that is not an exit.
+    @Test func theUpdatersRelaunchIsWaitedOut() {
+        let gap = state(at: "22:54:35", helpers: ["cef.win7x64", "cef.win64"], running: false, goneFor: 1)
+        #expect(gap == .keepWaiting("Steam is restarting to finish installing…"))
+    }
+
+    /// **22:54:46.** The relaunched client starts its UI from `cef.win64`. That
+    /// is the finish line: stop it here, shim, and relaunch.
+    @Test func theClientsFirstUILaunchIsTheFinishLine() {
+        #expect(state(at: "22:54:46", helpers: ["cef.win7x64", "cef.win64"]) == .uiLaunched(variant: "cef.win64"))
+    }
+
+    // MARK: - The failed download
+
+    /// **22:48:20.** Steam's updater gives up and puts up its own error. The
+    /// person is told what to do about it.
+    @Test func aFailedDownloadSaysWhatToDo() {
+        guard case .keepWaiting(let status) = state(at: "22:48:30", helpers: [], quietFor: 10) else {
+            Issue.record("a running Steam behind its error dialog is not finished, and not stalled yet")
+            return
+        }
+        #expect(status.contains("download failed"))
+        #expect(status.contains("close it"))
+    }
+
+    /// **22:49:10.** They closed it. A Steam that exits before its UI came up
+    /// is started again, which resumes the download: the next run found every
+    /// package already there and went straight to installing.
+    @Test func steamThatQuitsBeforeItsUIIsStartedAgain() {
+        #expect(state(at: "22:49:12", helpers: [], running: false, goneFor: 25) == .exitedEarly)
+        // …but not while it might still be starting or relaunching.
+        #expect(state(at: "22:49:12", helpers: [], running: false, goneFor: 5) != .exitedEarly)
+    }
+
+    // MARK: - Stopped bottles
+
+    /// **23:09:09**, after the stop. The install finished and the variant it
+    /// launched from is on disk: nothing to bootstrap, only the shim to write.
+    @Test func aFinishedInstallNeedsNoBootstrap() {
+        let variant = SteamCEFShim.launchedUIVariant(
+            webHelper: SteamCEFShim.lastWebHelperLaunch(inLog: log(Self.webHelperLog, at: "23:09:09")),
+            session: session(at: "23:09:09"),
+            helperVariants: ["cef.win7x64", "cef.win64"]
+        )
+        #expect(variant == "cef.win64")
+    }
+
+    /// **23:09:10.** A new session has begun and its client has not launched a
+    /// helper yet. The 22:54:46 launch belongs to the session before it and
+    /// says nothing about this one.
+    @Test func aLaunchFromBeforeTheNewestSessionDoesNotCount() {
+        #expect(!state(at: "23:09:10", helpers: ["cef.win7x64", "cef.win64"]).isFinished)
+    }
+
+    /// **23:09:11.** The shimmed launch, and the one after it that drew.
+    @Test func theShimmedLaunchIsSeen() {
+        #expect(state(at: "23:09:11", helpers: ["cef.win7x64", "cef.win64"]) == .uiLaunched(variant: "cef.win64"))
+        #expect(SteamCEFShim.lastWebHelperLaunch(inLog: log(Self.webHelperLog, at: "23:09:11"))?.shimmed == true)
+    }
+
+    /// The same, read off a bottle on disk: the interrupted layout of 22:53:31,
+    /// then the finished one of 23:09:09.
+    @Test func aStoppedBottleIsReadFromDisk() throws {
+        let fixture = try CEFBottleFixture()
+        defer { fixture.cleanUp() }
+        try fixture.makeValveVariant("cef.win7x64")
+        try fixture.writeBootstrapLog(log(Self.bootstrapLog, at: "22:53:31"))
+        #expect(!SteamCEFShim.hasLaunchedUISinceLastUpdate(in: fixture.bottle))
+
+        try fixture.makeValveVariant("cef.win64")
+        try fixture.writeBootstrapLog(log(Self.bootstrapLog, at: "23:09:09"))
+        try fixture.writeWebHelperLog(log(Self.webHelperLog, at: "23:09:09"))
+        #expect(SteamCEFShim.hasLaunchedUISinceLastUpdate(in: fixture.bottle))
+    }
+
+    // MARK: - Reading the updater
+
+    @Test func sessionsFollowTheLog() {
+        #expect(session(at: "22:36:25") == .init(startedAt: "2026-09-27 22:36:25", phase: .starting))
+        #expect(session(at: "22:39:23")?.phase == .downloading(doneKB: 77_631, totalKB: 241_937))
+        #expect(session(at: "22:48:20")?.phase == .downloadFailed)
+        #expect(session(at: "22:49:19") == .init(startedAt: "2026-09-27 22:49:17", phase: .installing))
+        // Relaunch, shutdown and the new session all inside one second.
+        #expect(session(at: "22:49:27") == .init(
+            startedAt: "2026-09-27 22:49:27",
+            phase: .downloading(doneKB: nil, totalKB: nil)
+        ))
+        #expect(session(at: "22:54:34")?.phase == .relaunching)
+        #expect(session(at: "22:54:36") == .init(startedAt: "2026-09-27 22:54:36", phase: .starting))
+    }
+
+    @Test func noSessionBeforeSteamHasRun() {
+        #expect(SteamCEFShim.lastUpdaterSession(inLog: "") == nil)
+    }
+
+    /// The figures carry the prefix locale's separators.
+    @Test func downloadFiguresKeepOnlyDigits() {
+        for line in [
+            "[2026-09-27 22:40:04] Downloading update (85,858 of 241,937 KB)...",
+            "[2026-09-27 22:40:04] Downloading update (85.858 of 241.937 KB)...",
+            "[2026-09-27 22:40:04] Downloading update (85 858 of 241 937 KB)...",
+            "[2026-09-27 22:40:04] Downloading update (85\u{00A0}858 of 241\u{00A0}937 KB)..."
+        ] {
+            let figures = SteamCEFShim.downloadFigures(line)
+            #expect(figures?.done == 85_858, "\(line)")
+            #expect(figures?.total == 241_937, "\(line)")
+        }
+        #expect(SteamCEFShim.downloadFigures("[2026-09-27 22:49:27] Downloading update...") == nil)
+    }
+
+    /// Ten minutes of nothing from a running Steam ends the wait with a
+    /// reason. Tonight's longest silence was 50 s.
+    @Test func aSilentSteamIsGivenUpOnAfterTenMinutes() {
+        #expect(state(at: "22:53:31", helpers: ["cef.win7x64"], quietFor: 599) != .stalled("Downloading Steam: 191 of 230 MB…"))
+        #expect(state(at: "22:53:31", helpers: ["cef.win7x64"], quietFor: 600) == .stalled("Downloading Steam: 191 of 230 MB…"))
+    }
+}
+
+private extension SteamCEFShim.FirstRunState {
+    var isFinished: Bool {
+        if case .uiLaunched = self { return true }
+        return false
     }
 }
 
@@ -375,6 +566,11 @@ private struct CEFBottleFixture {
     func writeWebHelperLog(_ text: String) throws {
         try FileManager.default.createDirectory(at: logsRoot, withIntermediateDirectories: true)
         try text.write(to: SteamCEFShim.webHelperLogURL(in: bottle), atomically: true, encoding: .utf8)
+    }
+
+    func writeBootstrapLog(_ text: String) throws {
+        try FileManager.default.createDirectory(at: logsRoot, withIntermediateDirectories: true)
+        try text.write(to: SteamCEFShim.bootstrapLogURL(in: bottle), atomically: true, encoding: .utf8)
     }
 
     private func write(_ url: URL, bytes: Int) throws {

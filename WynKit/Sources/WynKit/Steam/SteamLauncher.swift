@@ -397,10 +397,12 @@ public enum SteamLauncher {
         return dest
     }
 
-    /// Unattended SteamSetup (`/S`). Does not leave SteamSetup's "Run Steam" as
-    /// the first client — that path has no CEF args and no steamwebhelper shim,
-    /// so the HWND is black. Wine Mono is `msiexec /qn` first so wineboot never
-    /// shows the hung GUI installer. Caller then starts Steam via `launchSteam`.
+    /// Unattended SteamSetup (`/S`). Wine Mono is `msiexec /qn` first so
+    /// wineboot never shows the hung GUI installer. The caller then starts
+    /// Steam via `launchSteam` — both callers do, the app's Setup and
+    /// `wyn steam install` — and that is what keeps SteamSetup's own "Run
+    /// Steam" from staying the client: it has no CEF args and no shim, so its
+    /// window is black.
     public static func runSteamInstaller(in bottle: Bottle, installer: URL) async throws {
         try await WineMono.preparePrefix(bottle)
         Wine.allowMacWindows()
@@ -414,11 +416,13 @@ public enum SteamLauncher {
             throw SteamError.steamSetupFailed
         }
 
-        // NSIS `/S` still often Exec's steam.exe from .onInstSuccess — unshimmed.
+        // NSIS `/S` still often Exec's steam.exe from .onInstSuccess. That
+        // client starts by downloading itself, and its updater ignores
+        // -shutdown, so stopping it here fails on a slow line. launchSteam
+        // adopts it instead: it waits for the download and stops it once its
+        // UI has launched.
         if await waitBrieflyForSteamClient(in: bottle, seconds: 8) {
-            print("SteamSetup started the client; stopping it so Wyn can launch with CEF flags…")
-            await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 30)
-            try await requestSteamShutdownUntilExit(in: bottle)
+            print("SteamSetup started Steam; Wyn takes it over once it has installed itself.")
         }
     }
 
@@ -734,51 +738,42 @@ public enum SteamLauncher {
     ///
     /// A first install has no `bin/cef/cef.win*` at all — it appears after
     /// Steam's win32→win64 self-update, and the variants land up to a minute
-    /// apart (47 s, measured twice). So: bootstrap `-silent`, wait for the
-    /// layout to stop moving, stop the client, *then* shim.
+    /// apart (47 s, measured twice). So: run Steam `-silent` until the client
+    /// it installs has launched its UI, stop it, *then* shim.
     ///
     /// The order is the whole point. Shimming a running client is a loop —
     /// Steam verifies its files on any launch without `-noverifyfiles`, sees a
     /// 151,908-byte helper where its manifest says 7,488,152, re-extracts the
     /// package over the shim and restarts, about every ten seconds, forever.
-    /// `SteamCEFShim.waitForVariantsToSettle` carries the measurement.
+    /// `SteamCEFShim.install(into:)` carries the measurement.
     ///
-    /// `-silent` keeps the unshimmed bootstrap from putting a black first HWND
-    /// on screen. Never `wineserver -k`.
+    /// `-silent` hides the updater, not the sign-in window: a client with no
+    /// saved login still opens it, black, until it is stopped here (27 Sep
+    /// 2026). Never `wineserver -k`.
     private static func ensureGameHostCEFReady(plan: SteamLaunchPlan, bottle: Bottle) async throws {
         // A windowed client whose live helper is already shimmed is the warm
         // case. Adopt it untouched. Never start a second steam.exe here.
-        if isSteamClientRunning(in: bottle) {
-            if let launch = SteamCEFShim.lastWebHelperLaunch(in: bottle),
-               launch.shimmed,
-               SteamCEFShim.isInstalled(in: bottle),
-               !isSilentSteamClientRunning(in: bottle) {
-                return
-            }
-            if steamUILooksReady(in: bottle) {
-                if !SteamCEFShim.isInstalled(in: bottle) {
-                    print("Steam is preparing the login window (first run)…")
-                }
-                _ = try await SteamCEFShim.waitForVariantsToSettle(
-                    in: bottle, debug: plan.options.debug
-                )
-                // The shim cannot be written while this client runs, and a
-                // helper it already launched will not repaint if it is. Stop it;
-                // the visible launch that follows is the one that loads the shim.
-                print("Stopping Steam so the shim can be applied and the window can paint…")
-                await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
-                try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
-            } else {
-                print("Steam stub cannot load steamui.dll yet; asking it to exit so the first download can run…")
-                try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
-            }
+        if isSteamClientRunning(in: bottle),
+           let launch = SteamCEFShim.lastWebHelperLaunch(in: bottle),
+           launch.shimmed,
+           SteamCEFShim.isInstalled(in: bottle),
+           !isSilentSteamClientRunning(in: bottle) {
+            return
         }
 
-        if !SteamCEFShim.hasAnyHelper(in: bottle) {
+        // Any other running client is still installing itself or is drawing
+        // Valve's helper (a black window). A stopped one whose last update never
+        // got as far as its UI left an unfinished bin/cef. Either way Steam
+        // finishes first, and only a client that has finished takes -shutdown:
+        // the updater ignores it.
+        if isSteamClientRunning(in: bottle) || !SteamCEFShim.hasLaunchedUISinceLastUpdate(in: bottle) {
             guard SteamCEFShim.bundledShimURL != nil else {
                 throw SteamCEFShimError.shimBinaryMissing
             }
-            try await bootstrapSteamUntilCEFSettles(plan: plan, bottle: bottle)
+            try await runSteamUntilItsUILaunches(plan: plan, bottle: bottle)
+            progress("Restarting Steam with Wyn's fix for its window…")
+            await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
+            try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
         }
 
         // Steam is stopped, so this is the only safe moment to write the shim,
@@ -793,48 +788,111 @@ public enum SteamLauncher {
         _ = try SteamCEFShim.install(into: bottle, debug: plan.options.debug)
     }
 
-    /// Run Steam `-silent` purely to make it unpack `bin/cef`, then stop it.
+    /// Keep Steam running until the client it installs has launched its UI
+    /// once. Starts Steam `-silent` if it is not running, and again if it quits
+    /// before getting there; a restart resumes the download where it stopped.
     ///
-    /// Nothing is shimmed in here, deliberately: this is the launch that has
-    /// `-noverifyfiles` stripped, so it is the one client that will verify its
-    /// files and fight the shim.
-    private static func bootstrapSteamUntilCEFSettles(
-        plan: SteamLaunchPlan,
-        bottle: Bottle
-    ) async throws {
-        print("Steam is preparing the login window (first run)…")
+    /// There is no deadline, only progress, and the person watching sees what
+    /// Steam is doing. `SteamCEFShim.firstRunState` has the night the fixed
+    /// deadlines broke on a slow line. They can still leave: Cancel, or
+    /// `SteamError.firstRunStalled` when Steam writes nothing for ten minutes.
+    ///
+    /// Nothing is shimmed in here, deliberately: a client started without
+    /// `-noverifyfiles` verifies its files and fights the shim.
+    private static func runSteamUntilItsUILaunches(plan: SteamLaunchPlan, bottle: Bottle) async throws {
+        let maxStarts = 4
+        var starts = 0
+        if !isSteamClientRunning(in: bottle) {
+            try await startSteamSilently(plan: plan, bottle: bottle)
+            starts = 1
+        }
+
+        var lastSeen = Date()
+        var marks = SteamCEFShim.firstRunMarks(in: bottle)
+        var lastChange = Date()
+        var lastStatus = ""
+        var lastShown = Date.distantPast
+        while true {
+            try Task.checkCancellation()
+            let running = isSteamClientRunning(in: bottle)
+            if running { lastSeen = Date() }
+            let now = SteamCEFShim.firstRunMarks(in: bottle)
+            if now != marks {
+                marks = now
+                lastChange = Date()
+            }
+
+            let state = SteamCEFShim.firstRunState(
+                SteamCEFShim.FirstRunInputs(
+                    clientRunning: running,
+                    clientGoneFor: Date().timeIntervalSince(lastSeen),
+                    session: SteamCEFShim.lastUpdaterSession(in: bottle),
+                    webHelper: SteamCEFShim.lastWebHelperLaunch(in: bottle),
+                    helperVariants: marks.helperVariants,
+                    quietFor: Date().timeIntervalSince(lastChange)
+                )
+            )
+            switch state {
+            case .uiLaunched(let variant):
+                if plan.options.debug {
+                    print("[wyn:debug] CEF shim: Steam launched its UI from \(variant)")
+                }
+                return
+            case .keepWaiting(let status):
+                // The download figures move every second or two; the words
+                // change only when the phase does. Show a new phase at once,
+                // new figures at most every five seconds.
+                let newPhase = status.filter { !$0.isNumber } != lastStatus.filter { !$0.isNumber }
+                if newPhase || (status != lastStatus && Date().timeIntervalSince(lastShown) >= 5) {
+                    progress(status)
+                    lastStatus = status
+                    lastShown = Date()
+                }
+            case .exitedEarly:
+                guard starts < maxStarts else {
+                    throw SteamError.firstRunKeptStopping(starts: starts)
+                }
+                starts += 1
+                progress("Steam closed before it finished installing. Starting it again (\(starts) of \(maxStarts))…")
+                try await startSteamSilently(plan: plan, bottle: bottle)
+                lastSeen = Date()
+                lastChange = Date()
+                lastStatus = ""
+            case .stalled(let status):
+                throw SteamError.firstRunStalled(lastStatus: status)
+            }
+            try await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+    }
+
+    /// `steam.exe -silent` for a first run: the updater shows no window of
+    /// its own, and file verification stays on until `SteamUI.dll` exists.
+    private static func startSteamSilently(plan: SteamLaunchPlan, bottle: Bottle) async throws {
         var bootstrap = plan.options
         bootstrap.detachAfterStart = true
-        var bootstrapArgs = plan.args
+        var args = plan.args
         // SteamSetup only unpacks a stub. `-noverifyfiles` then skips the first
         // client download and Steam dies with "Failed to load steamui.dll".
         if !steamUILooksReady(in: bottle) {
-            print("Downloading the Steam client (file verify left on until SteamUI.dll exists)…")
-            bootstrapArgs = bootstrapArgs.filter { $0.lowercased() != "-noverifyfiles" }
+            args = args.filter { $0.lowercased() != "-noverifyfiles" }
+            // A launch that verifies must not find a shim: it would re-extract
+            // over it and restart, forever. Steam is stopped here, so Valve's
+            // helpers can go back.
+            if SteamCEFShim.anyVariantShimmed(in: bottle) {
+                try SteamCEFShim.uninstall(from: bottle, debug: plan.options.debug)
+            }
         }
-        if !bootstrapArgs.contains(where: { $0.lowercased() == "-silent" }) {
-            bootstrapArgs.append("-silent")
+        if !args.contains(where: { $0.lowercased() == "-silent" }) {
+            args.append("-silent")
         }
         Wine.allowMacWindows()
         _ = try await Wine.runProgram(
             at: plan.steamURL,
-            args: bootstrapArgs,
+            args: args,
             bottle: bottle,
             environment: plan.environment,
             options: bootstrap
         )
-
-        let appeared = try await SteamCEFShim.waitUntilHelperExists(
-            in: bottle, seconds: 180, debug: plan.options.debug
-        )
-        guard appeared else {
-            throw SteamError.cefDidNotAppear
-        }
-        _ = try await SteamCEFShim.waitForVariantsToSettle(
-            in: bottle, debug: plan.options.debug
-        )
-        await waitUntilSteamClientReadyForShutdown(in: bottle, seconds: 60)
-        try await requestSteamShutdownUntilExit(in: bottle, options: plan.options)
     }
 
     /// Ask Steam to exit once. Never `wineserver -k`.
@@ -953,6 +1011,7 @@ public enum SteamLauncher {
                 return
             }
         }
+        if !isSteamClientRunning(in: bottle) { return }
         print("Steam did not exit after -shutdown. Use Steam → Exit, then: wyn steam launch")
         throw SteamError.steamDidNotExit
     }
@@ -1000,10 +1059,21 @@ public enum SteamLauncher {
         return false
     }
 
+    /// Gone, and still gone three seconds later. When Steam's updater finishes
+    /// it exits and starts the client it installed, and the moment between the
+    /// two is not an exit: the new process came up two seconds after
+    /// `Update complete, launching Steam...` on 27 Sep 2026.
     private static func steamClientDidExit(in bottle: Bottle, seconds: TimeInterval) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
+        var goneSince: Date?
         while Date() < deadline {
-            if !isSteamClientRunning(in: bottle) { return true }
+            if isSteamClientRunning(in: bottle) {
+                goneSince = nil
+            } else if let since = goneSince {
+                if Date().timeIntervalSince(since) >= 3 { return true }
+            } else {
+                goneSince = Date()
+            }
             try? await Task.sleep(nanoseconds: 500_000_000)
         }
         return false
@@ -2747,7 +2817,8 @@ public enum SteamError: LocalizedError {
     case steamNotLoggedOn
     case steamDidNotExit
     case steamAlreadyRunningElsewhere
-    case cefDidNotAppear
+    case firstRunStalled(lastStatus: String)
+    case firstRunKeptStopping(starts: Int)
     case gameNotInstalled(appId: Int)
     case missingSteamAppId(profileId: String)
     case d3dMetalRequiresDirectLaunch
@@ -2770,8 +2841,17 @@ public enum SteamError: LocalizedError {
             return "Steam did not exit after steam.exe -shutdown. Use Steam → Exit (never wineserver -k), then: wyn steam launch"
         case .steamAlreadyRunningElsewhere:
             return "Steam is already running in another bottle or session. Use Steam → Exit (never wineserver -k), then retry."
-        case .cefDidNotAppear:
-            return "Steam did not unpack CEF (bin/cef/cef.win*). Quit Steam via Steam → Exit, then: wyn steam launch"
+        case .firstRunStalled(let lastStatus):
+            return """
+            Steam stopped making progress while installing itself: nothing \
+            changed for ten minutes (last: \(lastStatus)). Check the \
+            connection, then: wyn steam launch
+            """
+        case .firstRunKeptStopping(let starts):
+            return """
+            Steam closed \(starts) times before it finished installing itself. \
+            Check the connection, then: wyn steam launch
+            """
         case .gameNotInstalled(let appId):
             return "Game (Steam app \(appId)) is not installed. Open Steam and install it first."
         case .missingSteamAppId(let profileId):
@@ -2816,11 +2896,11 @@ public enum SteamError: LocalizedError {
             return "Open Steam, sign in with Remember me, then try again."
         case .steamDidNotExit, .steamAlreadyRunningElsewhere:
             return "Use Steam → Exit from Steam's own window, then try again."
-        case .cefDidNotAppear:
+        case .firstRunStalled, .firstRunKeptStopping:
             return """
-            Steam never unpacked its login interface — usually a network \
-            problem during the first client download. Check your connection \
-            and try again.
+            Steam downloads itself the first time it runs, and that stopped — \
+            usually the connection. Check it, then open Steam again: the \
+            download picks up where it stopped.
             """
         case .gameNotInstalled:
             return "Install the game in Steam first, then press Play."
