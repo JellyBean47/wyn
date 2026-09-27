@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { loadCatalog, filterGames, profileApiPayload, profileRunsFromDownload, downloadSupport, NOT_RUNNABLE_FROM_DOWNLOAD } from '../lib/catalog.mjs';
-import { gamesPage, submitPage, gamePage, homePage, installPage, SUPPORT_PAGE_ENABLED, supportPage, DOWNLOAD_URL, SOURCE_URL } from '../lib/html.mjs';
+import { gamesPage, submitPage, gamePage, homePage, installPage, SUPPORT_PAGE_ENABLED, supportPage, DOWNLOAD_URL, RUNTIME_SOURCE_URL, SOURCE_URL } from '../lib/html.mjs';
 const data = loadCatalog(fileURLToPath(new URL('../../', import.meta.url)));
 test('catalog profile references resolve', () => assert.deepEqual(data.missingProfiles, []));
 test('launched titles are the ones with Mac evidence, not theoretical ports', () => {
@@ -88,27 +88,33 @@ test('the download claim is enumerated, not inferred from the layer alone', () =
   const verified = data.games.filter((g) => g.status === 'verified');
   const by = (state) => verified.filter((g) => g.downloadSupport === state).map((g) => g.slug).sort();
 
+  // From 1.1 the download carries D3DMetal, so the five titles verified on
+  // d3dmetal (ac-odyssey, fallout-4, ready-or-not, satisfactory, witcher-3)
+  // moved from source-install to runs. They were measured on the same winecx
+  // commit and D3DMetal 3.0 the 1.1 image carries, not on the image itself.
   assert.deepEqual(by('runs'), [
-    'army-men-rts', 'doom-2016', 'fallout-new-vegas', 'rv-there-yet', 'solarpunk', 'wolfenstein-youngblood',
+    'ac-odyssey', 'army-men-rts', 'doom-2016', 'fallout-4', 'fallout-new-vegas', 'ready-or-not',
+    'rv-there-yet', 'satisfactory', 'solarpunk', 'witcher-3', 'wolfenstein-youngblood',
   ]);
-  assert.deepEqual(by('source-install'), ['ac-odyssey', 'fallout-4', 'ready-or-not', 'satisfactory', 'witcher-3']);
+  assert.deepEqual(by('source-install'), []);
   assert.deepEqual(by('untested'), []);
   assert.equal(data.counts.verifiedFromDownload, by('runs').length);
 
-  // Solarpunk ships both a d3dmetal and a dxmt profile, and solarpunk-dxmt is
-  // itself verified — so the download claim is carried by evidence, not by the
-  // layer name.
+  // Solarpunk ships both a d3dmetal and a dxmt profile. Until 1.0 only the
+  // dxmt one could run from the download; now both can.
   const solarpunk = data.bySlug.get('solarpunk');
   assert.equal(downloadSupport(solarpunk), 'runs');
-  assert.ok(solarpunk.profiles.some((p) => !profileRunsFromDownload(p)));
+  assert.ok(solarpunk.profiles.every((p) => profileRunsFromDownload(p)));
+  assert.equal(profileRunsFromDownload(data.profilesById.get('witcher-3')), true);
 
   // Satisfactory was `untested` until 13 Sep 2026, when satisfactory-dxmt was
   // actually run: RHIThread assert in PollQueryResults, on a launch confirmed
   // as DXMT by the adapter line and by lsof. Measured-to-fail is not the same
   // as no-runtime-for-it, so both reasons live in the map with their evidence.
+  // Its d3dmetal profile carries the title from 1.1; the dxmt one still fails.
   const satisfactory = data.bySlug.get('satisfactory');
   assert.equal(satisfactory.status, 'verified');
-  assert.equal(satisfactory.downloadSupport, 'source-install');
+  assert.equal(satisfactory.downloadSupport, 'runs');
   assert.match(NOT_RUNNABLE_FROM_DOWNLOAD.get('satisfactory-dxmt'), /PollQueryResults/);
   assert.match(NOT_RUNNABLE_FROM_DOWNLOAD.get('rdr2'), /vkd3d/);
   assert.equal(profileRunsFromDownload(data.profilesById.get('satisfactory-dxmt')), false);
@@ -120,11 +126,19 @@ test('the download claim is enumerated, not inferred from the layer alone', () =
   assert.equal(profileRunsFromDownload(rdr2), false);
 });
 test('a title needing the source install says so on its own page', () => {
-  const witcher = data.bySlug.get('witcher-3');
-  assert.equal(witcher.downloadSupport, 'source-install');
-  const html = gamePage(witcher);
+  // rdr2 runs on vkd3d on a hand-built tree no download carries.
+  const rdr2 = data.bySlug.get('rdr2');
+  assert.equal(rdr2.downloadSupport, 'source-install');
+  const html = gamePage(rdr2);
   assert.ok(html.includes('badge needs-source'));
-  assert.ok(html.includes('--accept-gptk-licence'));
+  assert.ok(html.includes('No profile here runs on the runtime inside'));
+
+  // witcher-3 was the example here until 1.1, when D3DMetal joined the image.
+  const witcher = data.bySlug.get('witcher-3');
+  assert.equal(witcher.downloadSupport, 'runs');
+  const witcherHtml = gamePage(witcher);
+  assert.ok(witcherHtml.includes('badge from-download'));
+  assert.ok(!witcherHtml.includes('--accept-gptk-licence'));
 
   const doom = data.bySlug.get('doom-2016');
   assert.equal(doom.downloadSupport, 'runs');
@@ -145,6 +159,9 @@ test('the binary is never offered without its source', () => {
     if (!DOWNLOAD_URL || !html.includes(DOWNLOAD_URL)) continue;
     assert.ok(html.includes(SOURCE_URL), 'a page offering the DMG must link the source');
     assert.ok(/GPL-3\.0/.test(html), 'a page offering the DMG must name the license');
+    // From 1.1 the DMG carries LGPL binaries too (Wine, GnuTLS, Wine Mono):
+    // their exact source is a release asset, and it goes wherever the DMG does.
+    assert.ok(html.includes(RUNTIME_SOURCE_URL), 'a page offering the DMG must link the runtime source');
   }
   // Until the DMG exists, the source install is still the offer, and the home
   // page has to say where it is.

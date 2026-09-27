@@ -54,20 +54,20 @@ export const NOT_RUNNABLE_FROM_DOWNLOAD = new Map([
   ],
 ]);
 
-/// Whether the hash-pinned runtime the app downloads on first launch can run
-/// this profile. D3DMetal is not in the image today — the winecx game-host it needs is
-/// compiled locally and Apple's GPTK comes from the user, not from Wyn — so a
-/// d3dmetal profile is a source install, not a download.
+/// Whether the runtime inside Wyn.dmg can run this profile. From 1.1 the app
+/// carries the winecx game-host with Apple's D3DMetal wired in, beside DXMT,
+/// DXVK and Wine's builtins, so every layer the enum names ships in the image
+/// and only the measured exceptions above are left out. (Until 1.0, D3DMetal
+/// needed the source install and every d3dmetal profile was left out here.)
 export function profileRunsFromDownload(profile) {
-  if (NOT_RUNNABLE_FROM_DOWNLOAD.has(profile.id)) return false;
-  return (profile.bottle?.translationLayer ?? null) !== "d3dmetal";
+  return !NOT_RUNNABLE_FROM_DOWNLOAD.has(profile.id);
 }
 
 /// What the signed download can do with this game. Three answers, because two
 /// would force a claim the evidence does not support:
 ///
-/// - `source-install`: nothing here can run on the shipped runtime. A capability
-///   statement about D3DMetal, true whatever the profiles' status is.
+/// - `source-install`: nothing here can run on the shipped runtime (rdr2's
+///   vkd3d tree). A capability statement, true whatever the profiles' status is.
 /// - `runs`: a profile that the download can run has actually been run —
 ///   verified or launched. This is a promise, so it needs evidence.
 /// - `untested`: the download could run one of these profiles, but nobody has.
