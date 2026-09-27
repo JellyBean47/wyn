@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { loadCatalog, filterGames, profileApiPayload, profileRunsFromDownload, downloadSupport, NOT_RUNNABLE_FROM_DOWNLOAD } from '../lib/catalog.mjs';
-import { gamesPage, submitPage, gamePage, homePage, installPage, SUPPORT_PAGE_ENABLED, supportPage, DOWNLOAD_URL, RUNTIME_SOURCE_URL, SOURCE_URL } from '../lib/html.mjs';
+import { gamesPage, submitPage, gamePage, homePage, installPage, SUPPORT_PAGE_ENABLED, supportPage, DOWNLOAD_URL, DOWNLOAD_VERSION, DOWNLOAD_IS_PRERELEASE, STABLE_DOWNLOAD, RUNTIME_SOURCE_URL, SOURCE_URL } from '../lib/html.mjs';
 const data = loadCatalog(fileURLToPath(new URL('../../', import.meta.url)));
 test('catalog profile references resolve', () => assert.deepEqual(data.missingProfiles, []));
 test('launched titles are the ones with Mac evidence, not theoretical ports', () => {
@@ -166,6 +166,23 @@ test('the binary is never offered without its source', () => {
   // Until the DMG exists, the source install is still the offer, and the home
   // page has to say where it is.
   assert.ok(homePage(data).includes(SOURCE_URL));
+});
+test('a pre-release is offered beside the stable download, and says it is one', () => {
+  // Both are GitHub release assets, so GitHub serves the bytes, not this site.
+  for (const url of [DOWNLOAD_URL, STABLE_DOWNLOAD?.url].filter(Boolean)) {
+    assert.match(url, /^https:\/\/github\.com\/JellyBean47\/wyn\/releases\/download\/v[0-9.]+\/Wyn\.dmg$/);
+  }
+  for (const html of [homePage(data), installPage(data)]) {
+    assert.ok(html.includes(DOWNLOAD_URL));
+    assert.ok(html.includes(`Download Wyn ${DOWNLOAD_VERSION}`));
+    if (DOWNLOAD_IS_PRERELEASE) {
+      // A pre-release never stands alone: the stable release is right beside it.
+      assert.ok(STABLE_DOWNLOAD, 'a pre-release needs STABLE_DOWNLOAD beside it');
+      assert.ok(html.includes('(pre-release)'));
+      assert.ok(html.includes(STABLE_DOWNLOAD.url));
+      assert.ok(html.includes(`Wyn ${STABLE_DOWNLOAD.version} (stable)`));
+    }
+  }
 });
 test('install steps are on a public page, not only behind the support flag', () => {
   // The install section used to live only on /support, which is switched off,

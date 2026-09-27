@@ -48,8 +48,20 @@ export function layerLabel(layer) {
 export const SUPPORT_PAGE_ENABLED = false;
 
 // Where the signed, notarized Wyn.dmg is published, or null while there is no
-// download. Set this to the release asset URL when the DMG goes up.
+// download. Set this to the release asset URL when the DMG goes up. Every
+// download is a GitHub release asset, so GitHub serves the bytes, not this site.
 export const DOWNLOAD_URL = "https://github.com/JellyBean47/wyn/releases/download/v1.1/Wyn.dmg";
+export const DOWNLOAD_VERSION = "1.1";
+
+// True while DOWNLOAD_URL is a GitHub pre-release that is still being tested:
+// it is labelled as one wherever it is offered, and STABLE_DOWNLOAD is offered
+// beside it. When 1.1 is promoted to latest: set this to false and
+// STABLE_DOWNLOAD to null, and the pages go back to a single download.
+export const DOWNLOAD_IS_PRERELEASE = true;
+export const STABLE_DOWNLOAD = {
+  version: "1.0",
+  url: "https://github.com/JellyBean47/wyn/releases/download/v1.0/Wyn.dmg",
+};
 
 // From 1.1 the DMG carries LGPL binaries (Wine, GnuTLS, Wine Mono), whose exact
 // corresponding source has to be offered from the same place (LGPL-2.1 §4):
@@ -119,6 +131,19 @@ function gameCards(games) {
       </ul>`;
 }
 
+/// The download buttons, newest first, in one place so the home and install
+/// pages offer the same thing. Each points at a GitHub release asset.
+export function downloadButtons() {
+  if (!DOWNLOAD_URL) return "";
+  const newest = `<a class="btn" href="${escapeHtml(DOWNLOAD_URL)}">Download Wyn ${escapeHtml(DOWNLOAD_VERSION)}${DOWNLOAD_IS_PRERELEASE ? " (pre-release)" : ""}</a>`;
+  if (!STABLE_DOWNLOAD) {
+    return `<div class="actions">${newest}</div>
+      <p>Signed and notarized, with Wine and Apple's D3DMetal inside the app.</p>`;
+  }
+  return `<div class="actions">${newest}<a class="btn ghost" href="${escapeHtml(STABLE_DOWNLOAD.url)}">Wyn ${escapeHtml(STABLE_DOWNLOAD.version)} (stable)</a></div>
+      <p>Wyn ${escapeHtml(DOWNLOAD_VERSION)} has Wine and Apple's D3DMetal inside the app, signed and notarized; it is a pre-release while it is being tested. Wyn ${escapeHtml(STABLE_DOWNLOAD.version)} is the previous release: it downloads its Wine runtime on first launch and has no D3DMetal.</p>`;
+}
+
 export function homePage(data) {
   const verified = data.games.filter((g) => g.status === "verified");
   const launched = data.games.filter((g) => g.status === "launched");
@@ -126,11 +151,12 @@ export function homePage(data) {
     <section class="hero">
       <p class="kicker">Compatibility catalog</p>
       <h1>Windows games. Mac settings. Shared progress.</h1>
-      <p class="lede">Find launch settings for Windows games on your Mac. See what has actually been tested, download a profile, and share the settings that worked for you. Wyn is free software under GPL-3.0. ${
+      <p class="lede">Find launch settings for Windows games on your Mac. See what has actually been tested, download a profile, and share the settings that worked for you. Wyn is free software under GPL-3.0${
         DOWNLOAD_URL
-          ? `<a href="${escapeHtml(DOWNLOAD_URL)}">Download Wyn.dmg</a> — signed and notarized, Wine and D3DMetal included, with the <a href="${escapeHtml(SOURCE_URL)}">source</a> and the <a href="${escapeHtml(RUNTIME_SOURCE_URL)}">runtime source</a>.`
-          : `A signed Mac download is coming; until then, <a href="/install">install from source</a> — the <a href="${escapeHtml(SOURCE_URL)}">source is on GitHub</a>.`
+          ? `: the <a href="${escapeHtml(SOURCE_URL)}">source</a> is on GitHub, and so is the <a href="${escapeHtml(RUNTIME_SOURCE_URL)}">source of the Wine runtime</a> inside the app.`
+          : `. A signed Mac download is coming; until then, <a href="/install">install from source</a> — the <a href="${escapeHtml(SOURCE_URL)}">source is on GitHub</a>.`
       }${SUPPORT_PAGE_ENABLED ? ' <a href="/support">Support testing</a>.' : ""}</p>
+      ${downloadButtons()}
       <form class="search" action="/games" method="get">
         <label class="sr-only" for="q">Search games</label>
         <input id="q" name="q" type="search" placeholder="Satisfactory, Solarpunk, Steam app id…" autocomplete="off">
@@ -414,7 +440,8 @@ export function installPage(data) {
       <h2>Get Wyn</h2>
       ${
         DOWNLOAD_URL
-          ? `<p><a class="btn" href="${escapeHtml(DOWNLOAD_URL)}">Download Wyn.dmg</a> — signed and notarized. Drag it to Applications and open it. Everything it needs is inside the app: Wine, DXMT, DXVK and Apple's D3DMetal. Setup installs them from the app itself, so nothing is compiled and only Steam is downloaded.</p>
+          ? `${downloadButtons()}
+      <p>Drag Wyn to Applications and open it. Everything ${escapeHtml(DOWNLOAD_VERSION)} needs is inside the app: Wine, DXMT, DXVK and Apple's D3DMetal. Setup installs them from the app itself, so nothing is compiled and only Steam is downloaded.</p>
       <p>You need an Apple Silicon Mac on macOS 15 or later, and <strong>Rosetta 2</strong> — Wine's unix half is x86_64. If you do not have it: <code>softwareupdate --install-rosetta --agree-to-license</code>.</p>
       <p>Wyn is free software under <a href="${escapeHtml(SOURCE_URL)}/blob/main/LICENSE">GPL-3.0-or-later</a>, and you are entitled to the source for the build you just downloaded: <a href="${escapeHtml(SOURCE_URL)}">${escapeHtml(SOURCE_URL)}</a>. The Wine runtime inside it is LGPL, and its exact source is published beside the download: <a href="${escapeHtml(RUNTIME_SOURCE_URL)}">Wyn-1.1-runtime-source.tar</a>. Or build it yourself:</p>`
           : `<p>A signed, notarized <code>Wyn.dmg</code> (drag to Applications, then set up Wine in the app) is the download we want. It is not published yet. Until then, build from source — Wyn is free software under <a href="${escapeHtml(SOURCE_URL)}/blob/main/LICENSE">GPL-3.0-or-later</a>:</p>`
