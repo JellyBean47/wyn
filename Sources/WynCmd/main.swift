@@ -1224,9 +1224,29 @@ extension WynCLI {
         @Flag(name: .long, help: "Sanity-check Libraries/Wine identity (FOSS winecx vs proprietary loader vs Whisky). No copy.")
         var check: Bool = false
 
+        @Flag(name: .long, help: "Install the runtime and Apple GPTK that a release Wyn.app carries. No download.")
+        var bundled: Bool = false
+
+        @Flag(name: .long, help: "With --bundled, replace an already installed runtime.")
+        var replace: Bool = false
+
         mutating func run() async throws {
             if whisky && gptkAware {
                 throw ValidationError("--whisky is frankea DXMT/DXVK; --gptk-aware is FOSS winecx game-host. Not both.")
+            }
+
+            if bundled {
+                guard let root = BundledRuntime.root else {
+                    throw ValidationError(BundledRuntime.InstallError.notBundled.errorDescription ?? "")
+                }
+                let version = BundledRuntime.version.map { "\($0)" } ?? "unknown"
+                print("Installing the runtime inside Wyn.app (Wine \(version)) from \(root.path(percentEncoded: false))…")
+                try BundledRuntime.install(replacing: replace)
+                print(GameHostIdentity.inspect().rendered)
+                if let d3dm = GPTKInstaller.installedD3DMetalVersion() {
+                    print("D3DMetal \(d3dm) wired in from Apple's GPTK inside Wyn.app.")
+                }
+                return
             }
 
             if check {

@@ -109,6 +109,14 @@ public enum WineMono {
             throw MonoError.wineMissing
         }
         let pin = pinForInstalledWine()
+        // The runtime a release Wyn.app carries already has the pinned MSI in
+        // its datadir. Checking the hash there first means that install never
+        // downloads 83 MB it is holding, and never depends on WineHQ being up.
+        let staged = datadirURL(for: pin)
+        if FileManager.default.fileExists(atPath: staged.path(percentEncoded: false)),
+           (try? verify(staged, pin: pin)) != nil {
+            return staged
+        }
         let cache = try await cachedMSI(pin: pin)
         try placeInDatadir(from: cache, pin: pin)
         return datadirURL(for: pin)

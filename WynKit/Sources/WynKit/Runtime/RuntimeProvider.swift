@@ -29,6 +29,8 @@ public enum RuntimeSource: String, Codable, CaseIterable, Sendable {
     case localBuild = "local-build"
     /// User-supplied tarball path.
     case custom = "custom"
+    /// Carried inside a release Wyn.app (1.1+): winecx game-host + Apple GPTK. See `BundledRuntime`.
+    case bundled = "bundled"
 
     public var displayName: String {
         switch self {
@@ -36,6 +38,7 @@ public enum RuntimeSource: String, Codable, CaseIterable, Sendable {
         case .gptkAware: return "FOSS winecx game-host (user-built)"
         case .localBuild: return "Local Build"
         case .custom: return "Custom"
+        case .bundled: return "Bundled with Wyn.app"
         }
     }
 
@@ -43,7 +46,8 @@ public enum RuntimeSource: String, Codable, CaseIterable, Sendable {
         switch self {
         case .whiskyCDN:
             return URL(string: "https://frankea.github.io/Whisky/WhiskyWineVersion.plist")
-        case .gptkAware, .localBuild, .custom:
+        case .gptkAware, .localBuild, .custom, .bundled:
+            // .bundled updates with the app, never on its own.
             return nil
         }
     }
@@ -55,7 +59,7 @@ public enum RuntimeSource: String, Codable, CaseIterable, Sendable {
         case .gptkAware:
             // Not fetched. Game-host is user-built winecx; see GameHostIdentity.
             return nil
-        case .localBuild, .custom:
+        case .localBuild, .custom, .bundled:
             return nil
         }
     }
