@@ -37,6 +37,8 @@ source "$ROOT/scripts/runtime-pins.env"
 source "$ROOT/scripts/runtime-deps.env"
 
 fail() { echo "error: $*" >&2; exit 1; }
+# shellcheck disable=SC1091
+source "$ROOT/scripts/winecx-series.sh"
 field() { local IFS='|'; read -r -a parts <<<"$1"; echo "${parts[$2]}"; }
 sha256() { shasum -a 256 "$1" | awk '{print $1}'; }
 
@@ -64,10 +66,10 @@ OUT="${OUT:-$ROOT/.scratch/Wyn-$version-runtime-source.tar}"
 
 echo "==> checking"
 commit="$(git -C "$WINE_SOURCE" rev-parse HEAD)"
-[[ "$commit" == "$WINECX_COMMIT" ]] || fail "winecx checkout is $commit, pin is $WINECX_COMMIT"
-[[ -z "$(git -C "$WINE_SOURCE" status --porcelain --untracked-files=no)" ]] \
-  || fail "the winecx checkout has local modifications"
+# The runtime is the pin plus patches/winecx: the checkout must be exactly that.
+winecx_verify "$WINE_SOURCE"
 tree="$(git -C "$WINE_SOURCE" rev-parse "$commit^{tree}")"
+patched_tree="$WINECX_TREE"
 
 [[ "$(sha256 "$MONO_SOURCE")" == "$WINE_MONO_SOURCE_SHA256" ]] \
   || fail "$(basename "$MONO_SOURCE") does not match WINE_MONO_SOURCE_SHA256"
@@ -75,11 +77,15 @@ tree="$(git -C "$WINE_SOURCE" rev-parse "$commit^{tree}")"
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/wyn-sources.XXXXXX")"
 trap 'rm -rf "$STAGE"' EXIT
 top="Wyn-$version-runtime-source"
-mkdir -p "$STAGE/$top"/{wine,libraries,wine-mono,dxmt,dxvk,build}
+mkdir -p "$STAGE/$top"/{wine/patches,libraries,wine-mono,dxmt,dxvk,build}
 
 echo "==> winecx $commit"
 git -C "$WINE_SOURCE" archive --format=tar --prefix="winecx-$commit/" "$commit" \
   | xz -T0 -6 > "$STAGE/$top/wine/winecx-$commit.tar.xz"
+while IFS= read -r p; do
+  cp "$p" "$STAGE/$top/wine/patches/"
+done < <(winecx_series)
+patch_list="$(winecx_series | while IFS= read -r p; do echo "- \`wine/patches/$(basename "$p")\`"; done)"
 
 echo "==> libraries"
 for spec in "$DEP_GMP" "$DEP_NETTLE" "$DEP_TASN1" "$DEP_GNUTLS" "$DEP_LIBPNG" "$DEP_FREETYPE" "$DEP_SDL2"; do
@@ -93,7 +99,7 @@ cp "$MONO_SOURCE" "$STAGE/$top/wine-mono/"
 cp "$DXMT_SOURCE" "$STAGE/$top/dxmt/"
 cp "$DXVK_SOURCE" "$STAGE/$top/dxvk/"
 for f in build-foss-game-host.sh build-runtime-deps.sh stage-runtime.sh sign-runtime.sh \
-         package-sources.sh runtime-pins.env runtime-deps.env; do
+         package-sources.sh winecx-series.sh runtime-pins.env runtime-deps.env; do
   cp "$ROOT/scripts/$f" "$STAGE/$top/build/"
 done
 
@@ -106,7 +112,7 @@ the release image as the LGPL requires.
 
 | Directory | What | Licence |
 | --- | --- | --- |
-| \`wine/\` | winecx at \`$commit\` (CodeWeavers' CrossOver 26.3 Wine changes on WineHQ 11.15), exactly the tree the runtime was built from | LGPL-2.1-or-later |
+| \`wine/\` | winecx at \`$commit\` (CodeWeavers' CrossOver 26.3 Wine changes on WineHQ 11.15) and, in \`wine/patches/\`, Wyn's changes to it: together exactly the tree the runtime was built from | LGPL-2.1-or-later |
 | \`libraries/\` | GMP, Nettle, libtasn1, GnuTLS, libpng, FreeType, SDL2: the upstream release tarballs, unmodified | see each |
 | \`wine-mono/\` | WineHQ's source for \`wine-mono-$WINE_MONO_VERSION-x86.msi\`, which Wyn ships unmodified | LGPL/MIT, MS-PL, zlib |
 | \`dxmt/\` | DXMT $DXMT_VERSION source (the binaries are 3Shain's release) | MIT |
@@ -127,11 +133,23 @@ is the pinned commit exactly:
     cd winecx-$commit && git init -q && git add -A -f && git write-tree
     # must print $tree
 
+The runtime was built from that tree with these patches applied in order:
+
+$patch_list
+
+Applying them gives the tree the runtime was built from:
+
+    for p in ../wine/patches/*.patch; do git apply --index "\$p"; done
+    git write-tree
+    # must print $patched_tree
+
 ## Rebuilding
 
 \`build/build-runtime-deps.sh\` builds \`libraries/\`;
 \`build/build-foss-game-host.sh\` builds Wine against them
-(\`WINECX_DEPS_PREFIX\`); \`build/stage-runtime.sh\` assembles \`Runtime/\`.
+(\`WINECX_DEPS_PREFIX\`) and applies the patch series first
+(\`WINECX_PATCH_DIR=\$PWD/wine/patches\`; without it the scripts stop);
+\`build/stage-runtime.sh\` assembles \`Runtime/\`.
 The exact configure flags are in those scripts.
 README
 

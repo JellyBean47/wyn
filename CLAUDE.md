@@ -81,6 +81,16 @@ D3DMetal run silently pins a DXVK launch to the builtins.
 **Vulkan-native titles (id Tech) need none of the D3D layers** and hit a
 different wall entirely — see `Documentation/vulkan-titles.md`.
 
+**Where `%gs` points is a per-process choice in the 1.1 runtime**
+(`patches/winecx/0001`). D3DMetal's native code is called straight from
+Windows code and needs the macOS pthread TSD there, so a process started with
+`CX_APPLEGPTK_LIBD3DSHARED_PATH`, or one that loads libd3dshared, keeps `%gs`
+on the TSD. Every other process gets the TEB, as on Windows. Under Rosetta the
+PE modules libd3dshared registers still read the TEB through `%gs` in TSD mode.
+Builtin DLLs and JIT code do not. `WINE_GSBASE=teb|tsd` pins the mode for an
+A/B, `WINEDEBUG=+gsbase` logs it, and `Tools/probes/gsprobe.c` measures it.
+Pinning `teb` under D3DMetal faults in `pthread_setname_np`.
+
 **The GUI app owns `Metadata.plist`.** If Wyn.app is running, it can rewrite a
 bottle with defaults (this renamed the Steam bottle to "Bottle" and reset its
 layer mid-session). Check `pgrep -f Wyn.app` before hand-editing a bottle, and

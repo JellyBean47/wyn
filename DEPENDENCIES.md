@@ -104,6 +104,18 @@ binaries. See [Documentation/user/game-host.md](Documentation/user/game-host.md)
   the distributor and must publish the exact corresponding source itself —
   pointing at dappermint's branch does not discharge it.
 - **Build:** `./scripts/build-foss-game-host.sh` (mingw-w64 gcc, not llvm-mingw)
+- **Wyn's patches:** `patches/winecx/`, applied in name order by
+  `build-foss-game-host.sh`, which refuses any other change to the checkout
+  (`scripts/winecx-series.sh`). The built tree records the pin, the tree hash
+  of pin + series and each patch's SHA-256 in
+  `share/wine/wyn-winecx-source.txt`; `package-sources.sh` ships the series
+  next to the pinned tree.
+  - `0001-ntdll-macos-gsbase-mode.patch` (29 Sep 2026): `%gs` is the TEB in
+    Windows code, as in upstream Wine, except in D3DMetal processes, which
+    keep CrossOver's pthread-TSD model because D3DMetal's native code is
+    called straight from Windows code. Fixes DOOM (2016) stopping at 91%:
+    `GetCurrentFiber()` read the TSD's QoS class, 0x8ff. The patch's
+    message has the measurements.
 - **Configure:** `ac_cv_func_pipe2=no`. The macOS 27 SDK declares `pipe2`
   (macOS 27.0 and later), configure found it, and `ntdll.so` weak-imported it
   unguarded — a call to address 0 on the first server pipe on macOS 15 and 26.

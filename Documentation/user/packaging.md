@@ -20,8 +20,9 @@ every `winebuild` blocked on I/O; on the SSD it completes normally.
 ```bash
 # 1. FreeType, GnuTLS, SDL2 (+ their deps) from pinned tarballs; MoltenVK from Khronos
 ./scripts/build-runtime-deps.sh
-# 2. winecx at WINECX_COMMIT against those libraries (WINECX_SEED_REPO: a local
-#    checkout holding the commit, to skip the clone on a slow line)
+# 2. winecx at WINECX_COMMIT plus patches/winecx, against those libraries
+#    (WINECX_SEED_REPO: a local checkout holding the commit, to skip the clone
+#    on a slow line)
 WINECX_DEPS_PREFIX=$PWD/.scratch/runtime-deps/prefix CCACHE_DISABLE=1 \
   WINECX_BUILD_DIR=<dir on the SSD> ./scripts/build-foss-game-host.sh
 # 3. assemble Runtime/ from the build and the publishers' pinned releases
@@ -44,9 +45,15 @@ xcrun notarytool submit .scratch/Wyn.dmg --keychain-profile wyn --wait && xcrun 
 All URLs and SHA-256 pins are in `scripts/runtime-pins.env` and
 `scripts/runtime-deps.env`.
 
+`build-foss-game-host.sh` applies `patches/winecx/*.patch` in name order to
+a clean checkout of the pin and refuses any other change to it. The tree it
+installs records the result in `share/wine/wyn-winecx-source.txt`: the pin,
+the git tree hash of pin + series, and each patch's SHA-256.
+
 `stage-runtime.sh` refuses:
-- a Wine tree without winecx's `CX_APPLEGPTK` hook, or not at the pinned
-  commit, or from a modified checkout
+- a Wine tree without winecx's `CX_APPLEGPTK` hook, or a checkout that is not
+  exactly the pinned commit plus `patches/winecx`, or a tree whose
+  `wyn-winecx-source.txt` names a different source tree than the checkout
 - any library in the tree that `build-runtime-deps.sh` did not build, byte
   for byte
 - a tree with absolute symlinks or Apple files already inside it
@@ -55,8 +62,8 @@ All URLs and SHA-256 pins are in `scripts/runtime-pins.env` and
 DXMT's D3D trio gets exactly one change: the 16-byte builtin marker is
 rewritten so Wine loads the DLLs as native. `smoke-runtime.sh` installs the
 image the way a first launch does, into a throwaway HOME, and checks the
-running processes: fonts, HTTPS, D3DMetal (D3D12 and D3D11), DXMT, DXVK and
-SDL.
+running processes: fonts, HTTPS, D3DMetal (D3D12 and D3D11), `%gs` (the TEB
+outside D3DMetal, so `GetCurrentFiber()` works), DXMT, DXVK and SDL.
 
 The build also refuses Wine binaries that weak-import a libSystem symbol newer
 than `MACOSX_DEPLOYMENT_TARGET` (15.0): an unguarded call to one jumps to

@@ -35,6 +35,8 @@ PREFIX="${WINECX_PREFIX:-$SCRATCH/prefix}"
 JOBS="${WINECX_JOBS:-$(( $(sysctl -n hw.logicalcpu) + $(sysctl -n hw.logicalcpu) / 2 ))}"
 
 fail() { echo "error: $*" >&2; exit 1; }
+# shellcheck disable=SC1091
+source "$ROOT/scripts/winecx-series.sh"
 
 command -v x86_64-w64-mingw32-gcc >/dev/null || fail "need x86_64-w64-mingw32-gcc (brew install mingw-w64). llvm-mingw is not accepted."
 command -v i686-w64-mingw32-gcc >/dev/null || fail "need i686-w64-mingw32-gcc (brew install mingw-w64)."
@@ -122,9 +124,11 @@ git -C winecx checkout -q --detach "$WINECX_COMMIT"
 git -C winecx --no-pager log -1 --oneline
 got="$(git -C winecx rev-parse HEAD)"
 [[ "$got" == "$WINECX_COMMIT" ]] || fail "winecx HEAD $got != pin $WINECX_COMMIT"
-# The corresponding source is this commit, so the build must be exactly it.
-[[ -z "$(git -C winecx status --porcelain --untracked-files=no)" ]] \
-  || fail "winecx checkout has local modifications; the build would not match $WINECX_COMMIT"
+# The corresponding source is this commit plus patches/winecx, so the build
+# must be exactly that: the series goes onto a clean checkout, and any other
+# local change is refused (scripts/winecx-series.sh).
+winecx_apply_series winecx
+echo "    source tree $WINECX_TREE ($(winecx_series | wc -l | tr -d ' ') patch(es) on the pin)"
 
 grep -q CX_APPLEGPTK_LIBD3DSHARED_PATH winecx/dlls/ntdll/unix/loader.c \
   || fail "ntdll tree missing CX_APPLEGPTK_LIBD3DSHARED_PATH"
@@ -404,6 +408,8 @@ $bad"
   done
   [[ -z "$weak" ]] || fail "Wine binaries weak-import libSystem symbols newer than macOS $MACOSX_DEPLOYMENT_TARGET:
 $weak"
+  # What this tree was built from; stage-runtime.sh checks it against the checkout.
+  winecx_source_record > "$PREFIX/wine-root/share/wine/wyn-winecx-source.txt"
   echo "Installed wine root: $PREFIX/wine-root"
   echo "Next:"
   echo "  wyn runtime install --gptk-aware --directory \"$PREFIX/wine-root\""

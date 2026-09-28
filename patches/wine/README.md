@@ -3,6 +3,8 @@
 These notes describe intended changes to **Wine** (LGPL-2.1-or-later). They are
 not a substitute for applying a proper source diff against a Wine tree.
 
+The patches the runtime is actually built with are in `patches/winecx/`.
+
 Do **not** commit patched `win32u.so` or `winemac.so` binaries. Build Wine from
 LGPL source, or apply equivalent changes yourself.
 

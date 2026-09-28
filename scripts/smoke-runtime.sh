@@ -18,6 +18,8 @@
 #   fonts     no "install a version of FreeType" warning on first boot
 #   https     WinHTTP → schannel → GnuTLS, chain checked against the keychain
 #   d3dmetal  D3D12 device, and a D3D11 device that presents; D3DMetal mapped
+#   gsbase    %gs is the TEB in Windows code and GetCurrentFiber() finds the
+#             fiber; a D3DMetal launch keeps it on the TSD (patches/winecx/0001)
 #   dxmt      D3D11 device through native DXMT that presents; winemetal.so mapped
 #   vulkan    vulkan-1 → winevulkan → MoltenVK finds the GPU (id Tech titles)
 #   sdl       a winedevice process mapped winebus and libSDL2 (controllers)
@@ -61,7 +63,7 @@ known() {  # name, condition-exit-status, detail — measured, not counted
 }
 
 echo "==> probes"
-for p in d3d12probe d3d11probe tlsprobe vkprobe; do
+for p in d3d12probe d3d11probe tlsprobe vkprobe gsprobe; do
   libs=()
   case "$p" in
     d3d12probe) libs=(-ld3d12 -ldxgi) ;;
@@ -137,6 +139,22 @@ check d3dmetal-d3d12 $? "$(grep -m1 adapter "$WORK/d3dm12.out")"
 run_probe d3dm11 d3d11probe.exe "${d3dm_env[@]}"
 grep -q "Present x10: 0x00000000" "$WORK/d3dm11.out" && grep -q "D3DMetal" "$WORK/d3dm11.maps"
 check d3dmetal-d3d11 $? "$(grep -m1 adapter "$WORK/d3dm11.out"), $(grep -m1 Present "$WORK/d3dm11.out")"
+
+echo "==> gsbase"
+# Everything but D3DMetal runs with %gs on the TEB, as on Windows; before
+# patches/winecx/0001 it was the macOS TSD, and GetCurrentFiber() read 0x8ff.
+"$T/bin/wine" "$WORK/gsprobe.exe" >"$WORK/gs.out" 2>/dev/null
+grep -q "^main gs=TEB" "$WORK/gs.out" && grep -q "^worker gs=TEB" "$WORK/gs.out" \
+  && grep -q "^fiber ok" "$WORK/gs.out"
+check gsbase $? "$(tr '\n' ' ' <"$WORK/gs.out")"
+# A D3DMetal launch keeps %gs on the TSD, which D3DMetal's native code needs.
+# The game's own code still reads the TEB: Rosetta shows it the TEB in the PE
+# modules libd3dshared registers (measured 29 Sep 2026).
+env "${d3dm_env[@]}" WINEDEBUG=+gsbase "$T/bin/wine" "$WORK/gsprobe.exe" \
+  >"$WORK/gs-d3dm.out" 2>"$WORK/gs-d3dm.err"
+grep -q "gsbase:signal_init_process %gs is the TSD" "$WORK/gs-d3dm.err" \
+  && grep -q "^fiber ok" "$WORK/gs-d3dm.out"
+check gsbase-d3dmetal $? "TSD mode, $(grep -m1 '^fiber' "$WORK/gs-d3dm.out" | cut -d: -f1)"
 
 echo "==> dxmt (Wyn's deployment: native trio + winemetal in system32)"
 DXMT="$T/../DXMT/x64"

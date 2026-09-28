@@ -35,7 +35,10 @@ are build and provenance work; neither is a licensing blocker.
 
 **Where every binary comes from (1.1 build, 27 Sep 2026).**
 - **Built here from pinned source:**
-  - Wine, by `build-foss-game-host.sh` from the pinned winecx commit.
+  - Wine, by `build-foss-game-host.sh` from the pinned winecx commit plus
+    Wyn's patches in `patches/winecx/` (from build 7, 29 Sep 2026: one
+    patch, to `ntdll`). The source archive carries the pinned tree and the
+    patches, and says how to re-derive the patched tree's hash.
   - The eight libraries above, by `build-runtime-deps.sh` from upstream tarballs.
 - **Unmodified publishers' releases, pinned by SHA-256:** MoltenVK (Khronos),
   DXVK-macOS (Gcenx), DXMT (3Shain), Wine Mono (WineHQ) and GPTK (Apple).

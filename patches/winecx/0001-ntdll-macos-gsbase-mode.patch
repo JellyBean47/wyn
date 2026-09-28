@@ -1,0 +1,252 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: JellyBean47 <ebenjohn82@gmail.com>
+Date: Tue, 29 Sep 2026 01:06:05 +0200
+Subject: [PATCH] ntdll: Point %gs at the TEB on macOS unless D3DMetal needs
+ the TSD.
+
+winecx keeps %gs on the macOS pthread TSD while Windows code runs
+(CrossOver 26.3's model) and copies the TEB's Self, TLS and PEB pointers
+into the TSD slots at the same offsets. Every other %gs read in Windows
+code gets macOS data. MSVC's inline GetCurrentFiber() reads gs:0x20 and
+gets the QoS class, 0x8ff. DOOM (2016)'s superscriptx64.dll then calls
+SwitchToFiber(0x8ff), faults, and stops at 91% of its first load.
+
+Upstream Wine points %gs at the TEB in Windows code. The 11.15 merge
+brought back its switches to the TSD (dispatcher entry, init_handler)
+and the one in leave_handler, but not the three switches back to the
+TEB (user-mode callback, syscall return, unix call return). That left a
+hybrid in which %gs is the TEB after a signal until the next syscall.
+
+D3DMetal cannot run in upstream's model. Windows code calls its native
+code directly, and with %gs on the TEB that code faults in
+pthread_setname_np+0x33, reading pthread_self through gs:0. Under
+Rosetta, the PE modules that libd3dshared registers as non-native code
+(CW HACK 22434) read the TEB through %gs even while %gs is on the TSD.
+
+So the model is now chosen per process:
+
+- TSD mode for processes started with CX_APPLEGPTK_LIBD3DSHARED_PATH,
+  that is, D3DMetal launches. Nothing switches to the TEB, which also
+  drops the hybrid's switch in leave_handler that handed native code the
+  TEB after a signal. check_invalid_gsbase no longer retries a faulting
+  %gs access there, because the retry would fault again forever.
+- TEB mode for every other process. Upstream 11.15's three switches
+  back to the TEB are restored as they are. A process in this mode that
+  loads a unix library backed by libd3dshared (GPTK's d3d11, d3d12,
+  dxgi...) moves to TSD mode for good. Its other threads follow at their
+  next syscall, unix call or signal.
+- WINE_GSBASE=teb or WINE_GSBASE=tsd pins either mode for the whole
+  process. WINEDEBUG=+gsbase logs each decision.
+
+Measured on macOS 27 under Rosetta, Apple M4. The probe compares
+gs:[0x08] with the TEB's StackBase, and gs:[0x20] is FiberData.
+- No GPTK environment: before, 0x8ff on every thread. After, 0x1e00,
+  then the fiber pointer after ConvertThreadToFiber.
+- D3DMetal (GPTK 3.0): D3D11 presents 10 frames and D3D12 creates a
+  device in TSD mode, as before. With WINE_GSBASE=teb, both fault in
+  pthread_setname_np+0x33.
+- DOOM (2016) through Steam -applaunch: before, an access violation in
+  kernelbase!SwitchToFiber at 91%. After, it reaches the main menu and
+  plays, with no crash report.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XjJSYdkZKSW5kcDtMSKwvD
+---
+ dlls/ntdll/unix/signal_x86_64.c | 102 +++++++++++++++++++++++++++++++-
+ dlls/ntdll/unix/unix_private.h  |   3 +
+ dlls/ntdll/unix/virtual.c       |   6 ++
+ 3 files changed, 110 insertions(+), 1 deletion(-)
+
+diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
+index 12e8d23..dec7a37 100644
+--- a/dlls/ntdll/unix/signal_x86_64.c
++++ b/dlls/ntdll/unix/signal_x86_64.c
+@@ -86,6 +86,33 @@ WINE_DECLARE_DEBUG_CHANNEL(seh);
+  * See libsyscall/custom/custom.s in xnu. */
+ extern void _thread_set_tsd_base(uint64_t);
+ 
++WINE_DECLARE_DEBUG_CHANNEL(gsbase);
++
++/* Wyn: where %gs points while Windows code runs.
++ *
++ * TEB mode is upstream Wine's model: %gs is the TEB in Windows code and the
++ * pthread TSD (amd64_thread_data()->pthread_teb) in unix code, switched by the
++ * dispatchers and the signal handlers.
++ *
++ * TSD mode is CrossOver's: %gs stays on the TSD. init_syscall_frame copies the
++ * TEB's Self, TLS and PEB pointers into the TSD slots at the same offsets, and
++ * under Rosetta the PE modules that libd3dshared registers as non-native code
++ * (CW HACK 22434) read the TEB through %gs anyway. D3DMetal needs this mode:
++ * Windows code calls its native code directly, and in TEB mode that code finds
++ * the TEB where it expects the TSD (pthread_setname_np faults on a null
++ * pthread_self). Without the registration, every other %gs read in Windows
++ * code returns macOS data: GetCurrentFiber() (gs:0x20) is the QoS class 0x8ff,
++ * and DOOM (2016) crashes in SwitchToFiber(0x8ff).
++ *
++ * So D3DMetal launches (CX_APPLEGPTK_LIBD3DSHARED_PATH set) start in TSD mode,
++ * and every other process starts in TEB mode and moves to TSD mode for good if
++ * it loads libd3dshared anyway (signal_gsbase_use_tsd). WINE_GSBASE=teb or
++ * WINE_GSBASE=tsd pins either mode for the whole process.
++ *
++ * The dispatchers read this from assembly. */
++BYTE gsbase_teb_mode = 1;
++static BOOL gsbase_mode_pinned;
++
+ /* CW Hack 24256 */
+ #include <sys/sysctl.h>
+ static BOOL is_rosetta2;
+@@ -828,7 +855,9 @@ static inline void leave_handler( struct thread_data *data, ucontext_t *sigconte
+         if (fs32_sel) __asm__ volatile( "movw %0,%%fs" :: "r" (fs32_sel) );
+     }
+ #elif defined __APPLE__
+-    if (!is_inside_signal_stack( data, (void *)RSP_sig(sigcontext )) &&
++    /* Wyn: in TSD mode init_handler's switch to the TSD is the one to keep. */
++    if (gsbase_teb_mode &&
++        !is_inside_signal_stack( data, (void *)RSP_sig(sigcontext )) &&
+         !is_inside_syscall( data, RSP_sig(sigcontext )))
+         _thread_set_tsd_base( (uint64_t)data->teb );
+ #endif
+@@ -1706,6 +1735,16 @@ __ASM_GLOBAL_FUNC( call_user_mode_callback,
+                    "jz 1f\n\t"
+                    "movw %ax,%fs\n"
+                    "1:\n\t"
++#elif defined __APPLE__
++                   "cmpb $0," __ASM_NAME("gsbase_teb_mode") "(%rip)\n\t"
++                   "je 1f\n\t"
++                   "movq %rcx,%r10\n\t"
++                   "movq %r13,%rdi\n\t"
++                   "xorl %esi,%esi\n\t"
++                   "movl $0x3000003,%eax\n\t"  /* _thread_set_tsd_base */
++                   "syscall\n\t"
++                   "movq %r10,%rcx\n"
++                   "1:\n\t"
+ #endif
+                    "movq 0x330(%r13),%r10\n\t" /* amd64_thread_data()->instrumentation_callback */
+                    "movq (%r10),%r10\n\t"
+@@ -2320,6 +2359,8 @@ static inline BOOL check_invalid_gsbase( struct thread_data *data, ucontext_t *u
+     sysarch( X86_64_GET_GSBASE, &cur_gsbase );
+ #elif defined(__APPLE__)
+     /* init_handler() has already reset GSBASE, we can't determine what it was before the signal */
++    /* Wyn: in TSD mode the fix-up below would retry with the same %gs forever. */
++    if (!gsbase_teb_mode) return FALSE;
+ #endif
+ 
+     if (cur_gsbase == (ULONG_PTR)data->teb) return FALSE;
+@@ -2909,6 +2950,21 @@ static void *mac_thread_gsbase(void)
+     if (kr == KERN_SUCCESS) return (void*)tiinfo.thread_handle;
+     return NULL;
+ }
++
++/**********************************************************************
++ *		signal_gsbase_use_tsd
++ *
++ * Wyn: keep %gs on the TSD from now on, because D3DMetal is about to run.
++ * Called on a unix-side path, so this thread returns to Windows code with the
++ * TSD. Other threads keep the TEB until their next syscall, unix call or
++ * signal, which switch to the TSD on entry and no longer switch back.
++ */
++void signal_gsbase_use_tsd( const char *reason )
++{
++    if (!gsbase_teb_mode || gsbase_mode_pinned) return;
++    gsbase_teb_mode = 0;
++    TRACE_(gsbase)( "%%gs is the TSD in Windows code from now on: %s\n", reason );
++}
+ #endif
+ 
+ #ifdef __linux__
+@@ -2983,6 +3039,25 @@ void signal_init_process( TEB *teb )
+     /* CW Hack 23427: __builtin_available presumably isn't signal-safe. */
+     if (__builtin_available( macOS 15.0, * ))
+         sequoia_or_later = TRUE;
++
++    /* Wyn: set before any thread enters Windows code. */
++    {
++        const char *mode = getenv( "WINE_GSBASE" );
++
++        if (getenv( "CX_APPLEGPTK_LIBD3DSHARED_PATH" )) gsbase_teb_mode = 0;
++        if (mode && !strcmp( mode, "tsd" ))
++        {
++            gsbase_teb_mode = 0;
++            gsbase_mode_pinned = TRUE;
++        }
++        else if (mode && !strcmp( mode, "teb" ))
++        {
++            gsbase_teb_mode = 1;
++            gsbase_mode_pinned = TRUE;
++        }
++        TRACE_(gsbase)( "%%gs is the %s in Windows code%s\n", gsbase_teb_mode ? "TEB" : "TSD",
++                        gsbase_mode_pinned ? " (pinned by WINE_GSBASE)" : "" );
++    }
+ #endif
+ 
+     sig_act.sa_mask = server_block_set;
+@@ -3369,6 +3444,18 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
+                    "movw %dx,%ss\n\t"
+ # endif
+                    "1:\n\t"
++#elif defined __APPLE__
++                   "cmpb $0," __ASM_NAME("gsbase_teb_mode") "(%rip)\n\t"
++                   "je 1f\n\t"
++                   "movq %rax,%r8\n\t"
++                   "movq %rcx,%rdx\n\t"
++                   "movq %r13,%rdi\n\t"            /* teb */
++                   "xorl %esi,%esi\n\t"
++                   "movl $0x3000003,%eax\n\t"      /* _thread_set_tsd_base */
++                   "syscall\n\t"
++                   "movq %rdx,%rcx\n\t"
++                   "movq %r8,%rax\n"
++                   "1:\n\t"
+ #endif
+                    "movl 0xb4(%rcx),%edx\n\t"      /* frame->restore_flags */
+                    "testl $0x48,%edx\n\t"          /* CONTEXT_FLOATING_POINT | CONTEXT_XSTATE */
+@@ -3671,6 +3758,19 @@ __ASM_GLOBAL_FUNC( __wine_unix_call_dispatcher,
+                    "movw %dx,%ss\n\t"
+ # endif
+                    "1:\n\t"
++#elif defined __APPLE__
++                   "cmpb $0," __ASM_NAME("gsbase_teb_mode") "(%rip)\n\t"
++                   "je 1f\n\t"
++                   "movq %rax,%rdx\n\t"
++                   "movq %rcx,%r14\n\t"
++                   "movq %r13,%rdi\n\t"            /* teb */
++                   "xorl %esi,%esi\n\t"
++                   "movl $0x3000003,%eax\n\t"      /* _thread_set_tsd_base */
++                   "syscall\n\t"
++                   "movq %r14,%rcx\n\t"
++                   "movq %rdx,%rax\n\t"
++                   "movq 0x60(%rcx),%r14\n"
++                   "1:\n\t"
+ #endif
+                    "movq 0x58(%rcx),%r13\n\t"
+                    "movq 0x28(%rcx),%rdi\n\t"
+diff --git a/dlls/ntdll/unix/unix_private.h b/dlls/ntdll/unix/unix_private.h
+index 0595035..aa47d8e 100644
+--- a/dlls/ntdll/unix/unix_private.h
++++ b/dlls/ntdll/unix/unix_private.h
+@@ -349,6 +349,9 @@ extern NTSTATUS signal_alloc_thread( TEB *teb );
+ extern void signal_free_thread( TEB *teb );
+ extern void signal_disable_syscall_dispatch(void);
+ extern void signal_init_process( TEB *teb );
++#if defined(__APPLE__) && defined(__x86_64__)
++extern void signal_gsbase_use_tsd( const char *reason );
++#endif
+ extern void DECLSPEC_NORETURN signal_start_thread( PRTL_THREAD_START_ROUTINE entry, void *arg, TEB *teb );
+ extern SYSTEM_SERVICE_TABLE KeServiceDescriptorTable[4];
+ extern void __wine_syscall_dispatcher(void);
+diff --git a/dlls/ntdll/unix/virtual.c b/dlls/ntdll/unix/virtual.c
+index edad6a4..25d8960 100644
+--- a/dlls/ntdll/unix/virtual.c
++++ b/dlls/ntdll/unix/virtual.c
+@@ -845,6 +845,12 @@ static NTSTATUS get_unixlib_funcs( void *so_handle, BOOL wow, const void **funcs
+ {
+     *funcs = dlsym( so_handle, wow ? "__wine_unix_call_wow64_funcs" : "__wine_unix_call_funcs" );
+     if (!*funcs) *entry = dlsym( so_handle, "__wine_unix_lib_init" );
++#if defined(__APPLE__) && defined(__x86_64__)
++    /* Wyn: GPTK's d3d11, d3d12, dxgi... are libd3dshared, which alone exports this.
++     * Its native code is about to be called straight from Windows code. */
++    if ((*funcs || *entry) && dlsym( so_handle, "supports_non_native_code_regions" ))
++        signal_gsbase_use_tsd( "loaded libd3dshared" );
++#endif
+     return *funcs || *entry ? STATUS_SUCCESS : STATUS_ENTRYPOINT_NOT_FOUND;
+ }
+ 

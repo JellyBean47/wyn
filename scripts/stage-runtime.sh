@@ -46,6 +46,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$ROOT/scripts/runtime-pins.env"
 
 fail() { echo "error: $*" >&2; exit 1; }
+# shellcheck disable=SC1091
+source "$ROOT/scripts/winecx-series.sh"
 
 WINE_ROOT="" WINE_SOURCE="" DEPS_PREFIX="" DXVK_TARBALL="" DXMT_TARBALL="" MONO_MSI="" GPTK_DMG=""
 OUT="$ROOT/.scratch/runtime-stage"
@@ -106,10 +108,14 @@ for f in LICENSE COPYING.LIB AUTHORS NOTICES.md VERSION; do
   [[ -f "$WINE_SOURCE/$f" ]] || fail "$WINE_SOURCE/$f missing: --wine-source must be the winecx checkout"
 done
 wine_commit="$(git -C "$WINE_SOURCE" rev-parse HEAD 2>/dev/null || echo unknown)"
-[[ "$wine_commit" == "$WINECX_COMMIT" ]] \
-  || fail "winecx checkout is $wine_commit, pin is $WINECX_COMMIT: the source asset would not match"
-[[ -z "$(git -C "$WINE_SOURCE" status --porcelain --untracked-files=no)" ]] \
-  || fail "the winecx checkout has local modifications: the source asset would not match"
+# The source asset is the pin plus patches/winecx; the checkout must be exactly
+# that, and the tree must say it was built from it (build-foss-game-host.sh).
+winecx_verify "$WINE_SOURCE"
+record="$WINE_ROOT/share/wine/wyn-winecx-source.txt"
+[[ -f "$record" ]] || fail "$record missing: build the tree with scripts/build-foss-game-host.sh"
+[[ "$(awk '$1 == "tree" {print $2}' "$record")" == "$WINECX_TREE" ]] \
+  || fail "the Wine tree was built from source tree $(awk '$1 == "tree" {print $2}' "$record"), the checkout is $WINECX_TREE"
+winecx_patches="$(winecx_series | while IFS= read -r p; do basename "$p"; done)"
 
 # Provenance: every library in the tree must be the one build-runtime-deps.sh
 # built, byte for byte — nothing borrowed from another runtime may ride along.
@@ -215,6 +221,11 @@ cat > "$OUT/Libraries/WynWineVersion.plist" <<PLIST
     </dict>
     <key>bundled</key><true/>
     <key>winecxCommit</key><string>$wine_commit</string>
+    <key>winecxTree</key><string>$WINECX_TREE</string>
+    <key>winecxPatches</key>
+    <array>
+$(printf '%s\n' "$winecx_patches" | sed '/^$/d; s|.*|        <string>&</string>|')
+    </array>
     <key>dxvkVersion</key><string>$DXVK_MACOS_VERSION</string>
     <key>dxmtVersion</key><string>$DXMT_VERSION</string>
 </dict>
@@ -269,7 +280,7 @@ cp "$DEPS_PREFIX/DEPS-MANIFEST.txt" "$lic/libraries/"
 # the archive scripts/package-sources.sh writes.
 wyn_version="$(sed -n 's/.*MARKETING_VERSION = \([0-9.]*\);.*/\1/p' "$ROOT/Wyn.xcodeproj/project.pbxproj" | head -1)"
 cat > "$lic/SOURCE.txt" <<SOURCE
-Wyn $wyn_version carries Wine (winecx $wine_commit), GnuTLS and the libraries it
+Wyn $wyn_version carries Wine (winecx $wine_commit with Wyn's patches), GnuTLS and the libraries it
 uses, and Wine Mono under the LGPL, and DXMT, DXVK, FreeType, libpng, SDL2 and
 MoltenVK under permissive licences. Their complete corresponding source is
 published on the same release page as this app's disk image, as
@@ -298,6 +309,8 @@ done < <(find "$OUT/Libraries" -type f)
   echo
   echo "wine        winecx $wine_commit ($wine_version)  LGPL-2.1-or-later"
   echo "            built by scripts/build-foss-game-host.sh from the pinned commit"
+  echo "            plus patches/winecx, source tree $WINECX_TREE:"
+  winecx_source_record | awk '$1 == "patch" {print "              " $3 "  " $2}'
   echo "libraries   built by scripts/build-runtime-deps.sh (see licenses/libraries/DEPS-MANIFEST.txt)"
   echo "dxvk        $DXVK_MACOS_SHA256  $(basename "$DXVK_TARBALL")  zlib"
   echo "            $DXVK_MACOS_URL"
