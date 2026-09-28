@@ -104,6 +104,10 @@ binaries. See [Documentation/user/game-host.md](Documentation/user/game-host.md)
   the distributor and must publish the exact corresponding source itself —
   pointing at dappermint's branch does not discharge it.
 - **Build:** `./scripts/build-foss-game-host.sh` (mingw-w64 gcc, not llvm-mingw)
+- **Configure:** `ac_cv_func_pipe2=no`. The macOS 27 SDK declares `pipe2`
+  (macOS 27.0 and later), configure found it, and `ntdll.so` weak-imported it
+  unguarded — a call to address 0 on the first server pipe on macOS 15 and 26.
+  The build now fails on any such weak import.
 - **Install:** `wyn runtime install --gptk-aware --directory <wine-root>`
   or `./scripts/install-foss-game-host.sh --directory …`
 - **Identity:** `ntdll.so` contains `CX_APPLEGPTK_LIBD3DSHARED_PATH` (winecx

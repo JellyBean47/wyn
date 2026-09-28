@@ -262,6 +262,12 @@ export LDFLAGS="$NIX_LDFS"
 export ac_cv_lib_soname_freetype="libfreetype.6.dylib"
 export ac_cv_lib_soname_gnutls="libgnutls.30.dylib"
 export ac_cv_lib_soname_MoltenVK="libMoltenVK.dylib"
+# The macOS 27 SDK declares pipe2 (API_AVAILABLE macOS 27.0), so configure
+# finds it and ntdll's server_pipe() calls it unguarded. Below macOS 27 that is
+# a weak import bound to address 0, and every Wine process faults on its first
+# server pipe (macOS 15 and 26). pipe() + FD_CLOEXEC is the path Wine always
+# took on macOS. The weak-import check after install keeps it that way.
+export ac_cv_func_pipe2=no
 
 mkdir -p build
 (
@@ -298,6 +304,9 @@ mkdir -p build
       || fail "gnutls was not found; Steam login needs schannel. Check FRANKEA_LIB + GNUTLS_CFLAGS."
     echo "note: built without gstreamer/ffmpeg (no Nix). Steam video decode may be missing."
   fi
+  # A build directory configured before ac_cv_func_pipe2=no keeps its config.h.
+  ! grep -q '^#define HAVE_PIPE2 ' include/config.h \
+    || fail "build/include/config.h enables pipe2 (macOS 27+ only): delete $SCRATCH/build and run again"
   echo "==> make -j$JOBS"
   make -j"$JOBS"
 )
@@ -378,6 +387,23 @@ $bad"
   if [[ -x "$PREFIX/wine-root/bin/wine" && ! -e "$PREFIX/wine-root/bin/wine64" ]]; then
     ln -s wine "$PREFIX/wine-root/bin/wine64"
   fi
+  # A libSystem symbol newer than MACOSX_DEPLOYMENT_TARGET links weak, and an
+  # unguarded call to it jumps to address 0 on an older macOS (pipe2, above).
+  # Wine's own binaries may keep only the one their source guards: msync.c
+  # calls __ulock_wait2 behind __builtin_available.
+  # (No `case` inside $( ): macOS's bash 3.2 ends the substitution at the
+  # pattern's `)`, and `bash -n` cannot see it.)
+  weak=""
+  for f in "$PREFIX/wine-root/bin/"* "$PREFIX/wine-root/lib/wine/x86_64-unix/"*.so; do
+    [[ -f "$f" && ! -L "$f" ]] || continue
+    magic="$(head -c 4 "$f" | xxd -p)"
+    [[ "$magic" == cffaedfe || "$magic" == cafebabe ]] || continue
+    found="$(nm -m "$f" 2>/dev/null | awk -v f="${f#"$PREFIX/wine-root/"}" \
+      '/\(undefined\) weak external .*\(from libSystem\)/ && $(NF-2) != "___ulock_wait2" { print "  " f ": " $(NF-2) }' || true)"
+    [[ -z "$found" ]] || weak+="$found"$'\n'
+  done
+  [[ -z "$weak" ]] || fail "Wine binaries weak-import libSystem symbols newer than macOS $MACOSX_DEPLOYMENT_TARGET:
+$weak"
   echo "Installed wine root: $PREFIX/wine-root"
   echo "Next:"
   echo "  wyn runtime install --gptk-aware --directory \"$PREFIX/wine-root\""

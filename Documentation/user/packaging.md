@@ -58,6 +58,12 @@ image the way a first launch does, into a throwaway HOME, and checks the
 running processes: fonts, HTTPS, D3DMetal (D3D12 and D3D11), DXMT, DXVK and
 SDL.
 
+The build also refuses Wine binaries that weak-import a libSystem symbol newer
+than `MACOSX_DEPLOYMENT_TARGET` (15.0): an unguarded call to one jumps to
+address 0 on an older macOS. The macOS 27 SDK made configure find `pipe2`,
+and builds 1–6 had exactly that in `ntdll.so`; `ac_cv_func_pipe2=no` keeps
+Wine on `pipe()` + `FD_CLOEXEC`.
+
 It copies Apple's evaluation environment into `GPTK/` byte for byte, and
 fails if D3DMetal stops verifying as Apple-signed.
 
