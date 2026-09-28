@@ -66,6 +66,9 @@ public struct GameProfile: Codable, Identifiable, Sendable {
     /// Absent means true — that pin is the safe first diagnostic, and an old
     /// profile must keep it. Ready or Not's first run was unjudgeable because of it.
     public var pinUnrealLowScalability: Bool
+    /// Files to put in place before every launch, e.g. DOOM's Vulkan build
+    /// over the OpenGL one Steam starts. See `ExecutableSubstitution`.
+    public var executableSubstitutions: [ExecutableSubstitution]
 
     public var needsUbisoftConnectPlay: Bool {
         requiresUbisoftConnect || id == "ac-odyssey"
@@ -86,7 +89,8 @@ public struct GameProfile: Codable, Identifiable, Sendable {
         status: ProfileStatus = .guessed,
         requiresUbisoftConnect: Bool = false,
         assettoCorsa: AssettoCorsaSession? = nil,
-        pinUnrealLowScalability: Bool = true
+        pinUnrealLowScalability: Bool = true,
+        executableSubstitutions: [ExecutableSubstitution] = []
     ) {
         self.id = id
         self.name = name
@@ -103,6 +107,7 @@ public struct GameProfile: Codable, Identifiable, Sendable {
         self.requiresUbisoftConnect = requiresUbisoftConnect
         self.assettoCorsa = assettoCorsa
         self.pinUnrealLowScalability = pinUnrealLowScalability
+        self.executableSubstitutions = executableSubstitutions
     }
 
     public init(from decoder: Decoder) throws {
@@ -125,6 +130,9 @@ public struct GameProfile: Codable, Identifiable, Sendable {
         pinUnrealLowScalability = try container.decodeIfPresent(
             Bool.self, forKey: .pinUnrealLowScalability
         ) ?? true
+        executableSubstitutions = try container.decodeIfPresent(
+            [ExecutableSubstitution].self, forKey: .executableSubstitutions
+        ) ?? []
     }
 
     public func matches(executable: URL) -> Bool {

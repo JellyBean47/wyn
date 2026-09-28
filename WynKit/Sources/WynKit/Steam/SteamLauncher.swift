@@ -1141,6 +1141,7 @@ public enum SteamLauncher {
         // VK_ERROR_FEATURE_NOT_PRESENT once the game has given up. A no-op for
         // every D3D title, and idempotent when it is already installed.
         ProfileApplicator.prepareVulkanShim(profile: profile)
+        applyExecutableSubstitutions(profile: profile, appId: appId, in: bottle)
 
         var options = options
         if profile.needsUbisoftConnectPlay,
@@ -2560,6 +2561,9 @@ public enum SteamLauncher {
         if options.debug {
             print("[wyn:debug] steam args: \(args.joined(separator: " "))")
         }
+        // Again, right before the launch: Steam may have repaired the file
+        // while it started up (a fresh client checks every library it sees).
+        applyExecutableSubstitutions(profile: profile, appId: appId, in: bottle)
         progress("Asking Steam to launch \(appId)…")
         try await Wine.runProgram(
             at: steamURL,
@@ -2575,6 +2579,25 @@ public enum SteamLauncher {
 
         if options.debug {
             SteamUIDiagnostics.printSnapshot(bottle: bottle, label: "post-exit")
+        }
+    }
+
+    /// Put a profile's `executableSubstitutions` in place in the game's install
+    /// folder. Cheap when already applied (a size check), and never fatal: a
+    /// launch that cannot substitute still tries, and says why.
+    static func applyExecutableSubstitutions(profile: GameProfile, appId: Int, in bottle: Bottle) {
+        guard !profile.executableSubstitutions.isEmpty,
+              let installDir = installDirectory(forAppId: appId, in: bottle)
+        else { return }
+        for outcome in ExecutableSubstitutions.apply(profile.executableSubstitutions, in: installDir) {
+            switch outcome {
+            case .alreadyInPlace:
+                break
+            case .substituted(let name):
+                progress("\(profile.name): put \(name) back to the build that runs on this Mac (Steam had restored its own).")
+            case .skipped(let name, let reason):
+                progress("\(profile.name): could not substitute \(name): \(reason)")
+            }
         }
     }
 
