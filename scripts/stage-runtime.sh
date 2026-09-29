@@ -166,7 +166,7 @@ tar -xzf "$DXVK_TARBALL" -C "$layers/dxvk"
 tar -xzf "$DXMT_TARBALL" -C "$layers/dxmt"
 dxvk_src="$(find "$layers/dxvk" -mindepth 1 -maxdepth 1 -type d | head -1)"
 dxmt_src="$(find "$layers/dxmt" -mindepth 1 -maxdepth 1 -type d | head -1)"
-for f in x64/d3d11.dll x32/d3d11.dll dxvk.conf; do
+for f in x64/d3d11.dll x32/d3d11.dll x64/dxgi.dll x32/dxgi.dll dxvk.conf; do
   [[ -f "$dxvk_src/$f" ]] || fail "DXVK release has no $f"
 done
 for f in x86_64-windows/d3d11.dll i386-windows/d3d11.dll x86_64-windows/winemetal.dll \
@@ -175,7 +175,12 @@ for f in x86_64-windows/d3d11.dll i386-windows/d3d11.dll x86_64-windows/winemeta
 done
 
 mkdir -p "$OUT/Libraries/DXVK"
-rsync -a "$dxvk_src/x64" "$dxvk_src/x32" "$dxvk_src/dxvk.conf" "$OUT/Libraries/DXVK/"
+# DXVK's own dxgi.dll ships: without it Wine.enableDXVK falls back to the
+# tree's builtin dxgi, which on this runtime is D3DMetal's and cannot make a
+# swapchain for a DXVK device. d3d9.dll does not ship yet: Gcenx advises
+# against it on macOS and no D3D9 title has been measured on it here.
+rsync -a --exclude d3d9.dll --exclude .DS_Store \
+  "$dxvk_src/x64" "$dxvk_src/x32" "$dxvk_src/dxvk.conf" "$OUT/Libraries/DXVK/"
 cp "$ROOT/Documentation/licenses/zlib-DXVK.txt" "$OUT/Libraries/DXVK/LICENSE"
 
 # Wyn deploys DXMT's D3D trio per game, as native DLLs next to the exe. The

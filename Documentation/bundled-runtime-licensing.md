@@ -64,6 +64,9 @@ zlib, bzip2, iconv and Kerberos are macOS's own.
 DXVK and DXMT were compared with the copies in frankea's v3.1.1 runtime,
 which Wyn's DXMT and DXVK profiles were verified on:
 - **DXVK:** identical, file for file.
+  - From 29 Sep 2026 Wyn pins the original `v1.10.3-20230507` release instead of its 2024 repack. Its
+    `d3d11.dll` and `d3d10core.dll` are byte-identical, and it adds DXVK's own `dxgi.dll`, which
+    DXVK's D3D11 needs on this runtime. It is the same zlib licence, and the source is the matching tag.
 - **DXMT:** identical except the D3D trio's 16-byte "Wine builtin DLL"
   marker at offset 0x40. frankea replaced it with the ordinary DOS-stub
   bytes so that Wine treats the DLLs as native per-game copies (Wyn's

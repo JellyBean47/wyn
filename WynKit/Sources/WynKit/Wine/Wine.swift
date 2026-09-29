@@ -612,8 +612,9 @@ public class Wine {
     }
 
     /// DXMT-only extras that must not remain when switching the bottle to DXVK.
-    /// Community DXVK-macOS ships `d3d11`/`d3d10core` only — leftover DXMT `dxgi`
-    /// would mix with DXVK and break the RHI.
+    /// The bundled DXVK carries its own `dxgi` (from 29 Sep 2026; the 2024
+    /// DXVK-macOS repack ships `d3d11`/`d3d10core` only). Either way a leftover
+    /// DXMT `dxgi` would mix with DXVK and break the RHI.
     private static let dxmtExclusiveDLLs = [
         "winemetal.dll", "nvapi64.dll", "nvapi.dll", "nvngx.dll"
     ]

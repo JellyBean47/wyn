@@ -29,7 +29,7 @@ WINECX_DEPS_PREFIX=$PWD/.scratch/runtime-deps/prefix CCACHE_DISABLE=1 \
 ./scripts/stage-runtime.sh \
   --wine-root <build>/prefix/wine-root --wine-source <build>/winecx \
   --deps-prefix .scratch/runtime-deps/prefix \
-  --dxvk-tarball <dxvk-macOS-async-v1.10.3-20230507-repack.tar.gz> \
+  --dxvk-tarball <dxvk-macOS-async-v1.10.3-20230507.tar.gz> \
   --dxmt-tarball <dxmt-v0.80-builtin.tar.gz> \
   --mono-msi <wine-mono-11.2.0-x86.msi> --gptk-dmg ~/Downloads/Game_Porting_Toolkit_3.0.dmg
 # 4. seal it into the app and the image, then measure it

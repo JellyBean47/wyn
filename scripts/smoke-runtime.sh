@@ -25,10 +25,9 @@
 #   sdl       a winedevice process mapped winebus and libSDL2 (controllers)
 #
 # Every check prints PASS or FAIL; the exit status is the number of failures.
-# KNOWN lines are measured and printed but not counted: DXVK's D3D11 path
-# cannot create a swapchain with the Gcenx 1.10.3 release (it ships no
-# dxgi.dll, and its d3d11 rejects both Wine's and D3DMetal's DXGI) on the old
-# frankea tree or this one, and no D3D11 title is verified on DXVK.
+# KNOWN lines are measured and printed but not counted (none at the moment;
+# DXVK's D3D11 check was one until the payload carried DXVK's own dxgi.dll,
+# 29 Sep 2026).
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -163,14 +162,16 @@ run_probe dxmt d3d11probe.exe WINEDLLOVERRIDES="$BASE_OVERRIDES;dxgi,d3d11,d3d10
 grep -q "Present x10: 0x00000000" "$WORK/dxmt.out" && grep -q "winemetal.so" "$WORK/dxmt.maps"
 check dxmt $? "$(grep -m1 adapter "$WORK/dxmt.out"), $(grep -m1 Present "$WORK/dxmt.out")"
 
-echo "==> dxvk (Wyn's deployment: native d3d11/d3d10core, Wine's builtin dxgi)"
+echo "==> dxvk (Wyn's deployment: every DLL in the payload, DXVK's own dxgi included)"
+# Wine.enableDXVK copies the whole x64 payload into system32. Before the
+# payload carried dxgi.dll it copied the tree's builtin dxgi instead, which here
+# is D3DMetal's and cannot make a swapchain for a DXVK device.
 DXVK="$T/../DXVK/x64"
-cp "$DXVK/d3d11.dll" "$DXVK/d3d10core.dll" "$sys32/"
-cp "$T/lib/wine/x86_64-windows/dxgi.dll" "$sys32/dxgi.dll"
+cp "$DXVK"/*.dll "$sys32/"
 rm -f "$sys32/winemetal.dll"
 run_probe dxvk d3d11probe.exe WINEDLLOVERRIDES="$BASE_OVERRIDES;dxgi,d3d9,d3d10core,d3d11=n,b" DXVK_ASYNC=1
-grep -q "Present x10: 0x00000000" "$WORK/dxvk.out"
-known dxvk-d3d11 $? "$(grep -m1 'CreateDevice' "$WORK/dxvk.out"); $(grep -m1 'not a DXVK adapter' "$WORK/dxvk.err")"
+grep -q "Present x10: 0x00000000" "$WORK/dxvk.out" && grep -q "Apple M4\|vendor=0x106b" "$WORK/dxvk.out"
+check dxvk-d3d11 $? "$(grep -m1 adapter "$WORK/dxvk.out"), $(grep -m1 Present "$WORK/dxvk.out")"
 
 echo "==> vulkan"
 "$T/bin/wine" "$WORK/vkprobe.exe" >"$WORK/vk.out" 2>"$WORK/vk.err"
