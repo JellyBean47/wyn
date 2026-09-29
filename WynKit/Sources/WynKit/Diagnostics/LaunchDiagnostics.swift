@@ -413,7 +413,10 @@ public enum LaunchDiagnostics {
         if let wineTree {
             lines.append("Launch Wine tree: \(wineTree.displayName)")
         }
-        if let layer {
+        if let profile, ProfileValidator.isVulkanNative(profile) {
+            // Its DXVK setting only picks the Steam launch; see LaunchPath.graphicsLabel.
+            lines.append("Graphics layer: Vulkan (the game's own; no D3D layer loads)")
+        } else if let layer {
             lines.append("Graphics layer: \(layer.displayName)")
         }
         if let wineExitStatus {

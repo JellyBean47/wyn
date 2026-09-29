@@ -700,8 +700,10 @@ extension WynCLI {
             // Same honesty as `steam launch`: the tree decides the layer. A
             // dxmt profile played on the game-host tree renders through
             // D3DMetal, and the numbers that come back are not evidence about
-            // dxmt.
-            if let notice = DeclaredLayerNotice.message(
+            // dxmt. A Vulkan-native game loads no D3D layer at all, so which
+            // layers the tree has says nothing about its run: no notice.
+            if !ProfileValidator.isVulkanNative(profile),
+               let notice = DeclaredLayerNotice.message(
                 declared: layer,
                 tree: frankeaSteam ? .frankea : .gameHost
             ) {

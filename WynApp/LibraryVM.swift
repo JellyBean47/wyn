@@ -77,8 +77,7 @@ final class LibraryVM: ObservableObject {
         // With no profile the layer is not what decides the launch, so naming
         // it would point at the wrong thing.
         guard path != .noProfile else { return path.shortLabel }
-        let layer = LaunchPath.effectiveLayer(profile: profile, bottle: bottle)
-        return "\(layer.displayName) · \(path.shortLabel)"
+        return "\(LaunchPath.graphicsLabel(profile: profile, bottle: bottle)) · \(path.shortLabel)"
     }
 
     /// The long form, for the tooltip.

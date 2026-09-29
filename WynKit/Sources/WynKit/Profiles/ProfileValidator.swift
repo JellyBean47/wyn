@@ -231,7 +231,7 @@ public enum ProfileValidator {
     /// The game renders through Vulkan itself, so nothing is translating D3D.
     /// Read from what the profile already says rather than a new schema field:
     /// these profiles override `vulkan-1` to builtin and tune MoltenVK.
-    static func isVulkanNative(_ profile: GameProfile) -> Bool {
+    public static func isVulkanNative(_ profile: GameProfile) -> Bool {
         if profile.environment.keys.contains(where: { $0.hasPrefix("MVK_") }) { return true }
         let overrides = profile.environment["WINEDLLOVERRIDES"]?.lowercased() ?? ""
         return overrides.contains("vulkan-1")

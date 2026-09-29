@@ -268,4 +268,20 @@ struct LaunchPathTests {
         bottle.settings.translationLayer = .dxmt
         #expect(LaunchPath.forProfile(profiled, in: bottle) == .steamApplaunch)
     }
+
+    /// DOOM and Wolfenstein: Youngblood declare DXVK only to get the Steam
+    /// launch; they render through Vulkan and load no D3D layer (29 Sep 2026).
+    /// The label says what they draw with, and the launch still follows the
+    /// declared layer.
+    @Test func vulkanNativeGamesAreLabelledVulkanAndStillLaunchThroughSteam() throws {
+        let bottle = Bottle(bottleUrl: URL.temporaryDirectory.appending(path: UUID().uuidString))
+        bottle.settings.translationLayer = .d3dMetal
+        for id in ["doom-2016", "wolfenstein-youngblood"] {
+            let profile = try #require(ProfileStore.profile(id: id))
+            #expect(LaunchPath.graphicsLabel(profile: profile, bottle: bottle) == "Vulkan", "\(id)")
+            #expect(LaunchPath.forProfile(profile, in: bottle) == .steamApplaunch, "\(id)")
+        }
+        let fallout = try #require(ProfileStore.profile(id: "fallout-4"))
+        #expect(LaunchPath.graphicsLabel(profile: fallout, bottle: bottle) == TranslationLayer.d3dMetal.displayName)
+    }
 }

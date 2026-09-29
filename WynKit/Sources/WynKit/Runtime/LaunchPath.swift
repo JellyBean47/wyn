@@ -78,6 +78,19 @@ public enum LaunchPath: Sendable, Equatable {
         profile.bottle?.translationLayer ?? bottle.settings.translationLayer
     }
 
+    /// What a label should call the graphics a game runs on.
+    ///
+    /// A Vulkan-native title (DOOM, Wolfenstein: Youngblood) declares DXVK
+    /// because that layer is what picks the Steam launch it needs, but no D3D
+    /// layer ever loads: the game calls Vulkan itself, through winevulkan and
+    /// MoltenVK. Measured 29 Sep 2026, DOOM's process loaded vulkan-1 and
+    /// winevulkan and no d3d9, d3d11 or dxgi at all. Calling that "DXVK" made
+    /// its runs look like DXVK evidence, so labels say "Vulkan".
+    public static func graphicsLabel(profile: GameProfile, bottle: Bottle) -> String {
+        if ProfileValidator.isVulkanNative(profile) { return "Vulkan" }
+        return effectiveLayer(profile: profile, bottle: bottle).displayName
+    }
+
     /// The answer for a real profile, which must check for an executable
     /// *before* the layer — that is the order `launchGame` uses.
     public static func forProfile(_ profile: GameProfile, in bottle: Bottle, direct: Bool = false) -> LaunchPath {
