@@ -93,6 +93,17 @@ struct WindowsRuntimesTests {
         #expect(missing.isEmpty)
     }
 
+    /// What Microsoft's installer actually writes, measured on a fresh 1.1
+    /// bottle on 29 Sep 2026: `Runtimes\X64`, capital X. The registry is
+    /// case-insensitive, so this is the same key and must read as present.
+    @Test func theKeyIsMatchedWhateverItsCase() throws {
+        let upper = installedHive.replacingOccurrences(of: #"Runtimes\\x64]"#, with: #"Runtimes\\X64]"#)
+        #expect(upper != installedHive)
+        let prefix = try fixture(upper)
+        let found = WindowsRuntimes.check(verbs: ["vcrun2022"], prefix: prefix)
+        #expect(found[0].result == .present("v14.51.36247.00"))
+    }
+
     @Test func anAbsentKeyIsMissing() throws {
         let prefix = try fixture("WINE REGISTRY Version 2\n\n")
         let found = WindowsRuntimes.check(verbs: ["vcrun2022"], prefix: prefix)

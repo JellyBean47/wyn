@@ -1136,6 +1136,15 @@ public enum SteamLauncher {
 
         try await waitOutPreviousD3DMetalSession(profile: profile, bottle: bottle)
 
+        // What Steam's first Play of the game would have installed: Wyn starts
+        // most games itself, so on a fresh bottle Steam's install scripts
+        // (Visual C++, Ubisoft Connect) never run. A no-op once they are in.
+        try await SteamBottlePrerequisites.ensure(
+            for: profile,
+            in: bottle,
+            installDirectory: installDirectory(forAppId: appId, in: bottle)
+        )
+
         // Vulkan-native titles need the MoltenVK feature shim in place before
         // the process starts; there is no recovering from
         // VK_ERROR_FEATURE_NOT_PRESENT once the game has given up. A no-op for

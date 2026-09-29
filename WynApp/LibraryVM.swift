@@ -389,6 +389,18 @@ final class LibraryVM: ObservableObject {
         if PlatformCatalog.isStoreInstallerRunning(item.kind) {
             return
         }
+        // Connect lives in the Steam bottle, not a store bottle of its own:
+        // install it there, then open it so the user can sign in.
+        if item.kind == .ubisoft {
+            guard let bottle else { return }
+            startLaunch("Installing Ubisoft Connect…") {
+                try await SteamBottlePrerequisites.installConnect(in: bottle)
+                if let connect = PlatformCatalog.installed().first(where: { $0.kind == .ubisoft }) {
+                    try await PlatformCatalog.launch(connect)
+                }
+            }
+            return
+        }
         startLaunch("Installing \(item.kind.displayName)…") {
             let bottle = try StoreInstaller.ensureBottle(for: item.kind)
             await MainActor.run { self.inFlightStoreBottle = bottle }

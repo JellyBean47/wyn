@@ -281,9 +281,14 @@ public enum WindowsRuntimes {
     /// Wine writes the key with every backslash doubled and a trailing epoch,
     /// e.g. `[Software\\Microsoft\\...\\x64] 1788466788`, so the header is
     /// matched on the bracketed part alone.
+    ///
+    /// Case-insensitively, as Windows reads the registry. Microsoft's own
+    /// installer writes `...\VC\Runtimes\X64`, capital X. An exact match on
+    /// `x64` called that MISSING on every fresh 1.1 bottle (29 Sep 2026), right
+    /// next to an Installed=1, v14.51 key that Steam's first run had written.
     private static func section(_ key: String, in hive: String) -> [String: String]? {
         let header = "[" + key.replacingOccurrences(of: #"\"#, with: #"\\"#) + "]"
-        guard let start = hive.range(of: header) else { return nil }
+        guard let start = hive.range(of: header, options: .caseInsensitive) else { return nil }
 
         let rest = hive[start.upperBound...]
         let end = rest.range(of: "\n[")?.lowerBound ?? rest.endIndex

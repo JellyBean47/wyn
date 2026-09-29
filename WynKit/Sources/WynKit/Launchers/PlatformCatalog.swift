@@ -262,9 +262,11 @@ public enum PlatformCatalog {
         return PlatformKind.displayOrder.compactMap { found[$0] }
     }
 
-    /// Steam/Connect/Rockstar only when installed; Epic/EA/Battle.net/GOG always (Install if missing).
+    /// Steam/Rockstar only when installed; Epic/EA/Battle.net/GOG always (Install if missing);
+    /// Connect whenever there is a Steam bottle, since it installs into that bottle.
     public static func platformRow() -> [PlatformRowItem] {
         let byKind = Dictionary(uniqueKeysWithValues: installed().map { ($0.kind, $0) })
+        let hasSteamBottle = GameLibrary.steamBottle() != nil
         return PlatformKind.displayOrder.compactMap { kind in
             if kind == .epic || kind == .gog {
                 // Official EGL / Galaxy bottles do not count as installed.
@@ -284,6 +286,11 @@ public enum PlatformCatalog {
                 return PlatformRowItem(kind: kind, installed: item)
             }
             if PlatformKind.installableStorefronts.contains(kind) {
+                return PlatformRowItem(kind: kind, installed: nil)
+            }
+            // A fresh bottle has no Connect: Steam only installs it on a
+            // game's first Play from Steam itself (SteamBottlePrerequisites).
+            if kind == .ubisoft, hasSteamBottle {
                 return PlatformRowItem(kind: kind, installed: nil)
             }
             return nil
