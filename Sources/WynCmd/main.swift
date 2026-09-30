@@ -1590,13 +1590,16 @@ extension WynCLI {
             discussion: """
             wyn connect status
                 Running? Signed in, and when? Did its ownership connection come \
-                up? Is a saved sign-in on disk (size and date only)?
+                up? Is a saved sign-in on disk (size and date only)? What did \
+                Ubisoft's bot check last show?
 
             wyn connect signin [--fresh-browser-cache]
                 Opens Connect for an interactive sign-in and waits for its \
-                account line. --fresh-browser-cache renames Connect's browser \
-                profile first (never deletes it), which recovered a sign-in that \
-                Ubisoft's bot check had refused. Saved credentials are untouched.
+                account line. It stops early, and says so, if Ubisoft's bot check \
+                blocks the login. --fresh-browser-cache renames Connect's browser \
+                profile first (never deletes it). That does not get past the \
+                block: a brand-new profile was blocked on its first login on \
+                29 Sep 2026. Saved credentials are untouched.
             """,
             subcommands: [ConnectStatus.self, ConnectSignIn.self],
             defaultSubcommand: ConnectStatus.self
@@ -1643,6 +1646,11 @@ extension WynCLI {
             } else {
                 print("Saved sign-in: none on disk")
             }
+            if let check = state.lastBotCheck, let at = state.lastBotCheckAt {
+                print("Bot check:  \(check.summary), \(WynCLI.connectStamp(at))")
+            } else {
+                print("Bot check:  none recorded")
+            }
 
             print("")
             if state.ownership != nil {
@@ -1650,8 +1658,11 @@ extension WynCLI {
                 print("Measured: this follows a signed-in Connect being killed minutes earlier.")
             } else if state.signedInAt == nil {
                 print("Sign in first:  wyn connect signin")
-                print("If its window shows \"Access is temporarily restricted\":")
-                print("  wyn connect signin --fresh-browser-cache")
+                if state.lastBotCheck == .blocked {
+                    print("The last sign-in hit Ubisoft's \"Access is temporarily restricted\" page:")
+                    print("its bot protection (DataDome) refused the login. Retrying straight away")
+                    print("gets the same page, so try again later.")
+                }
             } else {
                 print("Ready for a game launch.")
             }

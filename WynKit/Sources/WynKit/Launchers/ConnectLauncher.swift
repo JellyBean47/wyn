@@ -27,23 +27,50 @@
 
 import Darwin
 import Foundation
+import SQLite3
 
 public enum ConnectLauncher {
+    /// Wine's builtin d3d11/dxgi. With no `--use-angle` (see `cefArgs`), ANGLE
+    /// fails D3D11 on them and settles on D3D9Ex over wined3d.
     private static let connectDllOverrides =
         "winemenubuilder.exe=d;dwrite=b;d2d1,d3d10core=d;d3d11,dxgi=b;d3dcompiler_47=n"
+
+    /// CEF flags for game-host Connect. Connect also reads them from the args
+    /// files on every start, including starts Wyn did not make.
+    ///
+    /// There is deliberately no `--use-angle`: ANGLE picks its own backend.
+    /// Ubisoft's bot check (DataDome) reads the WebGL renderer from a Web
+    /// Worker. Connect disables WebGL on its pages' main thread, so the worker
+    /// is where the GPU name shows. Measured in the live login overlay:
+    ///
+    /// | flags / d3d11              | worker WebGL renderer                        | login          |
+    /// |----------------------------|----------------------------------------------|----------------|
+    /// | `=swiftshader-webgl` (≤ build 9) | `ANGLE (Apple, Vulkan … Apple M4 …, MoltenVK)` | blocked, first attempt of a fresh bottle, 29 Sep 21:46 |
+    /// | no `--use-angle`, DXVK     | `ANGLE (Apple, Apple M4 … Direct3D11 …)`     | blocked (profile already flagged) |
+    /// | no `--use-angle`, builtin  | `ANGLE (NVIDIA, NVIDIA GeForce 8800 GTX Direct3D9Ex …)` | **signed in**, fresh profile, 30 Sep 09:46 |
+    ///
+    /// The 09:46 sign-in also had the correct time zone (`TZ` set for that one
+    /// test; see `Documentation/ubisoft-connect.md`) and ran on another network.
+    /// It is not yet separated which of the three mattered. A Windows PC with
+    /// an Apple GPU does not exist, and a bot check has every reason to treat
+    /// one as spoofed.
+    ///
+    /// Never pin `--use-angle=d3d11`: with the builtin d3d11 that every
+    /// Steam-started process gets, CEF retries GPU startup forever and never
+    /// paints.
+    static let cefArgs = [
+        "--no-sandbox",
+        "--in-process-gpu",
+        "--disable-gpu-compositing",
+        "--use-gl=angle"
+    ]
 
     // Same flags as Tools/present-parent-native-run.sh. `--disable-gpu` makes
     // CEF spawn a gpu-process with `--use-gl=disabled`, ANGLE then fails
     // MoltenVK (no VK_KHR_win32_surface), StretchBlt never fires, FLY4 stays
     // empty, and the HWND is transparent. `--in-process-gpu` + SwiftShader is
     // the path that produced FAST blit/s≈100 on 9 Sep.
-    static let cefArgs = [
-        "--no-sandbox",
-        "--in-process-gpu",
-        "--disable-gpu-compositing",
-        "--use-gl=angle",
-        "--use-angle=swiftshader-webgl"
-    ]
+    static let fly4CefArgs = cefArgs + ["--use-angle=swiftshader-webgl"]
 
     private static let attempts = 6
     // CEF can take over a minute to reach StartView on a fresh cache.
@@ -130,9 +157,9 @@ public enum ConnectLauncher {
                 guard let startedAt = runningConnectStartDate() else {
                     throw PlatformLaunchError.connectSignInUnconfirmed
                 }
-                try await waitForWindow(logURL: logURL, offset: 0,
+                try await waitForWindow(in: bottle, logURL: logURL, offset: 0,
                                         requirePaintedFrame: false, requireAuthentication: true,
-                                        processStartedAt: startedAt)
+                                        processStartedAt: startedAt, botCheckSince: startedAt)
                 try await settleAfterSignIn(in: bottle)
             }
             return
@@ -147,10 +174,13 @@ public enum ConnectLauncher {
             LaunchProgress.emit(
                 "Ubisoft Connect: attaching upc.exe to the game-host wineserver (UI may be transparent)."
             )
-            try prepareConnectFiles(in: bottle)
+            try prepareConnectFiles(in: bottle, fly4: false)
             let (logURL, offset) = launcherLogPosition(in: bottle)
+            let spawnedAt = Date()
             try spawnConnect(in: bottle, wineTree: .game, injectPresent: false)
-            try await waitForWindow(logURL: logURL, offset: offset, requirePaintedFrame: false, requireAuthentication: true)
+            try await waitForWindow(in: bottle, logURL: logURL, offset: offset,
+                                    requirePaintedFrame: false, requireAuthentication: true,
+                                    botCheckSince: spawnedAt)
             if purpose == .game { try await settleAfterSignIn(in: bottle) }
             return
         }
@@ -164,11 +194,14 @@ public enum ConnectLauncher {
 
         let frankeaUp = SteamLauncher.isBottleWineserverFromTree(in: bottle, tree: .steam)
         if frankeaUp {
-            try prepareConnectFiles(in: bottle)
+            try prepareConnectFiles(in: bottle, fly4: true)
             unlinkFLY4()
             let (logURL, offset) = launcherLogPosition(in: bottle)
+            let spawnedAt = Date()
             try spawnConnect(in: bottle, wineTree: .steam, injectPresent: true)
-            try await waitForWindow(logURL: logURL, offset: offset, requirePaintedFrame: true, requireAuthentication: purpose == .game)
+            try await waitForWindow(in: bottle, logURL: logURL, offset: offset,
+                                    requirePaintedFrame: true, requireAuthentication: purpose == .game,
+                                    botCheckSince: spawnedAt)
             if purpose == .game { try await settleAfterSignIn(in: bottle) }
             return
         }
@@ -194,6 +227,10 @@ public enum ConnectLauncher {
             } catch PlatformLaunchError.connectSignInUnconfirmed {
                 // Leave the client open for interactive sign-in; retries cannot authenticate it.
                 throw PlatformLaunchError.connectSignInUnconfirmed
+            } catch PlatformLaunchError.connectBlockedByUbisoft {
+                // Leave the block page up. A relaunch sends Ubisoft another
+                // fresh client within seconds, which is exactly what a bot looks like.
+                throw PlatformLaunchError.connectBlockedByUbisoft
             } catch {
                 lastError = error
                 await drainConnect(in: bottle)
@@ -204,11 +241,14 @@ public enum ConnectLauncher {
 
     private static func coldStartAttempt(in bottle: Bottle, purpose: LaunchPurpose) async throws {
         await drainConnect(in: bottle)
-        try prepareConnectFiles(in: bottle)
+        try prepareConnectFiles(in: bottle, fly4: true)
         unlinkFLY4()
         let (logURL, offset) = launcherLogPosition(in: bottle)
+        let spawnedAt = Date()
         try spawnConnect(in: bottle, wineTree: .steam, injectPresent: true)
-        try await waitForWindow(logURL: logURL, offset: offset, requirePaintedFrame: true, requireAuthentication: purpose == .game)
+        try await waitForWindow(in: bottle, logURL: logURL, offset: offset,
+                                requirePaintedFrame: true, requireAuthentication: purpose == .game,
+                                botCheckSince: spawnedAt)
         if purpose == .game { try await settleAfterSignIn(in: bottle) }
     }
 
@@ -292,7 +332,7 @@ public enum ConnectLauncher {
         args.append(contentsOf: assignments)
         args.append(wine)
         args.append("upc.exe")
-        args.append(contentsOf: cefArgs)
+        args.append(contentsOf: injectPresent ? fly4CefArgs : cefArgs)
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/arch")
@@ -314,11 +354,13 @@ public enum ConnectLauncher {
     private static let fly4MaxHeight = 1200
 
     private static func waitForWindow(
+        in bottle: Bottle,
         logURL: URL,
         offset: Int,
         requirePaintedFrame: Bool,
         requireAuthentication: Bool,
-        processStartedAt: Date? = nil
+        processStartedAt: Date? = nil,
+        botCheckSince: Date
     ) async throws {
         for second in 1...startViewTimeoutSeconds {
             try Task.checkCancellation()
@@ -343,17 +385,39 @@ public enum ConnectLauncher {
                     isRunning: running
                 )
             }
+            if status == .ready { return }
+            // A hard block never resolves by waiting. Name it, instead of
+            // timing out into "sign-in could not be confirmed".
+            if requireAuthentication, running, second % 3 == 0,
+               latestBotCheck(in: bottle, since: botCheckSince)?.check == .blocked {
+                throw PlatformLaunchError.connectBlockedByUbisoft
+            }
             switch status {
             case .ready: return
             case .waiting: continue
             case .failed:
                 if requireAuthentication && running {
+                    if await blockedWithinHistoryCommitDelay(in: bottle, since: botCheckSince) {
+                        throw PlatformLaunchError.connectBlockedByUbisoft
+                    }
                     throw PlatformLaunchError.connectSignInUnconfirmed
                 }
                 throw PlatformLaunchError.connectWedged
             }
         }
         throw PlatformLaunchError.connectWedged
+    }
+
+    /// CEF commits `History` about every ten seconds. On 29 Sep 2026 a block
+    /// landed at 23:56:54, one second before a 120 s wait ran out, and the
+    /// person was told "sign-in could not be confirmed" instead. So look once
+    /// more, across one commit interval, before giving the generic answer.
+    private static func blockedWithinHistoryCommitDelay(in bottle: Bottle, since: Date) async -> Bool {
+        for _ in 0..<5 {
+            if latestBotCheck(in: bottle, since: since)?.check == .blocked { return true }
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+        }
+        return latestBotCheck(in: bottle, since: since)?.check == .blocked
     }
 
     enum StartupStatus { case waiting, ready, failed }
@@ -456,6 +520,106 @@ public enum ConnectLauncher {
         return parked
     }
 
+    /// What Ubisoft's bot check (DataDome) showed on Connect's sign-in page.
+    ///
+    /// Connect's login form loads DataDome's tag. When DataDome refuses the
+    /// login request, the form shows a `geo.captcha-delivery.com` page, and
+    /// Connect's own browser records the visit in its history.
+    public enum BotCheck: Equatable, Sendable {
+        /// `…/captcha/…&t=bv`: "Access is temporarily restricted". A hard
+        /// block with no puzzle to solve. Measured 14 Sep and 29 Sep 2026; on
+        /// 29 Sep it came on the first login of a brand-new bottle.
+        case blocked
+        /// `…/captcha/…` with another `t`: a puzzle the person can solve.
+        case captcha
+        /// `…/interstitial/`: DataDome's device check. It passed on its own on
+        /// 9 Sep and 15 Sep 2026.
+        case deviceCheck
+
+        public var summary: String {
+            switch self {
+            case .blocked: return "blocked (\"Access is temporarily restricted\")"
+            case .captcha: return "puzzle shown"
+            case .deviceCheck: return "device check (clears by itself)"
+            }
+        }
+    }
+
+    static func botCheck(fromURL url: String) -> BotCheck? {
+        guard let components = URLComponents(string: url),
+              let host = components.host,
+              host == "captcha-delivery.com" || host.hasSuffix(".captcha-delivery.com")
+        else { return nil }
+        if components.path.hasPrefix("/interstitial") { return .deviceCheck }
+        guard components.path.hasPrefix("/captcha") else { return nil }
+        let kind = components.queryItems?.first { $0.name == "t" }?.value
+        return kind == "bv" ? .blocked : .captcha
+    }
+
+    /// Bot-check pages in a copy of CEF's `History` database at or after
+    /// `since`, newest first. The URL carries DataDome and device identifiers,
+    /// so only its kind and time leave this function.
+    static func botChecks(historyDatabase: URL, since: Date, limit: Int) -> [(date: Date, check: BotCheck)] {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(historyDatabase.path(percentEncoded: false), &db,
+                              SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else {
+            sqlite3_close(db)
+            return []
+        }
+        defer { sqlite3_close(db) }
+        let sql = """
+            SELECT v.visit_time, u.url FROM visits v JOIN urls u ON u.id = v.url
+            WHERE u.url LIKE 'https://%captcha-delivery.com/%' AND v.visit_time >= ?
+            ORDER BY v.visit_time DESC
+            """
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_int64(statement, 1, chromeTime(since))
+        var found: [(date: Date, check: BotCheck)] = []
+        while found.count < limit, sqlite3_step(statement) == SQLITE_ROW {
+            guard let text = sqlite3_column_text(statement, 1) else { continue }
+            guard let check = botCheck(fromURL: String(cString: text)) else { continue }
+            found.append((dateFromChromeTime(sqlite3_column_int64(statement, 0)), check))
+        }
+        return found
+    }
+
+    static func latestBotCheck(historyDatabase: URL, since: Date) -> (date: Date, check: BotCheck)? {
+        botChecks(historyDatabase: historyDatabase, since: since, limit: 1).first
+    }
+
+    /// The same, for the live profile. CEF keeps `History` open and may have a
+    /// transaction in flight, so this reads a private copy (with its journal,
+    /// which SQLite rolls back on open) and never touches the original.
+    static func botChecks(in bottle: Bottle, since: Date, limit: Int) -> [(date: Date, check: BotCheck)] {
+        guard let cache = browserCacheDirectory(in: bottle) else { return [] }
+        let fm = FileManager.default
+        let history = cache.appending(path: "Default").appending(path: "History")
+        guard fm.fileExists(atPath: history.path(percentEncoded: false)) else { return [] }
+        let scratch = fm.temporaryDirectory.appending(path: "wyn-connect-history-\(UUID().uuidString)")
+        guard (try? fm.createDirectory(at: scratch, withIntermediateDirectories: true)) != nil else { return [] }
+        defer { try? fm.removeItem(at: scratch) }
+        let copy = scratch.appending(path: "History")
+        guard (try? fm.copyItem(at: history, to: copy)) != nil else { return [] }
+        let journal = cache.appending(path: "Default").appending(path: "History-journal")
+        try? fm.copyItem(at: journal, to: scratch.appending(path: "History-journal"))
+        return botChecks(historyDatabase: copy, since: since, limit: limit)
+    }
+
+    static func latestBotCheck(in bottle: Bottle, since: Date) -> (date: Date, check: BotCheck)? {
+        botChecks(in: bottle, since: since, limit: 1).first
+    }
+
+    /// Chrome stores times as microseconds since 1601-01-01 UTC.
+    static func chromeTime(_ date: Date) -> Int64 {
+        Int64((date.timeIntervalSince1970 + 11_644_473_600) * 1_000_000)
+    }
+
+    static func dateFromChromeTime(_ value: Int64) -> Date {
+        Date(timeIntervalSince1970: Double(value) / 1_000_000 - 11_644_473_600)
+    }
+
     /// What a person needs to know before launching a game that needs Connect.
     public struct State: Sendable {
         public var isRunning: Bool
@@ -464,6 +628,9 @@ public enum ConnectLauncher {
         public var hasSignInStore: Bool
         public var storeBytes: Int?
         public var storeModified: Date?
+        /// The newest bot-check page Connect's browser has ever shown.
+        public var lastBotCheck: BotCheck?
+        public var lastBotCheckAt: Date?
     }
 
     public static func state(in bottle: Bottle) -> State {
@@ -488,17 +655,22 @@ public enum ConnectLauncher {
                 modified = attrs[.modificationDate] as? Date
             }
         }
+        let botCheck = latestBotCheck(in: bottle, since: .distantPast)
         return State(isRunning: PlatformCatalog.isRunning(.ubisoft),
                      signedInAt: signedInAt, ownership: ownership,
-                     hasSignInStore: bytes != nil, storeBytes: bytes, storeModified: modified)
+                     hasSignInStore: bytes != nil, storeBytes: bytes, storeModified: modified,
+                     lastBotCheck: botCheck?.check, lastBotCheckAt: botCheck?.date)
     }
 
     /// Open Connect for an interactive sign-in and wait for the account line.
     ///
-    /// `freshBrowserCache` parks the CEF profile first. Ubisoft's bot check
-    /// (DataDome) refused the sign-in page on 14 Sep 2026 with a cookie that had
-    /// been flagged; a parked cache plus a visible window recovered it on 15 Sep.
-    /// Nothing is deleted, and saved credentials are never touched.
+    /// `freshBrowserCache` parks the CEF profile first. Nothing is deleted, and
+    /// saved credentials are never touched.
+    ///
+    /// Corrected 29 Sep 2026: the parked cache is not what got past Ubisoft's
+    /// bot check on 15 Sep. A brand-new bottle, with a new profile and a new
+    /// device ID, was hard-blocked on its very first login. A fresh profile
+    /// also looks like one more new device to DataDome, so use it rarely.
     @discardableResult
     public static func signIn(in bottle: Bottle, freshBrowserCache: Bool,
                               waitSeconds: Int = 240) async throws -> State {
@@ -523,7 +695,15 @@ public enum ConnectLauncher {
                                     isRunning: running, processStartedAt: startedAt) == .ready {
                 return state(in: bottle)
             }
+            if second % 3 == 0, let startedAt = runningConnectStartDate(),
+               latestBotCheck(in: bottle, since: startedAt)?.check == .blocked {
+                throw PlatformLaunchError.connectBlockedByUbisoft
+            }
             try await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+        if let startedAt = runningConnectStartDate(),
+           await blockedWithinHistoryCommitDelay(in: bottle, since: startedAt) {
+            throw PlatformLaunchError.connectBlockedByUbisoft
         }
         throw PlatformLaunchError.connectSignInUnconfirmed
     }
@@ -764,7 +944,25 @@ public enum ConnectLauncher {
         }
     }
 
-    private static func prepareConnectFiles(in bottle: Bottle) throws {
+    /// Remove DXVK's 32-bit d3d11/dxgi from Connect's folder, and only those.
+    /// Test runs on 29 Sep 2026 put them there. Under DXVK, Connect reports
+    /// "Apple M4" as its WebGL GPU (see `cefArgs`), which is the renderer that
+    /// was blocked. Connect ships no d3d11/dxgi of its own.
+    static func removeDXVKFromConnect(in bottle: Bottle) {
+        let fm = FileManager.default
+        let uc = installDirectory(in: bottle)
+        let x32 = WynWineInstaller.libraryFolder(for: .game)
+            .appending(path: "DXVK").appending(path: "x32")
+        for name in ["d3d11.dll", "dxgi.dll"] {
+            let placed = uc.appending(path: name).path(percentEncoded: false)
+            let dxvk = x32.appending(path: name).path(percentEncoded: false)
+            if fm.contentsEqual(atPath: placed, andPath: dxvk) {
+                try? fm.removeItem(atPath: placed)
+            }
+        }
+    }
+
+    private static func prepareConnectFiles(in bottle: Bottle, fly4: Bool) throws {
         let fm = FileManager.default
         let uc = installDirectory(in: bottle)
 
@@ -780,7 +978,9 @@ public enum ConnectLauncher {
         try? fm.removeItem(at: uc.appending(path: "version.dll"))
         try? fm.removeItem(at: uc.appending(path: "version_wine.dll"))
 
-        let argsText = cefArgs.joined(separator: "\n") + "\n"
+        removeDXVKFromConnect(in: bottle)
+
+        let argsText = (fly4 ? fly4CefArgs : cefArgs).joined(separator: "\n") + "\n"
         let data = Data(argsText.utf8)
         for name in ["devargs.txt", "testargs.txt", "webcore_args.txt"] {
             try data.write(to: uc.appending(path: name))

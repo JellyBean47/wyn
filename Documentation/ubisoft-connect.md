@@ -1,3 +1,66 @@
+# Correction — 29/30 September 2026: the block page is DataDome; what got past it
+
+"Access is temporarily restricted" is DataDome, Ubisoft's bot filter.
+Connect's own browser history records the page as
+`geo.captcha-delivery.com/captcha/…&t=bv`. `t=bv` is DataDome's hard block,
+not a puzzle. It answers the login request that Connect's sign-in form sends
+(`connect.cdn.ubisoft.com/overlay/default/`, which loads `dd.ubisoft.com/tags.js`).
+
+Measured on build 9, in a brand-new bottle with a new browser profile and a new
+device ID:
+- The very first login was blocked (21:46).
+- Three later logins were blocked too (22:02, 23:09, 23:56).
+
+So parking the browser cache (below, 17 Sep) is not what recovered the 15 Sep
+sign-in. `wyn connect signin --fresh-browser-cache` no longer claims it is.
+
+What Wyn changed:
+- **CEF flags.** Game-host Connect no longer pins `--use-angle`, and it keeps
+  Wine's builtin d3d11/dxgi. DataDome's tag reads the WebGL renderer in a Web
+  Worker; Connect disables WebGL on the page's main thread itself.
+  - `=swiftshader-webgl` (build 9 and earlier) never gave SwiftShader. The
+    worker reported `ANGLE (Apple, … Apple M4 …, MoltenVK)`, a Windows PC with
+    an Apple GPU.
+  - With no pin, ANGLE falls back to D3D9Ex over wined3d and reports
+    `ANGLE (NVIDIA, NVIDIA GeForce 8800 GTX Direct3D9Ex …)`, Wine's standard
+    card.
+  - **30 Sep 09:46, the first sign-in since 15 Sep.** Fresh CEF profile (old
+    one renamed), this renderer, `TZ=Africa/Johannesburg` for that one launch,
+    and a phone hotspot. DataDome showed only its device check (interstitial),
+    which passed by itself. Every failure had shown `t=bv` straight away.
+  - **30 Sep 18:04, the same profile resumed its session on home Wi-Fi with
+    no `TZ` override**: `AccountStartupUser` 18 s after start, the token
+    refreshed, and no DataDome page at all in the history. Neither the
+    hotspot nor the time zone is needed to stay signed in. Whether a fresh
+    password login passes without them is untested.
+  - DXVK beside upc.exe (tried 29 Sep) still reports "Apple M4", so Wyn now
+    removes it if it finds it there.
+  - Never pin `--use-angle=d3d11`: on the builtin d3d11, CEF retries GPU
+    startup forever.
+- **A flagged cookie follows the profile.** Every blocked attempt leaves a
+  `datadome` cookie in Connect's CEF profile, and DataDome recognises it on
+  any network. All retests before 30 Sep reused that profile, so they tested
+  nothing.
+- **Detection.** Launches and `wyn connect signin` read Connect's browser
+  history (a private copy, kinds and times only). A hard block ends the wait
+  with `connectBlockedByUbisoft`, not "sign-in could not be confirmed". The
+  cold-start retry loop stops on it instead of relaunching Connect.
+- **Reporting.** `wyn connect status` and the diagnostics bundle (`connect.txt`,
+  `connect-logs/`) show the last bot-check results.
+
+With DXVK WebGL and (by hand) the correct time zone, the 23:09 and 23:56
+logins were still hard-blocked, but they reused the flagged profile, so they
+say nothing about the flags. (iCloud Private Relay is not offered in South
+Africa, so it played no part in any test.) See
+`~/wyn-handovers/FINDING-20260929-connect-datadome.md`.
+
+Also found: every bottle reports its time zone as the first registry zone with
+matching rules (Kaliningrad for Africa/Johannesburg). Wine only maps
+`/etc/localtime` to an IANA name under `/usr/share/zoneinfo`, and macOS's link
+resolves under `/private/var/db/timezone/`. Setting `TZ` fixes the name but
+breaks msvcrt/UCRT local time (Connect's own log went one hour wrong). The fix
+belongs in winecx.
+
 # Correction — 15 September 2026: rendering is not authentication
 
 The shared Windows-user profile prevents profile divergence; it cannot prevent

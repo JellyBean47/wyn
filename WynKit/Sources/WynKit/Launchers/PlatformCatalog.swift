@@ -89,6 +89,7 @@ public enum PlatformLaunchError: LocalizedError, Sendable {
     case connectOnGPTK
     case unexpectedWineserver
     case connectSignInUnconfirmed
+    case connectBlockedByUbisoft
     case connectOwnershipUnavailable
     case connectAlreadyRunning
     case connectWedged
@@ -111,6 +112,15 @@ public enum PlatformLaunchError: LocalizedError, Sendable {
             return "This bottle already has a wineserver that is not frankea. Quit it before opening Ubisoft Connect."
         case .connectSignInUnconfirmed:
             return "Ubisoft Connect sign-in could not be confirmed. Open the Ubisoft Connect tile and finish signing in before launching the game. If no sign-in window appears, quit Ubisoft Connect and Steam normally, then reopen the tile."
+        case .connectBlockedByUbisoft:
+            return """
+            Ubisoft blocked this sign-in. Connect is showing Ubisoft's \
+            "Access is temporarily restricted" page: its bot protection (DataDome) \
+            refused the login request. This is not a Wyn or Wine error, and \
+            retrying straight away gets the same page. Close Ubisoft Connect and \
+            try again later. With "Keep me logged in" ticked, a successful \
+            sign-in is remembered, so later starts usually skip this page.
+            """
         case .connectOwnershipUnavailable:
             return """
             Ubisoft Connect signed in but could not bring up its ownership connection, \

@@ -82,6 +82,7 @@ extension DiagnosticsBundle {
         try write(readme(note: note), to: "README.txt")
         try write(summary(bottle: bottle, stamp: stamp), to: "summary.txt")
         try write(cefReport(bottle: bottle), to: "cef-shim.txt")
+        try write(connectReport(bottle: bottle), to: "connect.txt")
         try write(processReport(), to: "processes.txt")
         try write(launchRecordReport(), to: "launch-records.txt")
         try write(runtimeReport(bottle: bottle), to: "windows-runtimes.txt")
@@ -102,6 +103,15 @@ extension DiagnosticsBundle {
                 let url = logs.appending(path: fileName)
                 guard let text = readText(url) else { continue }
                 try write(tail(text, lines: maxLogLines), to: "steam-logs/\(fileName)")
+            }
+
+            // Connect's own log. Its account line carries the Ubisoft user ID,
+            // a UUID, so every UUID is masked before `write` redacts the rest.
+            let connectLog = ConnectLauncher.installDirectory(in: bottle)
+                .appending(path: "logs").appending(path: "launcher_log.txt")
+            if let text = readText(connectLog) {
+                let masked = replacingMatches(in: text, pattern: uuidPattern, with: "<uuid>")
+                try write(tail(masked, lines: maxLogLines), to: "connect-logs/launcher_log.txt")
             }
         }
 
@@ -131,9 +141,12 @@ extension DiagnosticsBundle {
           doctor.txt     the same report as `wyn doctor`
           cef-shim.txt   Steam's CEF variants and whether the login-window shim
                          reached the one Steam actually loads
-          processes.txt  Wine and Steam processes running at capture time
+          connect.txt    Ubisoft Connect: signed in or not, what Ubisoft's bot
+                         check last showed, the browser flags Connect reads
+          processes.txt  Wine, Steam and Connect processes at capture time
           wyn-logs/      Wyn's own recent logs
           steam-logs/    Steam's client logs from the bottle
+          connect-logs/  Ubisoft Connect's own log, account IDs masked
 
         WHAT IS NOT IN HERE
           Nothing from Steam's config/ directory. Your account name, your
@@ -386,15 +399,71 @@ extension DiagnosticsBundle {
 
     private static func processReport() -> String {
         let out = run("/bin/ps", ["-ax", "-o", "pid=,command="])
+        // Wine rewrites a process's command line to its Windows path, so
+        // Connect shows as `C:\…\Ubisoft\…\upc.exe` with no "wine" in it.
         let interesting = out
             .split(separator: "\n")
             .filter { line in
                 let l = line.lowercased()
                 return l.contains("wine") || l.contains("steam") || l.contains("wyn.app")
+                    || l.contains("ubisoft") || l.contains("uplay")
             }
             .map(String.init)
         if interesting.isEmpty { return "No Wine, Steam or Wyn processes running." }
         return interesting.joined(separator: "\n")
+    }
+
+    static let uuidPattern = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+
+    /// Ubisoft Connect, for "Access is temporarily restricted" reports. States,
+    /// kinds and times only: no URLs, account IDs or tokens.
+    private static func connectReport(bottle: Bottle?) -> String {
+        guard let bottle else { return "No bottle to inspect." }
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: ConnectLauncher.exeURL(in: bottle).path(percentEncoded: false)) else {
+            return "Ubisoft Connect is not installed in this bottle."
+        }
+        let installDir = ConnectLauncher.installDirectory(in: bottle)
+        var lines: [String] = []
+        let version = readText(installDir.appending(path: "version.txt"))?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? "?"
+        lines.append("installed: yes, version \(version)")
+
+        let state = ConnectLauncher.state(in: bottle)
+        lines.append("running: \(state.isRunning ? "yes" : "no")")
+        lines.append("signed in (newest session): \(state.signedInAt.map(shortTime) ?? "no")")
+        lines.append("ownership: \(state.ownership.map { "FAILED (\($0))" } ?? "no startup failure logged")")
+        lines.append("saved sign-in: \(state.storeBytes.map { "\($0) bytes" } ?? "none") (contents never read)")
+        lines.append("")
+
+        lines.append("Ubisoft's bot check (DataDome), newest first:")
+        let checks = ConnectLauncher.botChecks(in: bottle, since: .distantPast, limit: 10)
+        if checks.isEmpty { lines.append("  none recorded") }
+        for check in checks {
+            lines.append("  \(shortTime(check.date))  \(check.check.summary)")
+        }
+        lines.append("")
+
+        lines.append("browser flags Connect reads (devargs.txt):")
+        let flags = readText(installDir.appending(path: "devargs.txt")) ?? ""
+        let flagLines = flags.split(whereSeparator: \.isNewline)
+        if flagLines.isEmpty { lines.append("  (none)") }
+        for flag in flagLines { lines.append("  \(flag)") }
+        let dxvk = ["d3d11.dll", "dxgi.dll"].allSatisfy {
+            fm.fileExists(atPath: installDir.appending(path: $0).path(percentEncoded: false))
+        }
+        // DXVK there makes Connect's WebGL report "Apple M4", the blocked renderer.
+        lines.append("d3d11/dxgi beside upc.exe: \(dxvk ? "YES (should be none)" : "none")")
+        lines.append("")
+
+        // The page reads the zone Wine reports. It has disagreed with the Mac
+        // (Kaliningrad for Johannesburg) in every bottle measured.
+        let bottleZone = readText(bottle.url.appending(path: "system.reg")).flatMap { text in
+            text.range(of: #""TimeZoneKeyName"="([^"]*)""#, options: .regularExpression)
+                .map { String(text[$0]).components(separatedBy: "\"")[3] }
+        } ?? "?"
+        lines.append("time zone: Mac \(TimeZone.current.identifier), bottle \(bottleZone)")
+        return lines.joined(separator: "\n")
     }
 
     private static func doctorReport(bottle: Bottle?) -> String {

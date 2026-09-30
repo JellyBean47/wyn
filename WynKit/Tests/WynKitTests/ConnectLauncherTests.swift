@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import Testing
 @testable import WynKit
 
@@ -153,8 +154,85 @@ struct ConnectLauncherTests {
     }
 
     @Test func cefArgsKeepInProcessGpuSoFLY4GetsStretchBlts() {
-        #expect(ConnectLauncher.cefArgs.contains("--in-process-gpu"))
-        #expect(!ConnectLauncher.cefArgs.contains("--disable-gpu"))
+        for args in [ConnectLauncher.cefArgs, ConnectLauncher.fly4CefArgs] {
+            #expect(args.contains("--in-process-gpu"))
+            #expect(!args.contains("--disable-gpu"))
+        }
+        #expect(ConnectLauncher.fly4CefArgs.contains("--use-angle=swiftshader-webgl"))
+    }
+
+    /// No `--use-angle`, Wine's builtin d3d11: ANGLE lands on D3D9Ex and
+    /// Connect's WebGL reports "NVIDIA GeForce 8800 GTX". That is the setup of
+    /// the first sign-in to get past Ubisoft's bot check (30 Sep 2026).
+    /// `=swiftshader-webgl` reported "Apple M4 … MoltenVK" and was blocked.
+    /// Pinning `=d3d11` made CEF retry GPU startup forever on the builtin.
+    @Test func gameHostCefArgsLeaveTheAngleBackendToAngle() {
+        #expect(!ConnectLauncher.cefArgs.contains { $0.hasPrefix("--use-angle") })
+        #expect(ConnectLauncher.cefArgs.contains("--use-gl=angle"))
+    }
+
+    @Test func dataDomePagesAreClassifiedByPathAndKind() {
+        let block = "https://geo.captcha-delivery.com/captcha/?initialCid=x&hash=y&cid=z&t=bv&referer=https%3A%2F%2Fconnect.cdn.ubisoft.com%2Foverlay%2Fdefault%2F&s=1&e=2&dm=cd"
+        #expect(ConnectLauncher.botCheck(fromURL: block) == .blocked)
+        #expect(ConnectLauncher.botCheck(fromURL: block.replacingOccurrences(of: "t=bv", with: "t=fe")) == .captcha)
+        #expect(ConnectLauncher.botCheck(fromURL: "https://geo.captcha-delivery.com/interstitial/?initialCid=x") == .deviceCheck)
+        #expect(ConnectLauncher.botCheck(fromURL: "https://connect.cdn.ubisoft.com/overlay/default/") == nil)
+        #expect(ConnectLauncher.botCheck(fromURL: "https://notcaptcha-delivery.com/captcha/?t=bv") == nil)
+    }
+
+    @Test func chromeTimeRoundTripsAtMicrosecondPrecision() throws {
+        let date = try #require(ConnectLauncher.launcherTimestamp("2026-09-29 21:46:42"))
+        #expect(ConnectLauncher.dateFromChromeTime(ConnectLauncher.chromeTime(date)) == date)
+    }
+
+    /// Chrome's `History` layout, reduced to the columns the reader uses.
+    @Test func historyReaderReturnsNewestCheckAfterTheCutoff() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appending(path: "wyn-history-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let db = dir.appending(path: "History")
+
+        let processStart = try #require(ConnectLauncher.launcherTimestamp("2026-09-29 22:01:39"))
+        let rows: [(String, Date)] = [
+            ("https://geo.captcha-delivery.com/captcha/?t=bv&cid=old", processStart.addingTimeInterval(-900)),
+            ("https://connect.cdn.ubisoft.com/overlay/default/?deviceId=x", processStart.addingTimeInterval(9)),
+            ("https://geo.captcha-delivery.com/interstitial/?cid=a", processStart.addingTimeInterval(20)),
+            ("https://geo.captcha-delivery.com/captcha/?t=bv&cid=new", processStart.addingTimeInterval(33))
+        ]
+        var handle: OpaquePointer?
+        #expect(sqlite3_open(db.path(percentEncoded: false), &handle) == SQLITE_OK)
+        var sql = """
+            CREATE TABLE urls(id INTEGER PRIMARY KEY, url LONGVARCHAR);
+            CREATE TABLE visits(id INTEGER PRIMARY KEY, url INTEGER NOT NULL, visit_time INTEGER NOT NULL);
+            """
+        for (index, row) in rows.enumerated() {
+            sql += "INSERT INTO urls VALUES (\(index + 1), '\(row.0)');"
+            sql += "INSERT INTO visits(url, visit_time) VALUES (\(index + 1), \(ConnectLauncher.chromeTime(row.1)));"
+        }
+        #expect(sqlite3_exec(handle, sql, nil, nil, nil) == SQLITE_OK)
+        sqlite3_close(handle)
+
+        let latest = try #require(ConnectLauncher.latestBotCheck(historyDatabase: db, since: processStart))
+        #expect(latest.check == .blocked)
+        #expect(latest.date == processStart.addingTimeInterval(33))
+
+        let all = ConnectLauncher.botChecks(historyDatabase: db, since: .distantPast, limit: 10)
+        #expect(all.map { $0.check } == [.blocked, .deviceCheck, .blocked])
+
+        // The block from before this process started must not fail this start.
+        let before = ConnectLauncher.latestBotCheck(historyDatabase: db,
+                                                    since: processStart.addingTimeInterval(21))
+        #expect(before?.check == .blocked)
+        #expect(ConnectLauncher.latestBotCheck(historyDatabase: db,
+                                               since: processStart.addingTimeInterval(60)) == nil)
+    }
+
+    @Test func blockedSignInSaysUbisoftBlockedItAndNotToRetryAtOnce() throws {
+        let message = try #require(PlatformLaunchError.connectBlockedByUbisoft.errorDescription)
+        #expect(message.contains("Access is temporarily restricted"))
+        #expect(message.contains("not a Wyn or Wine error"))
+        #expect(!message.contains("reopen the tile"))
     }
 
     @Test func d3dmetalOdysseyPlayDoesNotKeepFrankea() {

@@ -100,7 +100,7 @@ public enum DiagnosticsBundle {
         return out
     }
 
-    private static func replacingMatches(
+    static func replacingMatches(
         in text: String,
         pattern: String,
         with replacement: String,
