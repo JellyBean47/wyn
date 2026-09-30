@@ -129,11 +129,9 @@ echo "==> timezone"
 # under /private/var/db/timezone/…/zoneinfo/, which Wine only understood from
 # patches/winecx/0002; before it, Africa/Johannesburg read as Kaliningrad.
 mac_zone="$(readlink /etc/localtime | sed 's#.*/zoneinfo/##')"
-want="$(awk -v zone="\"$mac_zone\"" '
-  /^\[Software\\\\Wine\\\\Time Zones\\\\TZ Mapping\]/ { on = 1; next }
-  /^\[/ { on = 0 }
-  on && index($0, zone "=") == 1 { sub(/^[^=]*="/, ""); sub(/"$/, ""); print; exit }
-' "$WINEPREFIX/system.reg")"
+# Asked of the running wineserver: system.reg on disk lags behind it.
+want="$("$T/bin/wine" reg query 'HKLM\Software\Wine\Time Zones\TZ Mapping' /v "$mac_zone" 2>/dev/null \
+  | tr -d '\r' | sed -n 's/^ *[^ ].*  *REG_SZ  *//p' | head -1)"
 "$T/bin/wine" "$WORK/tzprobe.exe" >"$WORK/tz.out" 2>/dev/null
 got="$(sed -n 's/^zone //p' "$WORK/tz.out" | tr -d '\r')"
 if [[ -n "$want" ]]; then
