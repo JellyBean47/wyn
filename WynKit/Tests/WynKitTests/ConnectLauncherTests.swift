@@ -154,11 +154,112 @@ struct ConnectLauncherTests {
     }
 
     @Test func cefArgsKeepInProcessGpuSoFLY4GetsStretchBlts() {
-        for args in [ConnectLauncher.cefArgs, ConnectLauncher.fly4CefArgs] {
+        for args in [ConnectLauncher.cefArgs, ConnectLauncher.legacyFLY4CefArgs] {
             #expect(args.contains("--in-process-gpu"))
             #expect(!args.contains("--disable-gpu"))
         }
-        #expect(ConnectLauncher.fly4CefArgs.contains("--use-angle=swiftshader-webgl"))
+        #expect(ConnectLauncher.legacyFLY4CefArgs.contains("--use-angle=swiftshader-webgl"))
+    }
+
+    /// Build 10 chose the flags by asking whether a wineserver was up. On a
+    /// fresh install nothing is, so the Connect tile started Connect with
+    /// SwiftShader WebGL ("Apple M4") and its first login was blocked
+    /// (30 Sep 2026, 21:48). On the bundled runtime every start is game-host.
+    @Test func theBundledRuntimeStartsConnectOnTheGameHostWhateverIsRunning() {
+        for up in [false, true] {
+            #expect(ConnectLauncher.startPath(steamTreeIsGameTree: true, gameHostWineserverUp: up) == .gameHost)
+        }
+        #expect(ConnectLauncher.startPath(steamTreeIsGameTree: false, gameHostWineserverUp: true) == .gameHost)
+        #expect(ConnectLauncher.startPath(steamTreeIsGameTree: false, gameHostWineserverUp: false) == .legacyFLY4)
+    }
+
+    @Test func gameHostArgsFilesNeverPinAnAngleBackend() {
+        let text = ConnectLauncher.argsFileText(for: .gameHost)
+        #expect(!text.contains("--use-angle"))
+        #expect(text.split(separator: "\n").map(String.init) == ConnectLauncher.cefArgs)
+        #expect(ConnectLauncher.cefArgs(for: .gameHost) == ConnectLauncher.cefArgs)
+        #expect(ConnectLauncher.cefArgs(for: .legacyFLY4) == ConnectLauncher.legacyFLY4CefArgs)
+    }
+
+    /// The line from the blocked fresh-install start, 30 Sep 2026 21:47.
+    @Test func connectsOwnCommandLineIsReadFromItsLog() throws {
+        let log = """
+        [   212]  2026-09-30 21:47:11      [   216]     INFO       HubUtils.cpp (192)                               Timezone: UTC+02:00
+        [   212]  2026-09-30 21:47:11      [   216]     INFO       HubUtils.cpp (204)                               Command line: --no-sandbox --in-process-gpu --use-angle=swiftshader-webgl --disable-gpu-compositing --use-gl=angle
+        [   212]  2026-09-30 21:47:11      [   216]     INFO       HubUtils.cpp (208)                               Test/dev args file present.
+        """
+        let flags = try #require(ConnectLauncher.connectCommandLine(log: log))
+        #expect(flags == "--no-sandbox --in-process-gpu --use-angle=swiftshader-webgl --disable-gpu-compositing --use-gl=angle")
+        #expect(flags.contains("--use-angle"))
+
+        let later = log + "\n[   204]  2026-09-30 22:30:00      [   208]     INFO       HubUtils.cpp (204)                               Command line: --no-sandbox --in-process-gpu --disable-gpu-compositing --use-gl=angle"
+        #expect(ConnectLauncher.connectCommandLine(log: later)?.contains("--use-angle") == false)
+        #expect(ConnectLauncher.connectCommandLine(log: "Starting Ubisoft Game Launcher") == nil)
+    }
+
+    @Test func onlyABlockWithNoSignInSinceReplacesTheProfile() throws {
+        let block = try #require(ConnectLauncher.launcherTimestamp("2026-09-30 21:48:52"))
+        let blocked: (date: Date, check: ConnectLauncher.BotCheck) = (block, .blocked)
+        #expect(ConnectLauncher.profileNeedsReplacing(lastBotCheck: blocked, savedSignInModified: nil))
+        #expect(ConnectLauncher.profileNeedsReplacing(lastBotCheck: blocked,
+                                                      savedSignInModified: block.addingTimeInterval(-3600)))
+        // Signed in after the block: the profile got through.
+        #expect(!ConnectLauncher.profileNeedsReplacing(lastBotCheck: blocked,
+                                                       savedSignInModified: block.addingTimeInterval(60)))
+        // A device check or a puzzle is not a block.
+        #expect(!ConnectLauncher.profileNeedsReplacing(lastBotCheck: (block, .deviceCheck), savedSignInModified: nil))
+        #expect(!ConnectLauncher.profileNeedsReplacing(lastBotCheck: (block, .captcha), savedSignInModified: nil))
+        #expect(!ConnectLauncher.profileNeedsReplacing(lastBotCheck: nil, savedSignInModified: nil))
+    }
+
+    @Test func aBlockedProfileIsRenamedForItsBlockAndTheSignInIsKept() throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appending(path: "ConnectBlockedProfile-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let leaf = root.appending(path: "drive_c/users/crossover/AppData/Local/Ubisoft Game Launcher")
+        let history = leaf.appending(path: "cache/http2/Default/History")
+        try FileManager.default.createDirectory(at: history.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        let block = try #require(ConnectLauncher.launcherTimestamp("2026-09-30 21:48:52"))
+        try writeHistory(history, visits: [
+            ("https://geo.captcha-delivery.com/captcha/?t=bv&cid=x", block)
+        ])
+        let bottle = Bottle(bottleUrl: root)
+
+        // A sign-in saved after the block: keep the profile.
+        let store = leaf.appending(path: "ConnectSecureStorage.dat")
+        try Data(count: 64).write(to: store)
+        try FileManager.default.setAttributes([.modificationDate: block.addingTimeInterval(60)],
+                                              ofItemAtPath: store.path(percentEncoded: false))
+        #expect(try ConnectLauncher.replaceBlockedProfile(in: bottle) == nil)
+        #expect(ConnectLauncher.browserCacheDirectory(in: bottle) != nil)
+
+        // Saved before the block: park the profile, keep the saved sign-in.
+        try FileManager.default.setAttributes([.modificationDate: block.addingTimeInterval(-60)],
+                                              ofItemAtPath: store.path(percentEncoded: false))
+        let parked = try #require(try ConnectLauncher.replaceBlockedProfile(in: bottle))
+        #expect(parked.lastPathComponent == "http2.blocked-20260930-214852")
+        #expect(FileManager.default.fileExists(atPath: parked.appending(path: "Default/History").path(percentEncoded: false)))
+        #expect(ConnectLauncher.browserCacheDirectory(in: bottle) == nil)
+        #expect(ConnectLauncher.savedSignIn(in: bottle)?.bytes == 64)
+
+        // Nothing left to replace.
+        #expect(try ConnectLauncher.replaceBlockedProfile(in: bottle) == nil)
+    }
+
+    private func writeHistory(_ db: URL, visits: [(String, Date)]) throws {
+        var handle: OpaquePointer?
+        #expect(sqlite3_open(db.path(percentEncoded: false), &handle) == SQLITE_OK)
+        var sql = """
+            CREATE TABLE urls(id INTEGER PRIMARY KEY, url LONGVARCHAR);
+            CREATE TABLE visits(id INTEGER PRIMARY KEY, url INTEGER NOT NULL, visit_time INTEGER NOT NULL);
+            """
+        for (index, row) in visits.enumerated() {
+            sql += "INSERT INTO urls VALUES (\(index + 1), '\(row.0)');"
+            sql += "INSERT INTO visits(url, visit_time) VALUES (\(index + 1), \(ConnectLauncher.chromeTime(row.1)));"
+        }
+        #expect(sqlite3_exec(handle, sql, nil, nil, nil) == SQLITE_OK)
+        sqlite3_close(handle)
     }
 
     /// No `--use-angle`, Wine's builtin d3d11: ANGLE lands on D3D9Ex and
@@ -228,10 +329,14 @@ struct ConnectLauncherTests {
                                                since: processStart.addingTimeInterval(60)) == nil)
     }
 
+    /// Not "not a Wyn or Wine error" any more: on 30 Sep 2026 Wyn's own flags
+    /// made Connect look like a Windows PC with an Apple GPU.
     @Test func blockedSignInSaysUbisoftBlockedItAndNotToRetryAtOnce() throws {
         let message = try #require(PlatformLaunchError.connectBlockedByUbisoft.errorDescription)
         #expect(message.contains("Access is temporarily restricted"))
-        #expect(message.contains("not a Wyn or Wine error"))
+        #expect(message.contains("retrying straight away"))
+        #expect(message.contains("fresh browser profile"))
+        #expect(message.contains("another network"))
         #expect(!message.contains("reopen the tile"))
     }
 

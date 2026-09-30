@@ -1,3 +1,43 @@
+# Correction — 30 September 2026, evening: build 10 still started Connect as Apple M4
+
+Build 10's flag change reached only one of Connect's start paths. It chose
+the flags by asking whether a wineserver was already up; on the bundled
+runtime the "Steam tree" is the game tree, so a start with nothing running
+took the old FLY4 path and wrote `--use-angle=swiftshader-webgl` into the args
+files. That is exactly a fresh install: the Connect tile comes before Steam
+runs. The owner's fresh install of build 10 was hard-blocked (`t=bv`) on its
+first login, 21:48, with Connect's own log reading
+`Command line: … --use-angle=swiftshader-webgl …` and the time zone still
+Kaliningrad. The tile had returned as soon as Connect was up, so Wyn said
+nothing about the block.
+
+What changed for build 11:
+- **One start path.** On the bundled runtime every Connect start is a
+  game-host start: winecx, builtin d3d11/dxgi, no `--use-angle`, no FLY4.
+  Measured first: its login form paints with nothing else running, and its
+  worker WebGL reads `ANGLE (NVIDIA, NVIDIA GeForce 8800 GTX Direct3D9Ex …)`.
+  FLY4 with SwiftShader is left only for a Wyn 1.0 install with a separate
+  frankea tree (`ConnectLauncher.StartPath`).
+- **Args files rewritten before Steam starts**, so a Connect that Steam or a
+  game starts gets the same flags.
+- **Connect's own log is checked.** A game-host start whose logged command
+  line pins an ANGLE backend warns, and the diagnostics bundle shows the
+  flags of the last start.
+- **Time zone.** winecx patch 0002 names the zone from macOS's
+  `/etc/localtime` link, so Connect's pages read `Africa/Johannesburg`, not
+  `Europe/Kaliningrad`. No `TZ` variable is involved.
+- **A blocked profile is replaced.** After a hard block with no sign-in
+  saved since, the next start renames the browser profile to
+  `http2.blocked-<time of the block>` and starts fresh. It never retries on
+  its own.
+- **The tile waits for the outcome.** It stays with Connect until it signs
+  in, is blocked (and says so), or is closed.
+
+Still outside Wyn's control: DataDome also weighs the network. If a clean
+start is blocked on one network, one sign-in from another network with
+"Keep me logged in" is the remedy; later starts resume without meeting the
+bot check (18:04 on the home network, after the 09:46 sign-in).
+
 # Correction — 29/30 September 2026: the block page is DataDome; what got past it
 
 "Access is temporarily restricted" is DataDome, Ubisoft's bot filter.

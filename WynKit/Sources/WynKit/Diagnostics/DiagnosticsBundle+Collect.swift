@@ -449,6 +449,14 @@ extension DiagnosticsBundle {
         let flagLines = flags.split(whereSeparator: \.isNewline)
         if flagLines.isEmpty { lines.append("  (none)") }
         for flag in flagLines { lines.append("  \(flag)") }
+        // What Connect itself logged it started with. Build 10 wrote the
+        // files right and still started some launches as Apple M4.
+        let log = readText(installDir.appending(path: "logs").appending(path: "launcher_log.txt")) ?? ""
+        let used = ConnectLauncher.connectCommandLine(log: log)
+        lines.append("flags of the last start (Connect's log): \(used ?? "none logged")")
+        if let used, used.contains("--use-angle") {
+            lines.append("  ^ pins an ANGLE backend: its WebGL GPU name can read as Apple M4")
+        }
         let dxvk = ["d3d11.dll", "dxgi.dll"].allSatisfy {
             fm.fileExists(atPath: installDir.appending(path: $0).path(percentEncoded: false))
         }

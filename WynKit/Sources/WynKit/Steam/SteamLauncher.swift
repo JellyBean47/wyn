@@ -570,6 +570,9 @@ public enum SteamLauncher {
         if !isSteamClientRunning(in: bottle) {
             registerHostSteamLibraries(in: bottle)
         }
+        // A Ubisoft game started from Steam starts Connect itself, with the
+        // flags in Connect's args files. Make them the ones Wyn uses.
+        ConnectLauncher.refreshArgsFiles(in: bottle)
 
         let plan = try makeSteamLaunchPlan(
             in: bottle,

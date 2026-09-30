@@ -15,14 +15,16 @@
 //  You should have received a copy of the GNU General Public License along with Wyn.
 //  If not, see https://www.gnu.org/licenses/.
 //
-//  Ubisoft Connect CEF paints on Libraries.steam (Wine 11.0 / dxmt-wine11.0)
-//  via FLY4 StretchBlt replay. FLY_COCOA_FAST is EA-titled only and is not
-//  this path.
+//  Every Connect start on the bundled runtime is a game-host start: winecx,
+//  Wine's builtin d3d11/dxgi, `cefArgs`, no FLY4. Its login form paints
+//  (measured 30 Sep 2026 on a fresh bottle, with and without Steam running).
+//  FLY4 StretchBlt replay with SwiftShader WebGL is kept only for a Wyn 1.0
+//  install whose Libraries.steam is a separate frankea tree (`StartPath`).
 //
-//  Odyssey (and any `requiresUbisoftConnect` title) also needs `upc.exe` on
-//  the *game-host* wineserver for D3DMetal play. That UI may be transparent
-//  (no FLY4); game readiness requires account-startup evidence. Do not
-//  wineserver -k a Logged-On session to start Connect.
+//  Odyssey (and any `requiresUbisoftConnect` title) needs `upc.exe` on the
+//  game-host wineserver for D3DMetal play; game readiness requires
+//  account-startup evidence. Do not wineserver -k a Logged-On session to
+//  start Connect.
 //
 
 import Darwin
@@ -48,6 +50,7 @@ public enum ConnectLauncher {
     /// | `=swiftshader-webgl` (≤ build 9) | `ANGLE (Apple, Vulkan … Apple M4 …, MoltenVK)` | blocked, first attempt of a fresh bottle, 29 Sep 21:46 |
     /// | no `--use-angle`, DXVK     | `ANGLE (Apple, Apple M4 … Direct3D11 …)`     | blocked (profile already flagged) |
     /// | no `--use-angle`, builtin  | `ANGLE (NVIDIA, NVIDIA GeForce 8800 GTX Direct3D9Ex …)` | **signed in**, fresh profile, 30 Sep 09:46 |
+    /// | `=swiftshader-webgl` (build 10 cold start, see `StartPath`) | Apple M4 again | blocked, first attempt of a fresh install, 30 Sep 21:48 |
     ///
     /// The 09:46 sign-in also had the correct time zone (`TZ` set for that one
     /// test; see `Documentation/ubisoft-connect.md`) and ran on another network.
@@ -65,12 +68,45 @@ public enum ConnectLauncher {
         "--use-gl=angle"
     ]
 
-    // Same flags as Tools/present-parent-native-run.sh. `--disable-gpu` makes
-    // CEF spawn a gpu-process with `--use-gl=disabled`, ANGLE then fails
-    // MoltenVK (no VK_KHR_win32_surface), StretchBlt never fires, FLY4 stays
-    // empty, and the HWND is transparent. `--in-process-gpu` + SwiftShader is
-    // the path that produced FAST blit/s≈100 on 9 Sep.
-    static let fly4CefArgs = cefArgs + ["--use-angle=swiftshader-webgl"]
+    /// Wyn 1.0's frankea tree only. Same flags as
+    /// Tools/present-parent-native-run.sh. `--disable-gpu` makes CEF spawn a
+    /// gpu-process with `--use-gl=disabled`, ANGLE then fails MoltenVK (no
+    /// VK_KHR_win32_surface), StretchBlt never fires, FLY4 stays empty, and
+    /// the HWND is transparent. `--in-process-gpu` + SwiftShader is the path
+    /// that produced FAST blit/s≈100 on 9 Sep. Its WebGL name is Apple M4, so
+    /// the bundled runtime must never use it.
+    static let legacyFLY4CefArgs = cefArgs + ["--use-angle=swiftshader-webgl"]
+
+    /// How Connect is started, and with which flags.
+    ///
+    /// Build 10 applied `cefArgs` only when Steam's wineserver was already up.
+    /// A start with nothing running took the FLY4 path, because the bundled
+    /// runtime's "Steam tree" is the game tree and that path only asked
+    /// whether a wineserver was up. So a fresh install, where the Connect tile
+    /// comes before Steam runs, still started Connect as Apple M4, and its
+    /// first login was blocked (30 Sep 2026, 21:48). The choice now depends on
+    /// which Wine exists, not on what happens to be running.
+    enum StartPath: Equatable {
+        /// winecx (the bundled runtime, or Wyn 1.0 with Steam already up on
+        /// it): `cefArgs`, builtin d3d11/dxgi, no FLY4. The login form paints.
+        case gameHost
+        /// Wyn 1.0 with a separate frankea `Libraries.steam` and nothing
+        /// running on the game tree: FLY4 with `legacyFLY4CefArgs`.
+        case legacyFLY4
+    }
+
+    static func startPath(steamTreeIsGameTree: Bool, gameHostWineserverUp: Bool) -> StartPath {
+        steamTreeIsGameTree || gameHostWineserverUp ? .gameHost : .legacyFLY4
+    }
+
+    static func cefArgs(for path: StartPath) -> [String] {
+        path == .gameHost ? cefArgs : legacyFLY4CefArgs
+    }
+
+    /// What Wyn writes to devargs.txt, testargs.txt and webcore_args.txt.
+    static func argsFileText(for path: StartPath) -> String {
+        cefArgs(for: path).joined(separator: "\n") + "\n"
+    }
 
     private static let attempts = 6
     // CEF can take over a minute to reach StartView on a fresh cache.
@@ -167,20 +203,28 @@ public enum ConnectLauncher {
 
         // Same prefix as Logged-On Steam on game-host Wine. Do not drain
         // the bottle — wineserver -k would kill Steam.
-        if SteamLauncher.isBottleWineserverFromTree(in: bottle, tree: .game) {
+        let gameHostUp = SteamLauncher.isBottleWineserverFromTree(in: bottle, tree: .game)
+        let path = startPath(steamTreeIsGameTree: WynWineInstaller.steamTreeIsGameTree,
+                             gameHostWineserverUp: gameHostUp)
+        if path == .gameHost {
             guard WynWineInstaller.isWineInstalled(for: .game) else {
                 throw PlatformLaunchError.wineTreeMissing(.game)
             }
-            LaunchProgress.emit(
-                "Ubisoft Connect: attaching upc.exe to the game-host wineserver (UI may be transparent)."
-            )
-            try prepareConnectFiles(in: bottle, fly4: false)
+            LaunchProgress.emit(gameHostUp
+                ? "Ubisoft Connect: starting beside Steam…"
+                : "Ubisoft Connect: starting…")
+            try prepareConnectFiles(in: bottle, path: .gameHost)
             let (logURL, offset) = launcherLogPosition(in: bottle)
             let spawnedAt = Date()
-            try spawnConnect(in: bottle, wineTree: .game, injectPresent: false)
-            try await waitForWindow(in: bottle, logURL: logURL, offset: offset,
-                                    requirePaintedFrame: false, requireAuthentication: true,
-                                    botCheckSince: spawnedAt)
+            try spawnConnect(in: bottle, path: .gameHost)
+            if purpose == .game {
+                try await waitForWindow(in: bottle, logURL: logURL, offset: offset,
+                                        requirePaintedFrame: false, requireAuthentication: true,
+                                        botCheckSince: spawnedAt)
+            } else {
+                try await waitForShell(logURL: logURL, offset: offset)
+            }
+            warnIfAngleBackendPinned(log: logTail(logURL, offset: offset))
             if purpose == .game { try await settleAfterSignIn(in: bottle) }
             return
         }
@@ -194,11 +238,11 @@ public enum ConnectLauncher {
 
         let frankeaUp = SteamLauncher.isBottleWineserverFromTree(in: bottle, tree: .steam)
         if frankeaUp {
-            try prepareConnectFiles(in: bottle, fly4: true)
+            try prepareConnectFiles(in: bottle, path: .legacyFLY4)
             unlinkFLY4()
             let (logURL, offset) = launcherLogPosition(in: bottle)
             let spawnedAt = Date()
-            try spawnConnect(in: bottle, wineTree: .steam, injectPresent: true)
+            try spawnConnect(in: bottle, path: .legacyFLY4)
             try await waitForWindow(in: bottle, logURL: logURL, offset: offset,
                                     requirePaintedFrame: true, requireAuthentication: purpose == .game,
                                     botCheckSince: spawnedAt)
@@ -241,11 +285,11 @@ public enum ConnectLauncher {
 
     private static func coldStartAttempt(in bottle: Bottle, purpose: LaunchPurpose) async throws {
         await drainConnect(in: bottle)
-        try prepareConnectFiles(in: bottle, fly4: true)
+        try prepareConnectFiles(in: bottle, path: .legacyFLY4)
         unlinkFLY4()
         let (logURL, offset) = launcherLogPosition(in: bottle)
         let spawnedAt = Date()
-        try spawnConnect(in: bottle, wineTree: .steam, injectPresent: true)
+        try spawnConnect(in: bottle, path: .legacyFLY4)
         try await waitForWindow(in: bottle, logURL: logURL, offset: offset,
                                 requirePaintedFrame: true, requireAuthentication: purpose == .game,
                                 botCheckSince: spawnedAt)
@@ -263,11 +307,9 @@ public enum ConnectLauncher {
         return (logURL, offset)
     }
 
-    private static func spawnConnect(
-        in bottle: Bottle,
-        wineTree: WineTree,
-        injectPresent: Bool
-    ) throws {
+    private static func spawnConnect(in bottle: Bottle, path: StartPath) throws {
+        let wineTree: WineTree = path == .gameHost ? .game : .steam
+        let injectPresent = path == .legacyFLY4
         let dylibs: (epi: URL, inject: URL)?
         if injectPresent {
             guard let present = presentDylibs() else {
@@ -332,7 +374,7 @@ public enum ConnectLauncher {
         args.append(contentsOf: assignments)
         args.append(wine)
         args.append("upc.exe")
-        args.append(contentsOf: injectPresent ? fly4CefArgs : cefArgs)
+        args.append(contentsOf: cefArgs(for: path))
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/arch")
@@ -418,6 +460,43 @@ public enum ConnectLauncher {
             try? await Task.sleep(nanoseconds: 3_000_000_000)
         }
         return latestBotCheck(in: bottle, since: since)?.check == .blocked
+    }
+
+    /// A start for sign-in is done when Connect's shell is up: its login form
+    /// paints on the game-host tree, so there is nothing else to wait for
+    /// here. Whether the person then signs in is `awaitSignIn`'s question.
+    private static func waitForShell(logURL: URL, offset: Int) async throws {
+        for second in 1...startViewTimeoutSeconds {
+            try Task.checkCancellation()
+            try await Task.sleep(nanoseconds: 1_000_000_000)
+            switch startupStatus(log: logTail(logURL, offset: offset), elapsedSeconds: second,
+                                 isRunning: PlatformCatalog.isRunning(.ubisoft), hasFrame: true) {
+            case .ready: return
+            case .waiting: continue
+            case .failed: throw PlatformLaunchError.connectWedged
+            }
+        }
+        throw PlatformLaunchError.connectWedged
+    }
+
+    /// The flags Connect says it started with: its own command line merged
+    /// with the args files, from the newest `Command line:` line.
+    static func connectCommandLine(log: String) -> String? {
+        guard let line = log.components(separatedBy: "\n")
+            .last(where: { $0.contains("Command line:") }),
+            let marker = line.range(of: "Command line:") else { return nil }
+        return line[marker.upperBound...].trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Build 10 shipped a start that still pinned an ANGLE backend, and only
+    /// Ubisoft noticed. Connect logs the flags it really used, so say so when
+    /// a game-host start has one, rather than trusting what Wyn meant to pass.
+    private static func warnIfAngleBackendPinned(log: String) {
+        guard let flags = connectCommandLine(log: log), flags.contains("--use-angle") else { return }
+        LaunchProgress.emit(
+            "Ubisoft Connect: warning: it started with an ANGLE backend pinned (\(flags)). "
+                + "Ubisoft's bot check may refuse its sign-in. Please send Wyn's diagnostics."
+        )
     }
 
     enum StartupStatus { case waiting, ready, failed }
@@ -513,11 +592,72 @@ public enum ConnectLauncher {
     /// Rename (never delete) Connect's browser profile so the next start builds a
     /// fresh one. Recovered a blocked web sign-in by hand on 15 Sep 2026.
     @discardableResult
-    static func parkBrowserCache(in bottle: Bottle, at date: Date = Date()) throws -> URL? {
+    static func parkBrowserCache(in bottle: Bottle, at date: Date = Date(),
+                                 name: (Date) -> String = parkedCacheName) throws -> URL? {
         guard let cache = browserCacheDirectory(in: bottle) else { return nil }
-        let parked = cache.deletingLastPathComponent().appending(path: parkedCacheName(at: date))
+        let parked = cache.deletingLastPathComponent().appending(path: name(date))
         try FileManager.default.moveItem(at: cache, to: parked)
         return parked
+    }
+
+    /// Named for the block it holds, so it is never mistaken for a profile
+    /// someone parked by hand.
+    static func blockedCacheName(at date: Date) -> String {
+        parkedCacheName(at: date).replacingOccurrences(of: "http2.parked-", with: "http2.blocked-")
+    }
+
+    /// Whether the next start needs a new browser profile.
+    ///
+    /// A hard block leaves DataDome's `datadome` cookie in the profile, and
+    /// DataDome recognises it on any network: on 29 Sep 2026 every retest
+    /// that reused one flagged profile was blocked, on three networks, and
+    /// the sign-in that passed (30 Sep 09:46) came from a fresh profile. So a
+    /// start after a block, with no sign-in saved since, must not reuse it.
+    /// A saved sign-in newer than the block means the profile got through.
+    static func profileNeedsReplacing(lastBotCheck: (date: Date, check: BotCheck)?,
+                                      savedSignInModified: Date?) -> Bool {
+        guard let last = lastBotCheck, last.check == .blocked else { return false }
+        guard let saved = savedSignInModified else { return true }
+        return saved < last.date
+    }
+
+    /// Park the profile when `profileNeedsReplacing` says so. Runs only on a
+    /// start the person asked for, never as a retry: each fresh profile is
+    /// one more new device to DataDome. The saved sign-in is outside the
+    /// profile and is not touched.
+    @discardableResult
+    static func replaceBlockedProfile(in bottle: Bottle) throws -> URL? {
+        guard let block = latestBotCheck(in: bottle, since: .distantPast),
+              profileNeedsReplacing(lastBotCheck: block,
+                                    savedSignInModified: savedSignIn(in: bottle)?.modified)
+        else { return nil }
+        guard let parked = try parkBrowserCache(in: bottle, at: block.date, name: blockedCacheName)
+        else { return nil }
+        LaunchProgress.emit(
+            "Ubisoft Connect: Ubisoft's bot check blocked the last sign-in, and that block stays "
+                + "with Connect's browser profile. Starting with a fresh one (the old one is kept as "
+                + "\(parked.lastPathComponent))."
+        )
+        return parked
+    }
+
+    /// `ConnectSecureStorage.dat`: what "Keep me logged in" saves. It sits
+    /// beside the browser profile, not in it, and its contents are never read.
+    static func savedSignIn(in bottle: Bottle) -> (bytes: Int, modified: Date)? {
+        let fm = FileManager.default
+        let usersRoot = bottle.url.appending(path: "drive_c").appending(path: "users")
+        guard let users = try? fm.contentsOfDirectory(at: usersRoot, includingPropertiesForKeys: nil)
+        else { return nil }
+        for user in users where user.lastPathComponent != "Public" {
+            let store = user.appending(path: "AppData").appending(path: "Local")
+                .appending(path: connectProfileLeaf).appending(path: "ConnectSecureStorage.dat")
+            if let attrs = try? fm.attributesOfItem(atPath: store.path(percentEncoded: false)),
+               let bytes = (attrs[.size] as? NSNumber)?.intValue,
+               let modified = attrs[.modificationDate] as? Date {
+                return (bytes, modified)
+            }
+        }
+        return nil
     }
 
     /// What Ubisoft's bot check (DataDome) showed on Connect's sign-in page.
@@ -644,21 +784,13 @@ public enum ConnectLauncher {
         var ownership: String?
         if case .failed(let code) = ownershipStatus(log: log) { ownership = code }
 
-        var bytes: Int?
-        var modified: Date?
-        let fm = FileManager.default
-        if let cache = browserCacheDirectory(in: bottle) {
-            let store = cache.deletingLastPathComponent().deletingLastPathComponent()
-                .appending(path: "ConnectSecureStorage.dat")
-            if let attrs = try? fm.attributesOfItem(atPath: store.path(percentEncoded: false)) {
-                bytes = (attrs[.size] as? NSNumber)?.intValue
-                modified = attrs[.modificationDate] as? Date
-            }
-        }
+        // Found without the browser profile: a parked or not-yet-created
+        // profile says nothing about whether a sign-in is saved.
+        let store = savedSignIn(in: bottle)
         let botCheck = latestBotCheck(in: bottle, since: .distantPast)
         return State(isRunning: PlatformCatalog.isRunning(.ubisoft),
                      signedInAt: signedInAt, ownership: ownership,
-                     hasSignInStore: bytes != nil, storeBytes: bytes, storeModified: modified,
+                     hasSignInStore: store != nil, storeBytes: store?.bytes, storeModified: store?.modified,
                      lastBotCheck: botCheck?.check, lastBotCheckAt: botCheck?.date)
     }
 
@@ -682,22 +814,48 @@ public enum ConnectLauncher {
             LaunchProgress.emit("  Restore it by renaming that directory back to http2.")
         }
         try await launch(in: bottle, purpose: .signIn)
+        guard try await awaitSignIn(in: bottle, waitSeconds: waitSeconds) == .signedIn else {
+            throw PlatformLaunchError.connectSignInUnconfirmed
+        }
+        return state(in: bottle)
+    }
 
+    /// The Ubisoft Connect tile. Opens Connect and stays with it until it has
+    /// signed in, Ubisoft's bot check has blocked it, or the person closes
+    /// it. Build 10's tile returned once the window was up, so a block was
+    /// left on screen with nothing from Wyn to explain it.
+    public static func openForSignIn(in bottle: Bottle, waitSeconds: Int = 600) async throws {
+        let wasRunning = PlatformCatalog.isRunning(.ubisoft)
+        try await launch(in: bottle, purpose: .signIn)
+        if wasRunning { return }
+        if try await awaitSignIn(in: bottle, waitSeconds: waitSeconds) == .signedIn {
+            LaunchProgress.emit("Ubisoft Connect: signed in.")
+        }
+    }
+
+    enum SignInWait: Equatable { case signedIn, closed, stillOpen }
+
+    /// Wait for the running Connect to sign in. Throws
+    /// `connectBlockedByUbisoft` on a hard block.
+    private static func awaitSignIn(in bottle: Bottle, waitSeconds: Int) async throws -> SignInWait {
         // The previous session's account line is still in the log, so require
         // one from the process that is running now.
         let (logURL, _) = launcherLogPosition(in: bottle)
         for second in 1...max(1, waitSeconds) {
             try Task.checkCancellation()
             let running = PlatformCatalog.isRunning(.ubisoft)
-            guard running else { break }
+            guard running else { return .closed }
             if let startedAt = runningConnectStartDate(),
                authenticationStatus(log: logTail(logURL, offset: 0), elapsedSeconds: second,
                                     isRunning: running, processStartedAt: startedAt) == .ready {
-                return state(in: bottle)
+                return .signedIn
             }
             if second % 3 == 0, let startedAt = runningConnectStartDate(),
                latestBotCheck(in: bottle, since: startedAt)?.check == .blocked {
                 throw PlatformLaunchError.connectBlockedByUbisoft
+            }
+            if second == 20 {
+                LaunchProgress.emit("Ubisoft Connect: sign in in Connect's window. Wyn is waiting…")
             }
             try await Task.sleep(nanoseconds: 1_000_000_000)
         }
@@ -705,7 +863,7 @@ public enum ConnectLauncher {
            await blockedWithinHistoryCommitDelay(in: bottle, since: startedAt) {
             throw PlatformLaunchError.connectBlockedByUbisoft
         }
-        throw PlatformLaunchError.connectSignInUnconfirmed
+        return .stillOpen
     }
 
     static func launcherTimestamp(_ line: String) -> Date? {
@@ -962,13 +1120,36 @@ public enum ConnectLauncher {
         }
     }
 
-    private static func prepareConnectFiles(in bottle: Bottle, fly4: Bool) throws {
+    /// Connect reads these on every start, including starts Wyn does not
+    /// make: Steam starting a Ubisoft game, or the game starting Connect.
+    private static func writeArgsFiles(in bottle: Bottle, path: StartPath) throws {
+        let data = Data(argsFileText(for: path).utf8)
+        let uc = installDirectory(in: bottle)
+        for name in ["devargs.txt", "testargs.txt", "webcore_args.txt"] {
+            try data.write(to: uc.appending(path: name))
+        }
+    }
+
+    /// Rewrite Connect's args files before Steam starts, so a Connect that
+    /// Steam or a game starts gets the same flags as one Wyn starts. Builds 9
+    /// and 10 left `--use-angle=swiftshader-webgl` in them. Bundled runtime
+    /// only: a Wyn 1.0 frankea tree keeps whatever its FLY4 start wrote.
+    public static func refreshArgsFiles(in bottle: Bottle) {
+        guard WynWineInstaller.steamTreeIsGameTree,
+              FileManager.default.fileExists(atPath: exeURL(in: bottle).path(percentEncoded: false)),
+              !PlatformCatalog.isRunning(.ubisoft) else { return }
+        removeDXVKFromConnect(in: bottle)
+        try? writeArgsFiles(in: bottle, path: .gameHost)
+    }
+
+    private static func prepareConnectFiles(in bottle: Bottle, path: StartPath) throws {
         let fm = FileManager.default
         let uc = installDirectory(in: bottle)
 
         // Before anything else: make sure the Windows user this launch will
         // resolve to can see the account we are already signed in as.
         shareConnectProfileAcrossWineUsers(in: bottle)
+        try replaceBlockedProfile(in: bottle)
         let real = uc.appending(path: "UplayWebCore_real.exe")
         let web = uc.appending(path: "UplayWebCore.exe")
         if fm.fileExists(atPath: real.path(percentEncoded: false)) {
@@ -979,12 +1160,7 @@ public enum ConnectLauncher {
         try? fm.removeItem(at: uc.appending(path: "version_wine.dll"))
 
         removeDXVKFromConnect(in: bottle)
-
-        let argsText = (fly4 ? fly4CefArgs : cefArgs).joined(separator: "\n") + "\n"
-        let data = Data(argsText.utf8)
-        for name in ["devargs.txt", "testargs.txt", "webcore_args.txt"] {
-            try data.write(to: uc.appending(path: name))
-        }
+        try writeArgsFiles(in: bottle, path: path)
 
         // ANGLE/SwiftShader LoadLibrary(d3dcompiler_47) fails with 126 on the
         // 190 KB Wine stub in system32. Steam ships the real 4.7 MB compiler.

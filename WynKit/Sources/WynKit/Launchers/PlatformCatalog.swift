@@ -116,10 +116,12 @@ public enum PlatformLaunchError: LocalizedError, Sendable {
             return """
             Ubisoft blocked this sign-in. Connect is showing Ubisoft's \
             "Access is temporarily restricted" page: its bot protection (DataDome) \
-            refused the login request. This is not a Wyn or Wine error, and \
-            retrying straight away gets the same page. Close Ubisoft Connect and \
-            try again later. With "Keep me logged in" ticked, a successful \
-            sign-in is remembered, so later starts usually skip this page.
+            refused the login request, and retrying straight away gets the same page. \
+            Close Ubisoft Connect. The next time you open it, Wyn starts it with a \
+            fresh browser profile, because the block stays with the old one. \
+            Try again later, or once from another network (a phone hotspot works). \
+            With "Keep me logged in" ticked, a successful sign-in is remembered, \
+            so later starts skip this page on any network.
             """
         case .connectOwnershipUnavailable:
             return """
@@ -566,7 +568,7 @@ public enum PlatformCatalog {
             options.detachAfterStart = true
             try await SteamLauncher.launchSteam(in: bottle, options: options)
         case .ubisoft:
-            try await ConnectLauncher.launch(in: bottle, purpose: .signIn)
+            try await ConnectLauncher.openForSignIn(in: bottle)
         case .rockstar:
             try await RockstarLauncher.launch(in: bottle)
         case .epic, .gog:

@@ -1596,10 +1596,12 @@ extension WynCLI {
             wyn connect signin [--fresh-browser-cache]
                 Opens Connect for an interactive sign-in and waits for its \
                 account line. It stops early, and says so, if Ubisoft's bot check \
-                blocks the login. --fresh-browser-cache renames Connect's browser \
-                profile first (never deletes it). That does not get past the \
-                block: a brand-new profile was blocked on its first login on \
-                29 Sep 2026. Saved credentials are untouched.
+                blocks the login. After a block, the next start gets a fresh \
+                browser profile by itself, because the block stays with the old \
+                one; the old one is renamed, never deleted. \
+                --fresh-browser-cache renames the profile even without a block. \
+                A fresh profile alone does not get past a block. Saved \
+                credentials are untouched.
             """,
             subcommands: [ConnectStatus.self, ConnectSignIn.self],
             defaultSubcommand: ConnectStatus.self
@@ -1661,7 +1663,8 @@ extension WynCLI {
                 if state.lastBotCheck == .blocked {
                     print("The last sign-in hit Ubisoft's \"Access is temporarily restricted\" page:")
                     print("its bot protection (DataDome) refused the login. Retrying straight away")
-                    print("gets the same page, so try again later.")
+                    print("gets the same page, so try again later, or once from another network.")
+                    print("The next start uses a fresh browser profile, because the block stays with the old one.")
                 }
             } else {
                 print("Ready for a game launch.")
