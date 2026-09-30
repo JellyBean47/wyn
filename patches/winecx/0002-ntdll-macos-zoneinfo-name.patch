@@ -1,0 +1,57 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: JellyBean47 <ebenjohn82@gmail.com>
+Date: Wed, 30 Sep 2026 22:30:00 +0200
+Subject: [PATCH 2/2] ntdll: Name the time zone from macOS's /etc/localtime
+ link.
+
+get_system_config_tz_info only takes the zone name from /etc/localtime
+when its real path starts with /usr/share/zoneinfo. On macOS the link
+resolves into a versioned tzdata tree,
+/private/var/db/timezone/tz/2026c.1.0/zoneinfo/Africa/Johannesburg, so
+the name was never used. get_timezone_info then fell back to
+find_reg_tz_info, which returns the first registry zone whose rules
+match: every zone that shares its offset and DST rules with an
+alphabetically earlier one is misnamed. Africa/Johannesburg became
+"Kaliningrad Standard Time" (Europe/Kaliningrad to Chromium's Intl),
+Europe/Berlin became Budapest's zone.
+
+Take the name from whatever follows "/zoneinfo/" when the path is not
+under default_tzinfo_dir. get_tz_info_from_zoneinfo_name still checks
+that the zone file exists under TZDIR or /usr/share/zoneinfo and maps it
+through Wine's "TZ Mapping" key, and get_timezone_info still discards
+the result unless its rules match the current offset, so a wrong guess
+falls back exactly as before.
+
+Setting TZ instead is not a fix: msvcrt and ucrtbase parse it with
+Windows syntax (tzn[+|-]hh[:mm]), and "Africa/Johannesburg" moved
+Ubisoft Connect's log clock by an hour.
+---
+ dlls/ntdll/unix/system.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/dlls/ntdll/unix/system.c b/dlls/ntdll/unix/system.c
+index dab9483..185dd6b 100644
+--- a/dlls/ntdll/unix/system.c
++++ b/dlls/ntdll/unix/system.c
+@@ -3080,9 +3080,15 @@ static BOOL get_system_config_tz_info( RTL_DYNAMIC_TIME_ZONE_INFORMATION *tzi, i
+ 
+     if (!realpath( "/etc/localtime", path )) return FALSE;
+     len = sizeof( default_tzinfo_dir ) - 1;
+-    if (strncmp( path, default_tzinfo_dir, len )) return FALSE;
+-    if (path[len] != '/') return FALSE;
+-    return get_tz_info_from_zoneinfo_name( tzi, path + len + 1, year );
++    if (!strncmp( path, default_tzinfo_dir, len ) && path[len] == '/')
++        return get_tz_info_from_zoneinfo_name( tzi, path + len + 1, year );
++    /* macOS links /etc/localtime into a versioned tzdata tree, e.g.
++     * /private/var/db/timezone/tz/2026c.1.0/zoneinfo/Africa/Johannesburg,
++     * which never starts with default_tzinfo_dir. The zone name is what
++     * follows "/zoneinfo/". */
++    if ((str = strstr( path, "/zoneinfo/" )))
++        return get_tz_info_from_zoneinfo_name( tzi, str + strlen( "/zoneinfo/" ), year );
++    return FALSE;
+ }
+ 
+ static LONG64 get_current_tz_bias(void)
+-- 
+2.54.0 (Apple Git-157)
+

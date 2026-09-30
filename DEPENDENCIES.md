@@ -116,6 +116,12 @@ binaries. See [Documentation/user/game-host.md](Documentation/user/game-host.md)
     called straight from Windows code. Fixes DOOM (2016) stopping at 91%:
     `GetCurrentFiber()` read the TSD's QoS class, 0x8ff. The patch's
     message has the measurements.
+  - `0002-ntdll-macos-zoneinfo-name.patch` (30 Sep 2026): names the time
+    zone from macOS's `/etc/localtime` link, which resolves under
+    `/private/var/db/timezone/…/zoneinfo/` rather than `/usr/share/zoneinfo`.
+    Without it Wine fell back to the first registry zone with matching rules
+    (Africa/Johannesburg became Kaliningrad), which Windows apps and their
+    web pages report, Ubisoft Connect's bot check included.
 - **Configure:** `ac_cv_func_pipe2=no`. The macOS 27 SDK declares `pipe2`
   (macOS 27.0 and later), configure found it, and `ntdll.so` weak-imported it
   unguarded — a call to address 0 on the first server pipe on macOS 15 and 26.

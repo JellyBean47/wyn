@@ -23,6 +23,7 @@
 #   dxmt      D3D11 device through native DXMT that presents; winemetal.so mapped
 #   vulkan    vulkan-1 → winevulkan → MoltenVK finds the GPU (id Tech titles)
 #   sdl       a winedevice process mapped winebus and libSDL2 (controllers)
+#   timezone  Windows code sees the Mac's own zone (patches/winecx/0002)
 #
 # Every check prints PASS or FAIL; the exit status is the number of failures.
 # KNOWN lines are measured and printed but not counted (none at the moment;
@@ -62,7 +63,7 @@ known() {  # name, condition-exit-status, detail — measured, not counted
 }
 
 echo "==> probes"
-for p in d3d12probe d3d11probe tlsprobe vkprobe gsprobe; do
+for p in d3d12probe d3d11probe tlsprobe vkprobe gsprobe tzprobe; do
   libs=()
   case "$p" in
     d3d12probe) libs=(-ld3d12 -ldxgi) ;;
@@ -122,6 +123,25 @@ run_probe() {  # label, exe, extra env...
   done
   wait "$wpid"
 }
+
+echo "==> timezone"
+# The zone Windows code sees must be the Mac's own. macOS links /etc/localtime
+# under /private/var/db/timezone/…/zoneinfo/, which Wine only understood from
+# patches/winecx/0002; before it, Africa/Johannesburg read as Kaliningrad.
+mac_zone="$(readlink /etc/localtime | sed 's#.*/zoneinfo/##')"
+want="$(awk -v zone="\"$mac_zone\"" '
+  /^\[Software\\\\Wine\\\\Time Zones\\\\TZ Mapping\]/ { on = 1; next }
+  /^\[/ { on = 0 }
+  on && index($0, zone "=") == 1 { sub(/^[^=]*="/, ""); sub(/"$/, ""); print; exit }
+' "$WINEPREFIX/system.reg")"
+"$T/bin/wine" "$WORK/tzprobe.exe" >"$WORK/tz.out" 2>/dev/null
+got="$(sed -n 's/^zone //p' "$WORK/tz.out" | tr -d '\r')"
+if [[ -n "$want" ]]; then
+  [[ "$got" == "$want" ]]
+  check timezone $? "Mac $mac_zone -> Windows \"$got\" (want \"$want\")"
+else
+  echo "SKIP  timezone  Mac $mac_zone has no Wine TZ Mapping entry; Windows says \"$got\""
+fi
 
 echo "==> https"
 "$T/bin/wine" "$WORK/tlsprobe.exe" >"$WORK/tls.out" 2>/dev/null

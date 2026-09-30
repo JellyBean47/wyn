@@ -18,6 +18,7 @@ message says what it changes and what was measured.
 | Patch | What |
 | --- | --- |
 | `0001-ntdll-macos-gsbase-mode.patch` | `%gs` is the TEB in Windows code (upstream's model) except in D3DMetal processes, which keep the pthread TSD. Fixes DOOM (2016) at 91%. `WINE_GSBASE=teb` or `tsd` pins the mode; `WINEDEBUG=+gsbase` logs it. |
+| `0002-ntdll-macos-zoneinfo-name.patch` | Takes the time zone name from macOS's `/etc/localtime` link (`…/zoneinfo/Africa/Johannesburg`), which never starts with `/usr/share/zoneinfo`. Without it every zone sharing rules with an alphabetically earlier one was misnamed (Johannesburg → Kaliningrad, Berlin → Budapest). Setting `TZ` is not a substitute: msvcrt/ucrtbase parse it with Windows syntax. |
 
 To change a patch: check out the pin, `git am` the series, edit, commit, and
 `git format-patch --zero-commit -N <pin>` back into this directory.
