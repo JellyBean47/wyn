@@ -38,7 +38,6 @@ Prefer titles already on disk. This Mac's Windows installs live on
 Installed catalog titles, verification order:
 
 1. Assassin's Creed Odyssey (`ac-odyssey`) — AnvilNext DX11, `launched`.
-   **Start from** [HANDOVER-20260909-ac-odyssey.md](HANDOVER-20260909-ac-odyssey.md).
    The game auths with **Steam and Ubisoft Connect**; `upc.exe` must be
    running on the same wineserver or `ACOdyssey.exe` sits idle with no
    window. 21:35 D3DMetal play attached Connect on GPTK and the Connect
