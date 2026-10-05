@@ -22,6 +22,7 @@ whisky-wine/
 # and Docs/ == docs/.
 HANDOFF.md
 Docs/HANDOVER-*
+Documentation/HANDOVER-*
 Docs/PLAN-*
 Docs/BLUEPRINT-*
 Docs/XBOX-*

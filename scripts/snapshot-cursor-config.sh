@@ -26,7 +26,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BOTTLE="${WYN_BOTTLE:-$HOME/Library/Containers/com.fly.gaming/Bottles/7F5EE61C-CFB8-42B4-BFCA-2B6CDE901A4A}"
 OUT_ROOT="${WYN_CURSOR_SNAP:-$ROOT/.scratch/foss-gptk-observe/cursor-ab/snapshots}"
 USER_WIN="${WYN_WINE_USER:-crossover}"
-STEAM_ACCOUNT="${WYN_STEAM_ACCOUNT:-1820256332}"
+STEAM_ACCOUNT="${WYN_STEAM_ACCOUNT:-}"
 APP_ID="${WYN_STEAM_APP:-526870}"
 SAVED="$BOTTLE/drive_c/users/$USER_WIN/AppData/Local/FactoryGame/Saved"
 GUS="$SAVED/Config/Windows/GameUserSettings.ini"
@@ -36,6 +36,13 @@ SYSTEM_REG="$BOTTLE/system.reg"
 DEBUGUI="$SAVED/DebugUI/Settings.data"
 SERVERMGR="$SAVED/SaveGames/ServerManager_V2.sav"
 STEAM_ROOT="$BOTTLE/drive_c/Program Files (x86)/Steam"
+# Steam names each userdata/ directory after the account. Take the first one
+# in the bottle; set WYN_STEAM_ACCOUNT when it holds more than one.
+if [[ -z "$STEAM_ACCOUNT" ]]; then
+  for d in "$STEAM_ROOT"/userdata/[1-9]*/; do
+    if [[ -d "$d" ]]; then STEAM_ACCOUNT="$(basename "$d")"; break; fi
+  done
+fi
 STATS="$STEAM_ROOT/appcache/stats/UserGameStats_${STEAM_ACCOUNT}_${APP_ID}.bin"
 REMOTECACHE="$STEAM_ROOT/userdata/${STEAM_ACCOUNT}/${APP_ID}/remotecache.vdf"
 LOCALCONFIG="$STEAM_ROOT/userdata/${STEAM_ACCOUNT}/config/localconfig.vdf"

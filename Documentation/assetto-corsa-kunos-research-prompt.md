@@ -97,7 +97,7 @@ Each step unblocked the next. Do not re-solve a solved step.
 2. **~20:05** `Could not load file or assembly 'CEF3'` (lives in
    `launcher/support`).
 3. **~20:12** **Got a window.** Log: `Initializing Steam: True`,
-   Steam ID `76561199780522060`, CEF already passed `--disable-gpu`,
+   Steam ID `…`, CEF already passed `--disable-gpu`,
    `--disable-gpu-compositing`, `--no-sandbox`,
    `remote-debugging-port=30150`, then `Create main window`, then
    `XamlParseException` in `ControllerSetupSlimDX` because Wine Mono
